@@ -1,0 +1,12 @@
+:80 {
+  encode gzip zstd
+
+  @api path /api/* /docs* /ws*
+  handle @api {
+    reverse_proxy api:3000
+  }
+
+  handle {
+    respond "Elysia API Gateway is running." 200
+  }
+}
