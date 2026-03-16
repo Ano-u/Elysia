@@ -1,0 +1,171 @@
+@import "tailwindcss";
+
+@theme {
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: var(--background);
+  --color-foreground: hsl(var(--foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  /* Elysia Theme Colors */
+  --color-elysia-ice: var(--elysia-ice);
+  --color-elysia-mist: var(--elysia-mist);
+  --color-elysia-coral: var(--elysia-coral);
+  --color-elysia-gold: var(--elysia-gold);
+}
+
+@layer base {
+  :root {
+    --background: var(--elysia-ice);
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --radius: 0.5rem;
+
+    /* Elysia Custom Theme Variables */
+    --elysia-ice: #F9FAFB;
+    --elysia-mist: #E0E7FF;
+    --elysia-coral: #FFE4E6;
+    --elysia-gold: #FEF08A;
+
+    /* Crystal & Liquid Textures */
+    --shadow-crystal: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+    --shadow-liquid: inset 0 0 20px rgba(255, 255, 255, 0.5), 0 8px 32px rgba(224, 231, 255, 0.2);
+    --shadow-glow: 0 0 20px rgba(254, 240, 138, 0.4);
+
+    /* Transitions */
+    --transition-main: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-sub: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .dark {
+    --background: 280 40% 6%;
+    --foreground: 310 30% 95%;
+
+    --card: 280 40% 8%;
+    --card-foreground: 310 30% 95%;
+
+    --popover: 280 40% 8%;
+    --popover-foreground: 310 30% 95%;
+
+    --primary: 310 80% 85%;
+    --primary-foreground: 280 40% 6%;
+
+    --secondary: 290 30% 15%;
+    --secondary-foreground: 310 30% 95%;
+
+    --muted: 290 30% 15%;
+    --muted-foreground: 310 20% 70%;
+
+    --accent: 310 40% 20%;
+    --accent-foreground: 310 30% 95%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 310 30% 95%;
+
+    --border: 290 30% 18%;
+    --input: 290 30% 18%;
+    --ring: 310 50% 50%;
+
+    /* Elysia Custom Theme Variables - Dark Mode */
+    --elysia-ice: #0F0A15;
+    --elysia-mist: #1A1325;
+    --elysia-coral: #2D1B2E;
+    --elysia-gold: #3D2B20;
+
+    /* Crystal & Liquid Textures - Dark Mode */
+    --shadow-crystal: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+    --shadow-liquid: inset 0 0 20px rgba(255, 180, 220, 0.1), 0 8px 32px rgba(200, 100, 150, 0.15);
+    --shadow-glow: 0 0 20px rgba(255, 180, 220, 0.2);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-white/40 dark:bg-black/30 backdrop-blur-xl border border-white/60 dark:border-white/10;
+    box-shadow: var(--shadow-crystal);
+  }
+
+  .glass-panel-hover {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .glass-panel-hover:hover {
+    @apply bg-white/50 dark:bg-black/40 border-white/80 dark:border-white/20;
+    box-shadow: var(--shadow-liquid);
+  }
+
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  /* 隐藏滚动条但保留滚动功能 */
+  .hide-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+  }
+}
