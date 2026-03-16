@@ -1,0 +1,49 @@
+# 依赖与构建产物
+node_modules/
+dist/
+.turbo/
+.cache/
+coverage/
+
+# 环境变量与本地配置
+.env
+.env.*
+!.env.example
+
+# 日志
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 系统文件
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Cloudflare Tunnel 凭据
+cloudflared/credentials.json
+
+# 备份输出
+backups/
+# 临时与本地环境文件
+.DS_Store
+Thumbs.db
+*.log
+.env.local
+.env.*.local
+
+# Node / pnpm
+node_modules/
+pnpm-debug.log*
+
+# 构建产物
+dist/
+build/
+.vite/
