@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-set "ROOT=%~dp0"
+for %%I in ("%~dp0.") do set "ROOT=%%~fI"
 cd /d "%ROOT%"
 
 echo [Elysia] Starting one-click deployment...
@@ -87,13 +87,13 @@ if /I "!PM_MODE!"=="powershell" (
   start "Elysia Frontend" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -Command "Set-Location -LiteralPath '%ROOT%'; pnpm --filter frontend dev -- --host 127.0.0.1 --port !FRONTEND_PORT! --strictPort"
   start "Elysia Worker" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -Command "Set-Location -LiteralPath '%ROOT%'; pnpm worker"
 ) else if /I "!PM_MODE!"=="corepack" (
-  start "Elysia Backend" cmd /k "cd /d \"%ROOT%\" && corepack.cmd pnpm dev"
-  start "Elysia Frontend" cmd /k "cd /d \"%ROOT%\" && corepack.cmd pnpm --filter frontend dev -- --host 127.0.0.1 --port !FRONTEND_PORT! --strictPort"
-  start "Elysia Worker" cmd /k "cd /d \"%ROOT%\" && corepack.cmd pnpm worker"
+  start "Elysia Backend" cmd /k "cd /d ""%ROOT%"" && corepack.cmd pnpm dev"
+  start "Elysia Frontend" cmd /k "cd /d ""%ROOT%"" && corepack.cmd pnpm --filter frontend dev -- --host 127.0.0.1 --port !FRONTEND_PORT! --strictPort"
+  start "Elysia Worker" cmd /k "cd /d ""%ROOT%"" && corepack.cmd pnpm worker"
 ) else (
-  start "Elysia Backend" cmd /k "cd /d \"%ROOT%\" && pnpm.cmd dev"
-  start "Elysia Frontend" cmd /k "cd /d \"%ROOT%\" && pnpm.cmd --filter frontend dev -- --host 127.0.0.1 --port !FRONTEND_PORT! --strictPort"
-  start "Elysia Worker" cmd /k "cd /d \"%ROOT%\" && pnpm.cmd worker"
+  start "Elysia Backend" cmd /k "cd /d ""%ROOT%"" && pnpm.cmd dev"
+  start "Elysia Frontend" cmd /k "cd /d ""%ROOT%"" && pnpm.cmd --filter frontend dev -- --host 127.0.0.1 --port !FRONTEND_PORT! --strictPort"
+  start "Elysia Worker" cmd /k "cd /d ""%ROOT%"" && pnpm.cmd worker"
 )
 
 echo [Elysia] Done.
