@@ -189,4 +189,20 @@
   .hide-scrollbar::-webkit-scrollbar {
     display: none; /* Chrome, Safari and Opera */
   }
+
+  @keyframes bg-drift {
+    0%, 100% { transform: scale(1.02) translateX(0) translateY(0); }
+    50%      { transform: scale(1.06) translateX(-16px) translateY(12px); }
+  }
+
+  .animate-bg-drift {
+    animation: bg-drift 24s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-bg-drift {
+      animation: none;
+    }
+  }
 }

@@ -13,8 +13,6 @@ import {
 } from "../../lib/apiClient";
 import type { PublicationStatus, RecordSummary } from "../../types/api";
 
-const BRIDGE_BG_URL =
-  "https://img2-tc.tapimg.com/moment/etag/FpPUtSEl5fZvpOCCmhFVlWDqIFXr.png/_tap_ugc.jpg";
 const ONBOARDING_STORAGE_KEY = "elysia-warm-guide-v1";
 
 const STATUS_LABEL: Record<PublicationStatus, string> = {
@@ -342,49 +340,27 @@ export const HomeView: React.FC = () => {
 
   return (
     <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-20 sm:px-8">
-      {/* Background Video Layer */}
-      <video
-        ref={videoRef}
-        src={BACKGROUND_VIDEO_URL}
-        poster={BACKGROUND_PHOTO_URL}
-        autoPlay
-        muted
-        loop
-        playsInline
-        disablePictureInPicture
-        onLoadedMetadata={handleLoadedMetadata}
-        className="absolute inset-0 w-full h-full object-cover -z-10 opacity-40 dark:opacity-30 mix-blend-screen dark:mix-blend-lighten pointer-events-none"
-      />
-      <motion.div
+      {/* Background Video Layer — pure CSS animation for GPU compositing */}
+      <div
         aria-hidden
-        className="absolute inset-0 z-0"
-        animate={
-          reduceMotion
-            ? undefined
-            : {
-                scale: [1.02, 1.06, 1.02],
-                x: [0, -16, 0],
-                y: [0, 12, 0],
-              }
-        }
-        transition={
-          reduceMotion
-            ? undefined
-            : {
-                duration: 24,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }
-        }
-        style={{
-          backgroundImage: `url(${BRIDGE_BG_URL})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          filter: "saturate(0.95) brightness(1.08)",
-        }}
-      />
+        className={`absolute inset-0 z-0 overflow-hidden pointer-events-none ${reduceMotion ? '' : 'animate-bg-drift'}`}
+        style={{ filter: "saturate(0.95) brightness(1.08)" }}
+      >
+        <video
+          ref={videoRef}
+          src={BACKGROUND_VIDEO_URL}
+          poster={BACKGROUND_PHOTO_URL}
+          autoPlay
+          muted
+          loop
+          playsInline
+          disablePictureInPicture
+          onLoadedMetadata={handleLoadedMetadata}
+          className="h-full w-full object-cover"
+        />
+      </div>
 
-      <div className="absolute inset-0 z-[1] bg-gradient-to-b from-white/45 via-white/72 to-white/86 dark:from-slate-900/35 dark:via-slate-900/68 dark:to-slate-900/84" />
+      {/* <div className="absolute inset-0 z-[1] bg-gradient-to-b from-white/45 via-white/72 to-white/86 dark:from-slate-900/35 dark:via-slate-900/68 dark:to-slate-900/84" /> */}
       <div className="absolute inset-0 z-[2] pointer-events-none bg-[radial-gradient(circle_at_20%_14%,rgba(255,255,255,0.7),transparent_45%),radial-gradient(circle_at_82%_12%,rgba(255,231,242,0.52),transparent_38%),radial-gradient(circle_at_50%_90%,rgba(214,236,255,0.34),transparent_52%)]" />
       <div className="pointer-events-none absolute inset-x-[9%] top-[7%] z-[3] h-[53%] rounded-[44%_44%_8%_8%/58%_58%_8%_8%] border border-white/45 bg-gradient-to-b from-white/26 to-transparent dark:border-white/10 dark:from-white/5" />
       <div className="pointer-events-none absolute inset-x-[16%] top-[12%] z-[3] h-[43%] rounded-[42%_42%_8%_8%/56%_56%_8%_8%] border border-white/35 dark:border-white/8" />
