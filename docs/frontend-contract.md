@@ -12,6 +12,13 @@
   - `GET /api/auth/oidc/login`
   - `GET /api/auth/oidc/callback`
 
+本地联调门禁开关：
+
+- 环境变量 `ACCESS_GATE_BYPASS`：
+  - `true`：本地直接跳过“加入申请”门禁
+  - `false`：严格执行门禁
+  - `auto`（默认）：`NODE_ENV=development` 时跳过，其他环境不跳过
+
 ## 2. 首次准入申请（加入申请小作文）
 
 - 查询状态：`GET /api/access/application/status`
@@ -114,6 +121,11 @@
   }
 }
 ```
+
+### 3.4 Markdown 支持
+
+- `moodPhrase / quote / description / comment content` 支持 Markdown 基础语法（含 GFM 列表、表格、删除线等）。
+- 前端渲染默认禁用原始 HTML（`skipHtml`），防止注入风险。
 
 ## 4. 风控限制
 

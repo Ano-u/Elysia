@@ -63,6 +63,26 @@ describe("access and risk-control permission gates", () => {
     expect(reply.statusCode).toBeUndefined();
   });
 
+  it("allows local bypass when ACCESS_GATE_BYPASS=true", async () => {
+    const prev = process.env.ACCESS_GATE_BYPASS;
+    process.env.ACCESS_GATE_BYPASS = "true";
+    try {
+      const req = makeReq(makeUser({ accessStatus: "pending" }));
+      const reply = makeReply();
+
+      const allowed = await requireAccessApproved(req, reply);
+
+      expect(allowed?.id).toBe("user-1");
+      expect(reply.statusCode).toBeUndefined();
+    } finally {
+      if (prev === undefined) {
+        delete process.env.ACCESS_GATE_BYPASS;
+      } else {
+        process.env.ACCESS_GATE_BYPASS = prev;
+      }
+    }
+  });
+
   it("blocks when risk-control is active", async () => {
     const req = makeReq(
       makeUser({

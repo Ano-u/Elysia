@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { requireAccessApproved, requireNotInRiskControl } from "../src/lib/auth.js";
+
+vi.mock("../src/lib/db.js", () => ({
+  query: vi.fn(),
+}));
 
 function createReply() {
   const reply = {

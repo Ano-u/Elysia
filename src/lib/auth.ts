@@ -27,6 +27,18 @@ type UserRow = {
   risk_control_reason: string | null;
 };
 
+function shouldBypassAccessGate(): boolean {
+  const override = process.env.ACCESS_GATE_BYPASS;
+  if (override === "true") {
+    return true;
+  }
+  if (override === "false") {
+    return false;
+  }
+
+  return process.env.NODE_ENV === "development";
+}
+
 export async function resolveAuthUser(req: FastifyRequest): Promise<AuthUser | null> {
   const raw = req.cookies.elysia_user_id;
   const unsigned = raw ? req.unsignCookie(raw) : null;
@@ -110,6 +122,9 @@ export async function requireAccessApproved(req: FastifyRequest, reply: FastifyR
     return null;
   }
   if (user.role === "admin") {
+    return user;
+  }
+  if (shouldBypassAccessGate()) {
     return user;
   }
   if (user.accessStatus !== "approved") {
