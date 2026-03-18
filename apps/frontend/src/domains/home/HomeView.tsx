@@ -356,7 +356,7 @@ export const HomeView: React.FC = () => {
           playsInline
           disablePictureInPicture
           onLoadedMetadata={handleLoadedMetadata}
-          className="h-full w-full object-cover"
+          className="w-full h-full object-cover opacity-72 dark:opacity-10 mix-blend-screen dark:mix-blend-lighten pointer-events-none"
         />
       </div>
 
