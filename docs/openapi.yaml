@@ -1,0 +1,515 @@
+openapi: 3.1.0
+info:
+  title: Elysia API (Governance Extension)
+  version: 0.4.0
+  description: |
+    增量 OpenAPI（审核/风控/申诉/准入/自动串联/管理员接口）。
+servers:
+  - url: /api
+paths:
+  /access/application/status:
+    get:
+      summary: 查询准入申请状态
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessApplicationStatusResponse'
+  /access/application:
+    post:
+      summary: 提交准入申请
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [essay]
+              properties:
+                essay:
+                  type: string
+                  minLength: 10
+                  maxLength: 2000
+      responses:
+        '200':
+          description: 已提交
+        '409':
+          description: 重复提交或已通过
+  /me/auto-linking:
+    get:
+      summary: 查询自动串联同意设置
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutoLinkingPreference'
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      summary: 更新自动串联同意设置
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AutoLinkingPatchRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutoLinkingPatchResponse'
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /records/{id}/publish-status:
+    get:
+      summary: 查询发布状态
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublishStatusResponse'
+  /appeals/status:
+    get:
+      summary: 查询我的封禁与申诉状态
+      responses:
+        '200':
+          description: OK
+  /appeals:
+    post:
+      summary: 提交申诉（单封禁事件仅一次）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [banEventId, appealText]
+              properties:
+                banEventId:
+                  type: string
+                  format: uuid
+                appealText:
+                  type: string
+                  minLength: 10
+                  maxLength: 3000
+      responses:
+        '200':
+          description: OK
+        '409':
+          description: APPEAL_PENDING 或 APPEAL_USED
+  /admin/moderation/queue:
+    get:
+      summary: 管理员-审核队列
+      parameters:
+        - in: query
+          name: queueType
+          schema:
+            type: string
+            enum: [moderation, second_review, risk_control, access_application, appeal, media_review]
+        - in: query
+          name: queueStatus
+          schema:
+            type: string
+            enum: [open, claimed, resolved]
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        '200':
+          description: OK
+  /admin/moderation/records/{id}/decision:
+    post:
+      summary: 管理员-文本审核决策
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision:
+                  type: string
+                  enum: [approve, reject, needs_changes, second_review, risk_control]
+                note:
+                  type: string
+      responses:
+        '200':
+          description: OK
+  /admin/moderation/media/{id}/decision:
+    post:
+      summary: 管理员-图片审核决策
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision:
+                  type: string
+                  enum: [approve, reject]
+                note:
+                  type: string
+      responses:
+        '200':
+          description: OK
+  /admin/access/applications:
+    get:
+      summary: 管理员-准入申请池
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        '200':
+          description: OK
+  /admin/access/applications/{id}/approve:
+    post:
+      summary: 管理员-通过准入申请
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+  /admin/access/applications/{id}/reject:
+    post:
+      summary: 管理员-驳回准入申请
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+  /admin/risk-control/events:
+    get:
+      summary: 管理员-风控事件列表
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, released, warned, banned]
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        '200':
+          description: OK
+  /admin/risk-control/events/{id}/action:
+    post:
+      summary: 管理员-风控处置
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [release, warn, ban_temp, ban_permanent]
+                note:
+                  type: string
+                banHours:
+                  type: integer
+                ipHash:
+                  type: string
+      responses:
+        '200':
+          description: OK
+  /admin/bans:
+    get:
+      summary: 管理员-封禁中心列表
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, lifted]
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        '200':
+          description: OK
+  /admin/bans/{id}/lift:
+    post:
+      summary: 管理员-解封
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+  /admin/appeals:
+    get:
+      summary: 管理员-申诉列表
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        '200':
+          description: OK
+  /admin/appeals/{id}/approve:
+    post:
+      summary: 管理员-通过申诉
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+  /admin/appeals/{id}/reject:
+    post:
+      summary: 管理员-驳回申诉
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+  /admin/ai-review/config:
+    get:
+      summary: 管理员-获取 AI 审核配置
+      responses:
+        '200':
+          description: OK
+    put:
+      summary: 管理员-更新 AI 审核配置
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [baseUrl, endpointType, model]
+              properties:
+                baseUrl:
+                  type: string
+                apiKey:
+                  type: string
+                endpointType:
+                  type: string
+                  enum: [responses, completions]
+                model:
+                  type: string
+                isEnabled:
+                  type: boolean
+      responses:
+        '200':
+          description: OK
+  /admin/ai-review/scan-recent:
+    post:
+      summary: 管理员-扫描最近1小时公开文本申请
+      responses:
+        '200':
+          description: OK
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: string
+          nullable: true
+    AutoLinkingPreference:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          default: false
+        scope:
+          type: string
+          enum: [private_only, public_recommendation]
+          default: private_only
+        mode:
+          type: string
+          enum: [suggestion]
+          default: suggestion
+        consentedAt:
+          type: string
+          format: date-time
+          nullable: true
+    AutoLinkingPatchRequest:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+        scope:
+          type: string
+          enum: [private_only, public_recommendation]
+        mode:
+          type: string
+          enum: [suggestion]
+    AutoLinkingPatchResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        autoLinking:
+          $ref: '#/components/schemas/AutoLinkingPreference'
+        hint:
+          type: string
+    AccessApplicationStatusResponse:
+      type: object
+      properties:
+        accessStatus:
+          type: string
+          enum: [not_submitted, pending, approved, rejected]
+        canSubmit:
+          type: boolean
+        application:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            essay:
+              type: string
+            status:
+              type: string
+              enum: [pending, approved, rejected]
+            reviewNote:
+              type: string
+              nullable: true
+            submittedAt:
+              type: string
+              format: date-time
+            reviewedAt:
+              type: string
+              format: date-time
+              nullable: true
+    PublishStatusResponse:
+      type: object
+      properties:
+        recordId:
+          type: string
+          format: uuid
+        visibilityIntent:
+          type: string
+          enum: [private, public]
+        status:
+          type: string
+          enum: [private, pending_auto, pending_manual, pending_second_review, risk_control_24h, published, rejected, needs_changes]
+        label:
+          type: string
+        isPublic:
+          type: boolean
+        publishRequestedAt:
+          type: string
+          format: date-time
+          nullable: true
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        reviewNotes:
+          type: string
+          nullable: true
+        riskSummary:
+          type: object
+          additionalProperties: true
