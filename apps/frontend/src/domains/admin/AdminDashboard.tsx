@@ -117,6 +117,18 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return maybe?.data?.message ?? maybe?.message ?? fallback;
 }
 
+const MODERATION_NOTE_TEMPLATES = [
+  "内容表达清晰，符合社区规范，允许公开展示。",
+  "内容存在边界风险，请按提示修改后重新提交。",
+  "内容违反社区规范，当前版本不予通过。",
+];
+
+const APPEAL_NOTE_TEMPLATES = [
+  "经复核，当前证据不足以维持限制，恢复账号功能。",
+  "经复核，原处罚依据充分，维持原裁决。",
+  "请后续遵守社区规则，避免再次触发同类限制。",
+];
+
 export const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<
     "moderation" | "access" | "risk" | "bans" | "appeals" | "audit" | "ai"
@@ -323,6 +335,16 @@ const ModerationQueue = () => {
               className="min-w-[240px] flex-1 rounded-full border border-white/45 bg-white/60 px-3 py-2 text-xs outline-none dark:border-white/12 dark:bg-black/22"
               placeholder="批量裁决备注（可选）"
             />
+            {MODERATION_NOTE_TEMPLATES.map((template, index) => (
+              <button
+                key={template}
+                type="button"
+                onClick={() => setBatchNote(template)}
+                className="rounded-full border border-white/45 bg-white/70 px-3 py-1.5 text-xs text-slate-600 hover:bg-white dark:border-white/12 dark:bg-black/22 dark:text-slate-200"
+              >
+                模板 {index + 1}
+              </button>
+            ))}
             <button
               type="button"
               disabled={selectedRecordItems.length === 0 || batchMutation.isPending}
@@ -932,6 +954,23 @@ const AppealsCenter = () => {
                     placeholder="裁决说明（2-500 字）"
                     className="mt-3 min-h-[72px] w-full rounded-2xl border border-white/45 bg-white/60 px-3 py-2 text-sm outline-none dark:border-white/12 dark:bg-black/22"
                   />
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {APPEAL_NOTE_TEMPLATES.map((template, index) => (
+                      <button
+                        key={template}
+                        type="button"
+                        onClick={() =>
+                          setNote((current) => ({
+                            ...current,
+                            [item.id]: template,
+                          }))
+                        }
+                        className="rounded-full border border-white/45 bg-white/70 px-3 py-1 text-xs text-slate-600 hover:bg-white dark:border-white/12 dark:bg-black/22 dark:text-slate-200"
+                      >
+                        模板 {index + 1}
+                      </button>
+                    ))}
+                  </div>
                   <div className="mt-3 flex gap-2">
                     <button
                       type="button"
@@ -966,14 +1005,27 @@ const AppealsCenter = () => {
 
 const AuditLogs = () => {
   const [keyword, setKeyword] = useState("");
+  const [action, setAction] = useState<string>("all");
+  const [rangeHours, setRangeHours] = useState<number>(24);
   const { data, isLoading } = useQuery({
     queryKey: ["admin-audit-logs"],
     queryFn: () => fetchApi<{ items: AuditLogItem[] }>("/api/admin/analytics/audit-logs"),
   });
 
+  const allActions = Array.from(new Set((data?.items ?? []).map((item) => item.action))).sort();
   const trimmedKeyword = keyword.trim().toLowerCase();
+  const latestTimestamp = data?.items?.length ? new Date(data.items[0].created_at).getTime() : NaN;
   const items =
     data?.items.filter((item) => {
+      if (action !== "all" && item.action !== action) {
+        return false;
+      }
+      if (rangeHours > 0) {
+        const diff = latestTimestamp - new Date(item.created_at).getTime();
+        if (Number.isFinite(diff) && diff > rangeHours * 60 * 60 * 1000) {
+          return false;
+        }
+      }
       if (!trimmedKeyword) {
         return true;
       }
@@ -985,12 +1037,37 @@ const AuditLogs = () => {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h3 className="font-elysia-display text-3xl text-slate-700 dark:text-slate-100">审计日志</h3>
-        <input
-          value={keyword}
-          onChange={(event) => setKeyword(event.target.value)}
-          placeholder="搜索 action / target / actor"
-          className="min-w-[240px] rounded-full border border-white/45 bg-white/60 px-3 py-1.5 text-xs text-slate-600 outline-none dark:border-white/12 dark:bg-black/22 dark:text-slate-200"
-        />
+        <div className="flex flex-wrap gap-2">
+          <select
+            value={rangeHours}
+            onChange={(event) => setRangeHours(Number(event.target.value))}
+            className="rounded-full border border-white/45 bg-white/60 px-3 py-1.5 text-xs text-slate-600 dark:border-white/12 dark:bg-black/22 dark:text-slate-200"
+          >
+            <option value={6}>最近6小时</option>
+            <option value={24}>最近24小时</option>
+            <option value={72}>最近3天</option>
+            <option value={168}>最近7天</option>
+            <option value={0}>全部时间</option>
+          </select>
+          <select
+            value={action}
+            onChange={(event) => setAction(event.target.value)}
+            className="rounded-full border border-white/45 bg-white/60 px-3 py-1.5 text-xs text-slate-600 dark:border-white/12 dark:bg-black/22 dark:text-slate-200"
+          >
+            <option value="all">全部动作</option>
+            {allActions.map((actionItem) => (
+              <option key={actionItem} value={actionItem}>
+                {actionItem}
+              </option>
+            ))}
+          </select>
+          <input
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            placeholder="搜索 action / target / actor"
+            className="min-w-[220px] rounded-full border border-white/45 bg-white/60 px-3 py-1.5 text-xs text-slate-600 outline-none dark:border-white/12 dark:bg-black/22 dark:text-slate-200"
+          />
+        </div>
       </div>
 
       {isLoading && <div>加载中...</div>}
