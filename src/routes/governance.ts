@@ -4,6 +4,14 @@ import { requireAdmin, requireUser } from "../lib/auth.js";
 import { query, withTransaction } from "../lib/db.js";
 import { broadcast } from "../lib/realtime.js";
 import { writeAuditLog } from "../lib/audit.js";
+import { createBanEvent } from "../lib/risk-control.js";
+
+function normalizeViolationType(value: string | null | undefined): "political" | "gore_violence" | "extremism" | "other" {
+  if (value === "political" || value === "gore_violence" || value === "extremism") {
+    return value;
+  }
+  return "other";
+}
 
 export async function governanceRoutes(app: FastifyInstance): Promise<void> {
   app.post("/reports", async (req, reply) => {
@@ -28,6 +36,7 @@ export async function governanceRoutes(app: FastifyInstance): Promise<void> {
       `,
       [user.id, body.targetUserId ?? null, body.targetRecordId ?? null, body.reportType, body.reason],
     );
+
     await writeAuditLog({
       actorUserId: user.id,
       action: "report.create",
@@ -44,6 +53,7 @@ export async function governanceRoutes(app: FastifyInstance): Promise<void> {
     if (!admin) {
       return;
     }
+
     const rows = await query<{
       id: string;
       report_type: string;
@@ -61,6 +71,7 @@ export async function governanceRoutes(app: FastifyInstance): Promise<void> {
         LIMIT 200
       `,
     );
+
     return { items: rows.rows };
   });
 
@@ -69,6 +80,7 @@ export async function governanceRoutes(app: FastifyInstance): Promise<void> {
     if (!admin) {
       return;
     }
+
     const params = z.object({ id: z.string().uuid() }).parse(req.params);
     const body = z
       .object({
@@ -88,10 +100,10 @@ export async function governanceRoutes(app: FastifyInstance): Promise<void> {
         [body.status, params.id],
       );
       if (report.rowCount !== 1) {
-        throw new Error("举报不存在");
+        throw new Error("REPORT_NOT_FOUND");
       }
-      const targetUserId = report.rows[0].target_user_id;
 
+      const targetUserId = report.rows[0].target_user_id;
       if (targetUserId && body.action !== "none") {
         await client.query(
           `
@@ -102,28 +114,29 @@ export async function governanceRoutes(app: FastifyInstance): Promise<void> {
         );
 
         if (body.action === "mute_7d") {
-          await client.query(
-            `
-              UPDATE users
-              SET is_banned = TRUE, ban_until = NOW() + INTERVAL '7 day', updated_at = NOW()
-              WHERE id = $1
-            `,
-            [targetUserId],
-          );
+          await createBanEvent(client, {
+            userId: targetUserId,
+            source: "report",
+            violationType: "other",
+            reason: "举报处理：禁言7天",
+            isPermanent: false,
+            banHours: 24 * 7,
+            createdBy: admin.id,
+          });
         }
+
         if (body.action === "ban") {
-          await client.query(
-            `
-              UPDATE users
-              SET is_banned = TRUE, ban_until = NULL, updated_at = NOW()
-              WHERE id = $1
-            `,
-            [targetUserId],
-          );
+          await createBanEvent(client, {
+            userId: targetUserId,
+            source: "report",
+            violationType: normalizeViolationType(report.rows[0].report_type),
+            reason: "举报处理：永久封禁",
+            isPermanent: true,
+            createdBy: admin.id,
+          });
         }
       }
 
-      // AI 举报确认计次策略
       if (body.status === "confirmed" && report.rows[0].report_type === "ai_generated" && targetUserId) {
         const stat = await client.query<{ ai_report_confirmed_count: number }>(
           `
@@ -140,28 +153,39 @@ export async function governanceRoutes(app: FastifyInstance): Promise<void> {
         const count = stat.rows[0].ai_report_confirmed_count;
 
         if (count >= 5) {
-          await client.query(
-            `
-              UPDATE users
-              SET is_banned = TRUE, ban_until = NULL, updated_at = NOW()
-              WHERE id = $1
-            `,
-            [targetUserId],
-          );
+          await createBanEvent(client, {
+            userId: targetUserId,
+            source: "report",
+            violationType: "other",
+            reason: "AI 举报累计达 5 次，永久封禁",
+            isPermanent: true,
+            createdBy: admin.id,
+          });
         } else if (count >= 3) {
-          await client.query(
-            `
-              UPDATE users
-              SET is_banned = TRUE, ban_until = NOW() + INTERVAL '7 day', updated_at = NOW()
-              WHERE id = $1
-            `,
-            [targetUserId],
-          );
+          await createBanEvent(client, {
+            userId: targetUserId,
+            source: "report",
+            violationType: "other",
+            reason: "AI 举报累计达 3 次，禁言 7 天",
+            isPermanent: false,
+            banHours: 24 * 7,
+            createdBy: admin.id,
+          });
         }
       }
 
       return { ok: true };
+    }).catch((error: unknown) => {
+      if (error instanceof Error && error.message === "REPORT_NOT_FOUND") {
+        reply.code(404).send({ message: "举报不存在" });
+        return null;
+      }
+      throw error;
     });
+
+    if (!result) {
+      return;
+    }
 
     broadcast("moderation.changed", { reportId: params.id, status: body.status });
     await writeAuditLog({
@@ -171,6 +195,7 @@ export async function governanceRoutes(app: FastifyInstance): Promise<void> {
       targetId: params.id,
       payload: { status: body.status, action: body.action },
     });
+
     return result;
   });
 
@@ -179,11 +204,14 @@ export async function governanceRoutes(app: FastifyInstance): Promise<void> {
     if (!admin) {
       return;
     }
+
     const params = z.object({ id: z.string().uuid() }).parse(req.params);
     const body = z
       .object({
         action: z.enum(["warning", "mute_7d", "ban", "unban"]),
         reason: z.string().min(2).max(300),
+        violationType: z.enum(["political", "gore_violence", "extremism", "other"]).default("other"),
+        ipHash: z.string().optional(),
       })
       .parse(req.body);
 
@@ -201,35 +229,54 @@ export async function governanceRoutes(app: FastifyInstance): Promise<void> {
       if (body.action === "warning") {
         return;
       }
+
       if (body.action === "mute_7d") {
-        await client.query(
-          `
-            UPDATE users
-            SET is_banned = TRUE, ban_until = NOW() + INTERVAL '7 day', updated_at = NOW()
-            WHERE id = $1
-          `,
-          [params.id],
-        );
-      } else if (body.action === "ban") {
-        await client.query(
-          `
-            UPDATE users
-            SET is_banned = TRUE, ban_until = NULL, updated_at = NOW()
-            WHERE id = $1
-          `,
-          [params.id],
-        );
-      } else if (body.action === "unban") {
-        await client.query(
-          `
-            UPDATE users
-            SET is_banned = FALSE, ban_until = NULL, updated_at = NOW()
-            WHERE id = $1
-          `,
-          [params.id],
-        );
+        await createBanEvent(client, {
+          userId: params.id,
+          ipHash: body.ipHash,
+          source: "admin_manual",
+          violationType: body.violationType,
+          reason: body.reason,
+          isPermanent: false,
+          banHours: 24 * 7,
+          createdBy: admin.id,
+        });
+        return;
       }
+
+      if (body.action === "ban") {
+        await createBanEvent(client, {
+          userId: params.id,
+          ipHash: body.ipHash,
+          source: "admin_manual",
+          violationType: body.violationType,
+          reason: body.reason,
+          isPermanent: true,
+          createdBy: admin.id,
+        });
+        return;
+      }
+
+      await client.query(
+        `
+          UPDATE users
+          SET is_banned = FALSE, ban_until = NULL, updated_at = NOW()
+          WHERE id = $1
+        `,
+        [params.id],
+      );
+
+      await client.query(
+        `
+          UPDATE ban_events
+          SET status = 'lifted', lifted_at = NOW(), lifted_by = $2, lift_reason = $3
+          WHERE user_id = $1
+            AND status = 'active'
+        `,
+        [params.id, admin.id, body.reason],
+      );
     });
+
     await writeAuditLog({
       actorUserId: admin.id,
       action: "user.sanction",
@@ -237,6 +284,7 @@ export async function governanceRoutes(app: FastifyInstance): Promise<void> {
       targetId: params.id,
       payload: { action: body.action, reason: body.reason },
     });
+
     return { ok: true };
   });
 }

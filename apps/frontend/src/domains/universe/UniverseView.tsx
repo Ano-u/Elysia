@@ -28,9 +28,9 @@ const generateCards = (num: number, canvasSize: number) => {
         id: `card-${count}`,
         x,
         y,
-        content: \`这是第 \${count + 1} 个在星海中漫游的灵魂记录。在这片浩瀚的二维空间里，我们彼此保持距离，却又互相感应。\`,
-        time: \`\${Math.floor(Math.random() * 24)}小时前\`,
-        author: \`@User\${Math.floor(Math.random() * 1000)}\`,
+        content: `这是第 ${count + 1} 个在星海中漫游的灵魂记录。在这片浩瀚的二维空间里，我们彼此保持距离，却又互相感应。`,
+        time: `${Math.floor(Math.random() * 24)}小时前`,
+        author: `@User${Math.floor(Math.random() * 1000)}`,
       });
       count++;
     }
@@ -39,12 +39,12 @@ const generateCards = (num: number, canvasSize: number) => {
   // If we need more cards, randomly place them
   while (count < num) {
     cards.push({
-      id: \`card-\${count}\`,
+      id: `card-${count}`,
       x: padding + Math.random() * (canvasSize - padding * 2),
       y: padding + Math.random() * (canvasSize - padding * 2),
-      content: \`额外的灵魂碎片 \${count + 1}。\`,
+      content: `额外的灵魂碎片 ${count + 1}。`,
       time: "刚刚",
-      author: \`@User\${Math.floor(Math.random() * 1000)}\`,
+      author: `@User${Math.floor(Math.random() * 1000)}`,
     });
     count++;
   }
