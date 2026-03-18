@@ -28,33 +28,35 @@ export const UniverseView: React.FC = () => {
   // Derive coordinates for API request
   const [requestCoords, setRequestCoords] = useState({ x: 0, y: 0 });
 
-  // Debounce API requests on drag
+  // Debounce API requests on drag and convert canvas position to virtual universe coords.
   useEffect(() => {
-    let timeoutId: number;
-    const unsubscribeX = x.on('change', (latestX) => {
-      clearTimeout(timeoutId);
-      timeoutId = window.setTimeout(() => {
-        // Convert screen coordinates to universe coordinates
-        // Center is 0,0 in our virtual coordinate system
-        const virtualX = -(latestX - viewportSize.width / 2);
-        setRequestCoords(prev => ({ ...prev, x: virtualX }));
-      }, 500); // 500ms debounce
-    });
+    let timeoutId: number | null = null;
 
-    const unsubscribeY = y.on('change', (latestY) => {
-      clearTimeout(timeoutId);
+    const schedule = () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
       timeoutId = window.setTimeout(() => {
-        const virtualY = -(latestY - viewportSize.height / 2);
-        setRequestCoords(prev => ({ ...prev, y: virtualY }));
-      }, 500);
-    });
+        const latestX = x.get();
+        const latestY = y.get();
+        const virtualX = latestX + canvasSize / 2 - viewportSize.width / 2;
+        const virtualY = latestY + canvasSize / 2 - viewportSize.height / 2;
+        setRequestCoords({ x: virtualX, y: virtualY });
+      }, 420);
+    };
+
+    const unsubscribeX = x.on("change", schedule);
+    const unsubscribeY = y.on("change", schedule);
+    schedule();
 
     return () => {
       unsubscribeX();
       unsubscribeY();
-      clearTimeout(timeoutId);
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
     };
-  }, [x, y, viewportSize]);
+  }, [canvasSize, x, y, viewportSize.height, viewportSize.width]);
 
   const { data: universeData, isLoading } = useQuery({
     queryKey: ['universe', 'viewport', requestCoords.x, requestCoords.y],
@@ -121,9 +123,23 @@ export const UniverseView: React.FC = () => {
 
       {isLoading && cards.length === 0 && (
          <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-            <div className="text-white/50 text-sm tracking-widest font-light animate-pulse">连接星海中...</div>
+            <div className="font-elysia-poem text-[1.5rem] leading-none text-white/70 animate-pulse">正在聆听星海回响...</div>
          </div>
       )}
+
+      {!isLoading && cards.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+          <div className="rounded-full border border-white/40 bg-white/40 px-5 py-2 text-sm text-slate-600 backdrop-blur-md dark:border-white/15 dark:bg-white/8 dark:text-slate-200/85">
+            还没有公开回响，先在礼堂写下一句吧。
+          </div>
+        </div>
+      )}
+
+      <div className="pointer-events-none absolute left-1/2 top-24 z-30 -translate-x-1/2">
+        <div className="rounded-full border border-white/45 bg-white/45 px-4 py-1.5 text-xs tracking-[0.14em] text-slate-500 backdrop-blur-md dark:border-white/12 dark:bg-black/18 dark:text-slate-300/70">
+          拖动画布漫游 · 焦点会在你附近亮起
+        </div>
+      </div>
 
       <motion.div
         drag
@@ -165,7 +181,7 @@ export const UniverseView: React.FC = () => {
               y={physicalY}
               content={content}
               time={timeStr}
-              author={card.authorName || '匿名星光'}
+              author={card.authorName || '无名星光'}
               focusRank={focusRank}
             />
           );
@@ -177,7 +193,7 @@ export const UniverseView: React.FC = () => {
         {["💖", "✨", "🌸"].map((emoji, i) => (
           <motion.div
             key={i}
-            className="w-12 h-12 flex items-center justify-center bg-white/10 backdrop-blur-md rounded-full text-2xl cursor-grab shadow-lg border border-white/20"
+            className="h-12 w-12 cursor-grab rounded-full border border-white/25 bg-white/12 text-2xl shadow-lg backdrop-blur-md flex items-center justify-center"
             drag
             dragSnapToOrigin
             whileDrag={{ scale: 1.2, zIndex: 100 }}

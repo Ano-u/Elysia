@@ -200,12 +200,15 @@ export const UniverseCard = React.forwardRef<HTMLDivElement, UniverseCardProps>(
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent pointer-events-none opacity-50 z-10" />
 
         <div className="relative z-20 flex flex-col gap-3">
-          <MarkdownText content={content} className="text-gray-800 dark:text-gray-200 text-sm leading-relaxed font-medium" />
+          <MarkdownText
+            content={content}
+            className="font-elysia-display text-sm leading-relaxed text-slate-700 dark:text-slate-200"
+          />
           <div className="flex items-center justify-between mt-2 pt-3 border-t border-white/20 dark:border-white/10">
-            <span className="text-xs font-semibold bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">
+            <span className="font-elysia-display text-sm bg-gradient-to-r from-rose-400 to-cyan-400 bg-clip-text text-transparent">
               {author}
             </span>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
+            <span className="text-xs text-slate-500 dark:text-slate-300/80">
               {time}
             </span>
           </div>

@@ -91,7 +91,7 @@ export const MindMapView: React.FC = () => {
   if (isLoading) {
      return (
         <div className="flex flex-col items-center justify-center min-h-screen">
-          <div className="text-slate-400 animate-pulse font-light tracking-widest text-sm">链接思绪中...</div>
+          <div className="font-elysia-poem text-[1.5rem] leading-none text-slate-500 animate-pulse">正在织起你的记忆星线...</div>
         </div>
      );
   }
@@ -99,7 +99,7 @@ export const MindMapView: React.FC = () => {
   if (isError) {
     return (
        <div className="flex flex-col items-center justify-center min-h-screen">
-         <div className="text-red-400 font-light text-sm">暂无法获取记忆之网，请稍后再试。</div>
+         <div className="text-red-400 font-light text-sm">记忆织网暂时失去连接，请稍后再试。</div>
        </div>
     );
   }
@@ -116,18 +116,22 @@ export const MindMapView: React.FC = () => {
       />
 
       {/* Mode Switcher */}
-      <div className="absolute top-24 left-1/2 -translate-x-1/2 z-50 flex gap-2 p-1 bg-white/10 dark:bg-black/20 backdrop-blur-md rounded-full border border-white/20">
+      <div className="absolute left-1/2 top-20 z-50 -translate-x-1/2 rounded-full border border-white/20 bg-white/10 px-4 py-1 text-[11px] tracking-[0.14em] text-slate-500 backdrop-blur-md dark:border-white/10 dark:bg-black/20 dark:text-slate-300/70">
+        轻触节点可高亮关系 · 拖动节点可重排结构
+      </div>
+
+      <div className="absolute top-28 left-1/2 -translate-x-1/2 z-50 flex gap-2 p-1 bg-white/10 dark:bg-black/20 backdrop-blur-md rounded-full border border-white/20">
          <button
            onClick={() => setMode('simple')}
            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${mode === 'simple' ? 'bg-white/90 text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
          >
-            简洁
+            静心
          </button>
          <button
            onClick={() => setMode('deep')}
            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${mode === 'deep' ? 'bg-white/90 text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
          >
-            深度
+            深潜
          </button>
       </div>
 

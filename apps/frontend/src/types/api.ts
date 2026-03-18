@@ -1,6 +1,53 @@
 // Auto-linking Types
 export type AutoLinkingMode = "suggestion";
 export type AutoLinkingScope = "private_only" | "public_recommendation";
+export type UserRole = "user" | "admin";
+export type VisibilityIntent = "private" | "public";
+export type AccessStatus = "not_submitted" | "pending" | "approved" | "rejected";
+export type PublicationStatus =
+  | "private"
+  | "pending_auto"
+  | "pending_manual"
+  | "pending_second_review"
+  | "risk_control_24h"
+  | "published"
+  | "rejected"
+  | "needs_changes";
+
+export interface AuthUser {
+  id: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+  role: UserRole;
+  isBanned: boolean;
+  banUntil: string | null;
+  accessStatus: AccessStatus;
+  riskControlUntil: string | null;
+  riskControlReason: string | null;
+}
+
+export interface AuthMeResponse {
+  user: AuthUser | null;
+}
+
+export interface DevSwitchUserRequest {
+  userId?: string;
+  username: string;
+  displayName: string;
+  avatarUrl?: string;
+  role?: UserRole;
+}
+
+export interface DevSwitchUserResponse {
+  user: {
+    id: string;
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+    role: UserRole;
+  };
+}
 
 export interface AutoLinkingPreference {
   enabled: boolean;
@@ -22,8 +69,6 @@ export interface AutoLinkingPatchResponse {
 }
 
 // Access Application Types
-export type AccessStatus = "not_submitted" | "pending" | "approved" | "rejected";
-
 export interface AccessApplication {
   id: string;
   essay: string;
@@ -40,9 +85,6 @@ export interface AccessApplicationStatusResponse {
 }
 
 // Record Publish Status Types
-export type VisibilityIntent = "private" | "public";
-export type PublicationStatus = "private" | "pending_auto" | "pending_manual" | "pending_second_review" | "risk_control_24h" | "published" | "rejected" | "needs_changes";
-
 export interface PublishStatusResponse {
   recordId: string;
   visibilityIntent: VisibilityIntent;
@@ -65,8 +107,9 @@ export interface UniverseItem {
   authorId: string;
   authorName: string;
   authorAvatar?: string | null;
+  hearts: number;
+  hugs: number;
   coord: { x: number; y: number };
-  reactions?: { hearts: number; hugs: number };
   personalScore?: number;
 }
 
@@ -102,22 +145,99 @@ export interface MindMapResponse {
 export interface CreateRecordRequest {
   moodPhrase: string;
   quote?: string;
+  extraEmotions?: string[];
   description?: string;
-  visibilityIntent?: VisibilityIntent;
+  isPublic?: boolean;
+  imageIds?: string[];
+  drawingId?: string;
+  occurredAt?: string;
+  locationId?: string;
+  tags?: string[];
 }
 
-export interface RecordResponse {
+export interface RecordSummary {
   id: string;
   moodPhrase: string;
-  publicationStatus: PublicationStatus;
+  description: string | null;
   visibilityIntent: VisibilityIntent;
+  publicationStatus: PublicationStatus;
+  isPublic: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateRecordResponse {
+  record: RecordSummary;
+  publishStatus: {
+    status: PublicationStatus;
+    label: string;
+  };
+}
+
+export interface HomeFeedResponse {
+  items: RecordSummary[];
+  nextCursor: string | null;
+}
+
+export interface OnboardingTask {
+  day: number;
+  title: string;
+  code: string;
+}
+
+export interface OnboardingProgressData {
+  current_day: number;
+  completed_days: number[];
+  last_completed_at: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface OnboardingProgressResponse {
+  progress: OnboardingProgressData;
+  tasks: OnboardingTask[];
+  targetTimeSeconds: number;
+}
+
+export interface OnboardingCompleteDayResponse {
+  ok: boolean;
+}
+
+export type NudgeFeedbackAction = "liked" | "dismissed" | "clicked" | "manual_trigger";
+
+export interface NudgeRecommendationsResponse {
+  items: string[];
+}
+
+export interface NudgeFeedbackRequest {
+  action: NudgeFeedbackAction;
+  context?: Record<string, unknown>;
+}
+
+export interface AppealRecord {
+  banEventId: string;
+  banStatus: "active" | "lifted";
+  violationType: string;
+  reason: string;
+  isPermanent: boolean;
+  createdAt: string;
+  appeal: {
+    id: string;
+    status: "pending" | "approved" | "rejected";
+    submittedAt: string;
+    reviewedAt: string | null;
+    resolutionNote: string | null;
+  } | null;
 }
 
 export interface AppealsStatusResponse {
   isBanned: boolean;
+  items: AppealRecord[];
   activeBanEvent?: {
     id: string;
     appealUsed: boolean;
+    reason?: string;
+    violationType?: string;
+    createdAt?: string;
   };
   pendingAppeal?: {
     id: string;

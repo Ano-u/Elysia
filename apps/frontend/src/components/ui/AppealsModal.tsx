@@ -48,12 +48,15 @@ export const AppealsModal: React.FC = () => {
       >
         <LiquidCard className="p-8 border-red-200/50 dark:border-red-900/30">
           <div className="text-center mb-8">
-            <h2 className="text-2xl font-serif text-slate-800 dark:text-slate-200 mb-2">
-              账号受限通知
+            <h2 className="font-elysia-display text-3xl text-slate-800 dark:text-slate-200 mb-2">
+              账号受限提醒
             </h2>
-            <p className="text-slate-500 dark:text-slate-400 text-sm">
+            <p className="font-elysia-poem text-[1.45rem] leading-none text-slate-500/90 dark:text-slate-300/80">
+              我们愿意听见你的解释。
+            </p>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-2">
               你似乎触碰到了星海的边界。<br/>
-              如果这是一场误会，请告诉我们。
+              如果这是一场误会，请认真告诉我们。
             </p>
           </div>
 
@@ -62,18 +65,18 @@ export const AppealsModal: React.FC = () => {
               <div className="flex flex-col items-center justify-center py-6 text-slate-500 dark:text-slate-400">
                 <div className="w-10 h-10 rounded-full border-2 border-slate-200 border-t-blue-400 animate-spin mb-4" />
                 <p>申诉正在处理中</p>
-                <p className="text-xs mt-2 opacity-70">每次限制仅有一次申诉机会，请耐心等待。</p>
+                <p className="text-xs mt-2 opacity-70">每次限制仅有一次申诉机会，请耐心等待最终结果。</p>
               </div>
             ) : hasUsedAppeal ? (
                <div className="flex flex-col items-center justify-center py-6 text-amber-600 dark:text-amber-500 text-center">
                 <p>该事件的申诉机会已使用</p>
-                <p className="text-xs mt-2 opacity-70">守护者已做出最终裁决，该账号将被永久封停。</p>
+                <p className="text-xs mt-2 opacity-70">守护者已做出最终裁决，该事件不再支持重复申诉。</p>
               </div>
             ) : (
               <>
                 <textarea
                   className="w-full bg-white/50 dark:bg-black/20 border border-white/40 dark:border-white/10 rounded-2xl p-4 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-red-300/50 resize-none min-h-[120px]"
-                  placeholder="请说明你认为这是误判的原因，或表达你愿意遵守规则的意愿..."
+                  placeholder="请说明你认为是误判的原因，或你将如何遵守社区规则。"
                   value={appealText}
                   onChange={(e) => {
                     setAppealText(e.target.value);
@@ -81,6 +84,10 @@ export const AppealsModal: React.FC = () => {
                   }}
                   disabled={submitMutation.isPending}
                 />
+                <div className="flex items-center justify-between px-1 text-xs text-slate-400 dark:text-slate-300/65">
+                  <span>建议 10-500 字，表达清楚事实与态度。</span>
+                  <span>{appealText.trim().length} 字</span>
+                </div>
 
                 <AnimatePresence>
                   {error && (
@@ -98,7 +105,7 @@ export const AppealsModal: React.FC = () => {
                 <div className="flex justify-end pt-4">
                   <button
                     onClick={() => submitMutation.mutate()}
-                    disabled={submitMutation.isPending || appealText.trim().length < 10}
+                    disabled={submitMutation.isPending || appealText.trim().length < 10 || appealText.trim().length > 500}
                     className="px-8 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 font-medium transition-all disabled:opacity-50 shadow-sm"
                   >
                     {submitMutation.isPending ? '提交中...' : '提交申诉'}

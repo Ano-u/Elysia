@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Great+Vibes&family=Manrope:wght@400;500;600;700&family=Noto+Serif+SC:wght@400;500;600&family=Parisienne&family=Zhi+Mang+Xing&display=swap");
+
 @import "tailwindcss";
 
 @theme {
@@ -43,6 +45,10 @@
   :root {
     --background: var(--elysia-ice);
     --foreground: 222.2 84% 4.9%;
+    --font-body: "Manrope", "Avenir Next", "PingFang SC", "Helvetica Neue", sans-serif;
+    --font-display: "Noto Serif SC", "Cormorant Garamond", serif;
+    --font-logo: "Parisienne", "Great Vibes", "Cormorant Garamond", "Noto Serif SC", serif;
+    --font-poem: "Zhi Mang Xing", "Noto Serif SC", serif;
 
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
@@ -72,15 +78,15 @@
     --radius: 0.5rem;
 
     /* Elysia Custom Theme Variables */
-    --elysia-ice: #F9FAFB;
-    --elysia-mist: #E0E7FF;
-    --elysia-coral: #FFE4E6;
-    --elysia-gold: #FEF08A;
+    --elysia-ice: #f8fbff;
+    --elysia-mist: #e6f1ff;
+    --elysia-coral: #ffeef4;
+    --elysia-gold: #fff4d8;
 
     /* Crystal & Liquid Textures */
-    --shadow-crystal: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
-    --shadow-liquid: inset 0 0 20px rgba(255, 255, 255, 0.5), 0 8px 32px rgba(224, 231, 255, 0.2);
-    --shadow-glow: 0 0 20px rgba(254, 240, 138, 0.4);
+    --shadow-crystal: 0 10px 35px rgba(135, 171, 214, 0.17);
+    --shadow-liquid: inset 0 0 26px rgba(255, 255, 255, 0.72), 0 12px 34px rgba(190, 214, 242, 0.25);
+    --shadow-glow: 0 0 26px rgba(255, 228, 196, 0.45);
 
     /* Transitions */
     --transition-main: 300ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -89,44 +95,44 @@
   }
 
   .dark {
-    --background: 280 40% 6%;
-    --foreground: 310 30% 95%;
+    --background: 221 44% 9%;
+    --foreground: 209 35% 95%;
 
-    --card: 280 40% 8%;
-    --card-foreground: 310 30% 95%;
+    --card: 222 36% 12%;
+    --card-foreground: 209 35% 95%;
 
-    --popover: 280 40% 8%;
-    --popover-foreground: 310 30% 95%;
+    --popover: 222 36% 12%;
+    --popover-foreground: 209 35% 95%;
 
-    --primary: 310 80% 85%;
-    --primary-foreground: 280 40% 6%;
+    --primary: 195 78% 86%;
+    --primary-foreground: 220 42% 12%;
 
-    --secondary: 290 30% 15%;
-    --secondary-foreground: 310 30% 95%;
+    --secondary: 220 26% 20%;
+    --secondary-foreground: 210 30% 93%;
 
-    --muted: 290 30% 15%;
-    --muted-foreground: 310 20% 70%;
+    --muted: 220 26% 20%;
+    --muted-foreground: 210 20% 72%;
 
-    --accent: 310 40% 20%;
-    --accent-foreground: 310 30% 95%;
+    --accent: 224 26% 22%;
+    --accent-foreground: 209 35% 95%;
 
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 310 30% 95%;
+    --destructive-foreground: 209 35% 95%;
 
-    --border: 290 30% 18%;
-    --input: 290 30% 18%;
-    --ring: 310 50% 50%;
+    --border: 220 20% 24%;
+    --input: 220 20% 24%;
+    --ring: 200 42% 58%;
 
     /* Elysia Custom Theme Variables - Dark Mode */
-    --elysia-ice: #0F0A15;
-    --elysia-mist: #1A1325;
-    --elysia-coral: #2D1B2E;
-    --elysia-gold: #3D2B20;
+    --elysia-ice: #0d1422;
+    --elysia-mist: #152238;
+    --elysia-coral: #251926;
+    --elysia-gold: #322a1d;
 
     /* Crystal & Liquid Textures - Dark Mode */
-    --shadow-crystal: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
-    --shadow-liquid: inset 0 0 20px rgba(255, 180, 220, 0.1), 0 8px 32px rgba(200, 100, 150, 0.15);
-    --shadow-glow: 0 0 20px rgba(255, 180, 220, 0.2);
+    --shadow-crystal: 0 10px 35px rgba(0, 0, 0, 0.42);
+    --shadow-liquid: inset 0 0 22px rgba(196, 225, 255, 0.12), 0 12px 32px rgba(0, 0, 0, 0.35);
+    --shadow-glow: 0 0 22px rgba(255, 214, 175, 0.2);
   }
 }
 
@@ -136,10 +142,25 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body);
   }
 }
 
 @layer utilities {
+  .font-elysia-logo {
+    font-family: var(--font-logo);
+    letter-spacing: 0.02em;
+  }
+
+  .font-elysia-display {
+    font-family: var(--font-display);
+  }
+
+  .font-elysia-poem {
+    font-family: var(--font-poem);
+    letter-spacing: 0.04em;
+  }
+
   .glass-panel {
     @apply bg-white/40 dark:bg-black/30 backdrop-blur-xl border border-white/60 dark:border-white/10;
     box-shadow: var(--shadow-crystal);

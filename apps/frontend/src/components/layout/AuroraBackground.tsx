@@ -12,6 +12,8 @@ export const AuroraBackground = ({
     <div className="relative min-h-screen w-full overflow-hidden transition-colors duration-700 flex flex-col items-center justify-center bg-[var(--elysia-ice)] dark:bg-[var(--elysia-ice)]">
       {/* Abstract Liquid Glass Base Background */}
       <div className="absolute inset-0 z-0 bg-gradient-to-br from-[var(--elysia-mist)]/10 via-transparent to-[var(--elysia-coral)]/5 dark:from-[var(--elysia-mist)]/5 dark:to-[var(--elysia-coral)]/5" />
+      <div className="pointer-events-none absolute inset-x-[8%] top-[5%] z-0 h-[48%] rounded-[45%_45%_8%_8%/60%_60%_8%_8%] border border-white/35 bg-gradient-to-b from-white/18 to-transparent dark:border-white/10 dark:from-white/3" />
+      <div className="pointer-events-none absolute inset-x-[16%] top-[10%] z-0 h-[40%] rounded-[42%_42%_8%_8%/56%_56%_8%_8%] border border-white/22 dark:border-white/7" />
 
       {/* Background Gradients */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
