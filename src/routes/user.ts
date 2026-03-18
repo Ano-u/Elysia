@@ -2,6 +2,14 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { requireUser } from "../lib/auth.js";
 import { query } from "../lib/db.js";
+import {
+  resolveAutoLinkingPreference,
+  type AutoLinkingMode,
+  type AutoLinkingScope,
+} from "../lib/auto-linking.js";
+
+const autoLinkingScopeSchema = z.enum(["private_only", "public_recommendation"]);
+const autoLinkingModeSchema = z.enum(["suggestion"]);
 
 export async function userRoutes(app: FastifyInstance): Promise<void> {
   app.get("/me/entry-preference", async (req, reply) => {
@@ -79,6 +87,96 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       [user.id, body.preferredEntry],
     );
     return { ok: true };
+  });
+
+  app.get("/me/auto-linking", async (req, reply) => {
+    const user = await requireUser(req, reply);
+    if (!user) {
+      return;
+    }
+
+    const pref = await query<{
+      auto_linking_enabled: boolean;
+      auto_linking_scope: AutoLinkingScope;
+      auto_linking_mode: AutoLinkingMode;
+      auto_linking_consented_at: string | null;
+    }>(
+      `
+        SELECT
+          auto_linking_enabled,
+          auto_linking_scope,
+          auto_linking_mode,
+          auto_linking_consented_at
+        FROM user_preferences
+        WHERE user_id = $1
+      `,
+      [user.id],
+    );
+
+    return resolveAutoLinkingPreference(pref.rows[0]);
+  });
+
+  app.patch("/me/auto-linking", async (req, reply) => {
+    const user = await requireUser(req, reply);
+    if (!user) {
+      return;
+    }
+
+    const body = z
+      .object({
+        enabled: z.boolean(),
+        scope: autoLinkingScopeSchema.optional(),
+        mode: autoLinkingModeSchema.default("suggestion"),
+      })
+      .parse(req.body);
+
+    const targetScope = body.scope ?? null;
+    const updated = await query<{
+      auto_linking_enabled: boolean;
+      auto_linking_scope: AutoLinkingScope;
+      auto_linking_mode: AutoLinkingMode;
+      auto_linking_consented_at: string | null;
+    }>(
+      `
+        INSERT INTO user_preferences (
+          user_id,
+          auto_linking_enabled,
+          auto_linking_scope,
+          auto_linking_mode,
+          auto_linking_consented_at
+        )
+        VALUES (
+          $1,
+          $2,
+          COALESCE($3::text, 'private_only'),
+          $4,
+          CASE WHEN $2 THEN NOW() ELSE NULL END
+        )
+        ON CONFLICT (user_id)
+        DO UPDATE SET
+          auto_linking_enabled = EXCLUDED.auto_linking_enabled,
+          auto_linking_scope = COALESCE($3::text, user_preferences.auto_linking_scope),
+          auto_linking_mode = EXCLUDED.auto_linking_mode,
+          auto_linking_consented_at = CASE
+            WHEN EXCLUDED.auto_linking_enabled THEN COALESCE(user_preferences.auto_linking_consented_at, NOW())
+            ELSE user_preferences.auto_linking_consented_at
+          END,
+          updated_at = NOW()
+        RETURNING
+          auto_linking_enabled,
+          auto_linking_scope,
+          auto_linking_mode,
+          auto_linking_consented_at
+      `,
+      [user.id, body.enabled, targetScope, body.mode],
+    );
+
+    const pref = resolveAutoLinkingPreference(updated.rows[0]);
+    return {
+      ok: true,
+      autoLinking: pref,
+      hint: "默认建议模式，不会自动改写正文",
+    };
   });
 
   app.get("/drafts", async (req, reply) => {

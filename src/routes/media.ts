@@ -130,9 +130,16 @@ export async function mediaRoutes(app: FastifyInstance): Promise<void> {
     }
     const params = z.object({ id: z.string().uuid() }).parse(req.params);
 
-    const media = await query<{ id: string; owner_user_id: string; status: string }>(
+    const media = await query<{
+      id: string;
+      owner_user_id: string;
+      status: string;
+      content_moderation_status: string;
+      manual_review_required: boolean;
+      content_review_notes: string | null;
+    }>(
       `
-        SELECT id, owner_user_id, status
+        SELECT id, owner_user_id, status, content_moderation_status, manual_review_required, content_review_notes
         FROM media_assets
         WHERE id = $1
       `,
@@ -164,6 +171,11 @@ export async function mediaRoutes(app: FastifyInstance): Promise<void> {
 
     return {
       media: target,
+      moderation: {
+        status: target.content_moderation_status,
+        manualReviewRequired: target.manual_review_required,
+        reviewNotes: target.content_review_notes,
+      },
       variants: variants.rows.map((v) => ({
         type: v.variant_type,
         url: `${env.R2_PUBLIC_BASE_URL}/${v.storage_key}`,

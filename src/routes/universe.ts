@@ -80,6 +80,7 @@ export async function universeRoutes(app: FastifyInstance): Promise<void> {
           LEFT JOIN record_quotes rq ON rq.record_id = r.id
           LEFT JOIN reactions re ON re.record_id = r.id
           WHERE r.is_public = TRUE
+            AND r.publication_status = 'published'
           GROUP BY r.id, rq.quote, u.display_name, u.avatar_url
         )
         SELECT *
@@ -133,6 +134,7 @@ export async function universeRoutes(app: FastifyInstance): Promise<void> {
         LEFT JOIN record_quotes rq ON rq.record_id = r.id
         LEFT JOIN reactions re ON re.record_id = r.id
         WHERE r.is_public = TRUE
+          AND r.publication_status = 'published'
           AND r.created_at > NOW() - INTERVAL '7 days'
         GROUP BY r.id, rq.quote, u.display_name, u.avatar_url
         ORDER BY
@@ -165,6 +167,7 @@ export async function universeRoutes(app: FastifyInstance): Promise<void> {
         LEFT JOIN record_quotes rq ON rq.record_id = r.id
         LEFT JOIN reactions re ON re.record_id = r.id
         WHERE r.is_public = TRUE
+          AND r.publication_status = 'published'
           AND r.created_at > NOW() - INTERVAL '7 days'
         GROUP BY r.id, rq.quote, u.display_name, u.avatar_url
         ORDER BY
@@ -197,6 +200,7 @@ export async function universeRoutes(app: FastifyInstance): Promise<void> {
         LEFT JOIN record_quotes rq ON rq.record_id = r.id
         LEFT JOIN reactions re ON re.record_id = r.id
         WHERE r.is_public = TRUE
+          AND r.publication_status = 'published'
         GROUP BY r.id, rq.quote, u.display_name, u.avatar_url
         ORDER BY r.created_at DESC
         LIMIT 30

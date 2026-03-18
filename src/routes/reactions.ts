@@ -1,12 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { requireUser } from "../lib/auth.js";
+import { requireAccessApproved, requireNotInRiskControl } from "../lib/auth.js";
 import { query } from "../lib/db.js";
 import { broadcast } from "../lib/realtime.js";
 
 export async function reactionsRoutes(app: FastifyInstance): Promise<void> {
   app.post("/reactions", async (req, reply) => {
-    const user = await requireUser(req, reply);
+    const accessUser = await requireAccessApproved(req, reply);
+    if (!accessUser) {
+      return;
+    }
+    const user = await requireNotInRiskControl(req, reply);
     if (!user) {
       return;
     }
@@ -16,6 +20,21 @@ export async function reactionsRoutes(app: FastifyInstance): Promise<void> {
         reactionType: z.enum(["hug", "heart"]),
       })
       .parse(req.body);
+
+    const targetRecord = await query<{ id: string }>(
+      `
+        SELECT id
+        FROM records
+        WHERE id = $1
+          AND is_public = TRUE
+          AND publication_status = 'published'
+      `,
+      [body.recordId],
+    );
+    if (targetRecord.rowCount !== 1) {
+      reply.code(404).send({ message: "目标记录不可互动" });
+      return;
+    }
 
     await query(
       `
@@ -45,7 +64,11 @@ export async function reactionsRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.delete("/reactions/:id", async (req, reply) => {
-    const user = await requireUser(req, reply);
+    const accessUser = await requireAccessApproved(req, reply);
+    if (!accessUser) {
+      return;
+    }
+    const user = await requireNotInRiskControl(req, reply);
     if (!user) {
       return;
     }
@@ -80,8 +103,23 @@ export async function reactionsRoutes(app: FastifyInstance): Promise<void> {
     return { ok: true };
   });
 
-  app.get("/records/:id/reactions-summary", async (req) => {
+  app.get("/records/:id/reactions-summary", async (req, reply) => {
     const params = z.object({ id: z.string().uuid() }).parse(req.params);
+    const targetRecord = await query<{ user_id: string }>(
+      `
+        SELECT user_id
+        FROM records
+        WHERE id = $1
+          AND is_public = TRUE
+          AND publication_status = 'published'
+      `,
+      [params.id],
+    );
+    if (targetRecord.rowCount !== 1) {
+      reply.code(404).send({ message: "目标记录不存在或不可见" });
+      return;
+    }
+
     const summary = await query<{ reaction_type: "hug" | "heart"; total: string }>(
       `
         SELECT reaction_type, COUNT(*)::text AS total

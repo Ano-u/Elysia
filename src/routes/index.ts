@@ -14,6 +14,9 @@ import { userRoutes } from "./user.js";
 import { systemRoutes } from "./system.js";
 import { locationRoutes } from "./locations.js";
 import { aiRoutes } from "./ai.js";
+import { accessRoutes } from "./access.js";
+import { adminRoutes } from "./admin.js";
+import { appealRoutes } from "./appeals.js";
 import { registerSocket } from "../lib/realtime.js";
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
@@ -25,6 +28,8 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(systemRoutes);
   await app.register(locationRoutes);
   await app.register(authRoutes);
+  await app.register(accessRoutes);
+  await app.register(appealRoutes);
   await app.register(userRoutes);
   await app.register(recordsRoutes);
   await app.register(commentsRoutes);
@@ -36,5 +41,6 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   await app.register(aiRoutes);
   await app.register(nudgeRoutes);
   await app.register(governanceRoutes);
+  await app.register(adminRoutes);
   await app.register(analyticsRoutes);
 }

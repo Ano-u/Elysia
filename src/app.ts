@@ -26,6 +26,19 @@ function isSensitivePath(method: string, url: string): boolean {
   return false;
 }
 
+function allowIpBanBypass(url: string): boolean {
+  if (url.startsWith("/api/appeals")) {
+    return true;
+  }
+  if (url.startsWith("/api/auth") || url.startsWith("/api/healthz") || url.startsWith("/api/public/config")) {
+    return true;
+  }
+  if (url.startsWith("/docs")) {
+    return true;
+  }
+  return false;
+}
+
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
@@ -88,6 +101,42 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   app.addHook("onRequest", async (req) => {
     req.user = await resolveAuthUser(req);
+  });
+
+  app.addHook("preHandler", async (req, reply) => {
+    if (allowIpBanBypass(req.url)) {
+      return;
+    }
+
+    const ipHash = hashIp(req.ip);
+    const rows = await query<{ is_permanent: boolean; banned_until: string | null; lifted_at: string | null }>(
+      `
+        SELECT is_permanent, banned_until, lifted_at
+        FROM ip_bans
+        WHERE ip_hash = $1
+        LIMIT 1
+      `,
+      [ipHash],
+    );
+
+    if (rows.rowCount !== 1) {
+      return;
+    }
+
+    const target = rows.rows[0];
+    if (target.lifted_at) {
+      return;
+    }
+
+    if (target.is_permanent) {
+      reply.code(403).send({ message: "当前网络地址已被封禁" });
+      return;
+    }
+
+    if (target.banned_until && new Date(target.banned_until).getTime() > Date.now()) {
+      reply.code(403).send({ message: "当前网络地址处于封禁中" });
+      return;
+    }
   });
 
   app.addHook("preHandler", async (req, reply) => {

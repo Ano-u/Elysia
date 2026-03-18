@@ -48,7 +48,7 @@ export async function mindmapRoutes(app: FastifyInstance): Promise<void> {
              user_id <> $1
              AND node_type = 'record'
              AND record_id IN (
-               SELECT id FROM records WHERE is_public = TRUE
+               SELECT id FROM records WHERE is_public = TRUE AND publication_status = 'published'
              )
            )
         ORDER BY created_at DESC
@@ -91,9 +91,9 @@ export async function mindmapRoutes(app: FastifyInstance): Promise<void> {
     }
     const params = z.object({ recordId: z.string().uuid() }).parse(req.params);
 
-    const record = await query<{ id: string; user_id: string; is_public: boolean }>(
+    const record = await query<{ id: string; user_id: string; is_public: boolean; publication_status: string }>(
       `
-        SELECT id, user_id, is_public
+        SELECT id, user_id, is_public, publication_status
         FROM records
         WHERE id = $1
       `,
@@ -104,7 +104,8 @@ export async function mindmapRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
     const r = record.rows[0];
-    if (!r.is_public && r.user_id !== user.id) {
+    const isPublished = r.is_public && r.publication_status === "published";
+    if (!isPublished && r.user_id !== user.id) {
       reply.code(403).send({ message: "无权查看该图谱节点" });
       return;
     }

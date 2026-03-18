@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { requireUser } from "../lib/auth.js";
@@ -7,10 +9,23 @@ import { env } from "../config/env.js";
 import { createR2DownloadUrl } from "../lib/r2.js";
 
 export async function systemRoutes(app: FastifyInstance): Promise<void> {
+  const openapiYamlPath = join(process.cwd(), "docs", "openapi.yaml");
+
   app.get("/public/config", async () => {
     return {
       turnstileSiteKey: env.CLOUDFLARE_TURNSTILE_SITE_KEY ?? null,
     };
+  });
+
+  app.get("/openapi.yaml", async (_req, reply) => {
+    try {
+      const yaml = readFileSync(openapiYamlPath, "utf8");
+      reply.type("application/yaml").send(yaml);
+      return;
+    } catch {
+      reply.code(404).send({ message: "openapi.yaml 不存在" });
+      return;
+    }
   });
 
   app.get("/healthz", async () => {

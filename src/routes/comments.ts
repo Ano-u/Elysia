@@ -1,10 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { requireUser } from "../lib/auth.js";
+import { requireAccessApproved, requireNotInRiskControl } from "../lib/auth.js";
 import { query, withTransaction } from "../lib/db.js";
 import { broadcast } from "../lib/realtime.js";
-import { validateQuoteLength } from "../lib/utils.js";
+import { hashIp, validateQuoteLength } from "../lib/utils.js";
 import { writeAuditLog } from "../lib/audit.js";
+import { assessModeration } from "../lib/moderation.js";
+import { decidePublication } from "../lib/publication-workflow.js";
+import { activateRiskControl, enqueueModerationQueue } from "../lib/risk-control.js";
 
 type CommentRow = {
   id: string;
@@ -19,6 +22,7 @@ type RecordRow = {
   user_id: string;
   mood_phrase: string;
   is_public: boolean;
+  publication_status: string;
 };
 
 const createCommentSchema = z.object({
@@ -30,7 +34,11 @@ const createCommentSchema = z.object({
 
 export async function commentsRoutes(app: FastifyInstance): Promise<void> {
   app.post("/records/:id/comments", async (req, reply) => {
-    const user = await requireUser(req, reply);
+    const accessUser = await requireAccessApproved(req, reply);
+    if (!accessUser) {
+      return;
+    }
+    const user = await requireNotInRiskControl(req, reply);
     if (!user) {
       return;
     }
@@ -45,16 +53,46 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    const record = await query<RecordRow>("SELECT id, user_id, mood_phrase, is_public FROM records WHERE id = $1", [params.id]);
+    const record = await query<RecordRow>(
+      "SELECT id, user_id, mood_phrase, is_public, publication_status FROM records WHERE id = $1",
+      [params.id],
+    );
     if (record.rowCount !== 1) {
       reply.code(404).send({ message: "目标记录不存在" });
       return;
     }
     const target = record.rows[0];
-    if (!target.is_public && target.user_id !== user.id) {
-      reply.code(403).send({ message: "目标记录未公开" });
+    const isPublished = target.is_public && target.publication_status === "published";
+    if (!isPublished) {
+      reply.code(403).send({ message: "仅可评论已公开内容" });
       return;
     }
+
+    const textAssessment = assessModeration({
+      moodPhrase: body.content.slice(0, 140),
+      quote: body.quote ?? undefined,
+      description: body.description ?? undefined,
+      extraEmotions: body.extraEmotions ?? [],
+      tags: [],
+    });
+    const decision = decidePublication({
+      visibilityIntent: "private",
+      hasImages: false,
+      textAssessment,
+    });
+    const riskSummary = {
+      source: "comment_derived",
+      textAssessment: {
+        level: textAssessment.level,
+        decision: textAssessment.decision,
+        confidence: textAssessment.confidence,
+        riskScore: textAssessment.riskScore,
+        riskLabels: textAssessment.riskLabels,
+        reason: textAssessment.reason,
+        violationType: textAssessment.violationType,
+      },
+      effectiveRiskLevel: decision.effectiveRiskLevel,
+    };
 
     const result = await withTransaction(async (client) => {
       const insertedComment = await client.query<CommentRow>(
@@ -74,12 +112,28 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
             mood_phrase,
             description,
             is_public,
+            visibility_intent,
+            publication_status,
+            publish_requested_at,
+            published_at,
+            risk_summary,
+            review_notes,
             source_record_id,
             source_comment_id
-          ) VALUES ($1, $2, $3, FALSE, $4, $5)
+          ) VALUES ($1, $2, $3, $4, 'private', $5, NULL, NULL, $6::jsonb, $7, $8, $9)
           RETURNING id
         `,
-        [user.id, body.content.slice(0, 140), body.description ?? null, params.id, comment.id],
+        [
+          user.id,
+          body.content.slice(0, 140),
+          body.description ?? null,
+          decision.isPublic,
+          decision.publicationStatus,
+          JSON.stringify(riskSummary),
+          decision.reason,
+          params.id,
+          comment.id,
+        ],
       );
       const derivedId = derivedRecord.rows[0].id;
 
@@ -141,6 +195,39 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
           `,
           [derivedNode.rows[0].id, sourceNode.rows[0].id],
         );
+      }
+
+      if (decision.queueType) {
+        await enqueueModerationQueue(client, {
+          targetType: "record",
+          targetId: derivedId,
+          queueType: decision.queueType,
+          reason: decision.reason,
+          priority: decision.queuePriority ?? 5,
+          payload: {
+            from: "comment_derived",
+            sourceRecordId: params.id,
+            riskLabels: textAssessment.riskLabels,
+            violationType: textAssessment.violationType,
+          },
+        });
+      }
+
+      if (decision.triggerRiskControl) {
+        await activateRiskControl(client, {
+          userId: user.id,
+          recordId: derivedId,
+          reason: decision.reason,
+          riskLevel: decision.effectiveRiskLevel === "very_high" ? "very_high" : "high",
+          triggerSource: "auto_text",
+          triggerIpHash: hashIp(req.ip),
+          payload: {
+            source: "comment_derived",
+            sourceRecordId: params.id,
+            riskLabels: textAssessment.riskLabels,
+            violationType: textAssessment.violationType,
+          },
+        });
       }
 
       return {
