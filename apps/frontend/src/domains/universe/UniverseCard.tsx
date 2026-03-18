@@ -126,10 +126,10 @@ export const UniverseCard = React.forwardRef<HTMLDivElement, UniverseCardProps>(
 
     return (
       <motion.div
-        ref={(node) => {
+        ref={(node: HTMLDivElement | null) => {
           if (typeof ref === "function") ref(node);
           else if (ref) ref.current = node;
-          if (cardRef) cardRef.current = node as HTMLDivElement;
+          if (cardRef && node) cardRef.current = node;
         }}
         initial={{ scale: targetScale, opacity: targetOpacity }}
         animate={controls}
@@ -153,15 +153,15 @@ export const UniverseCard = React.forwardRef<HTMLDivElement, UniverseCardProps>(
             : "hover:bg-white/50 dark:hover:bg-white/10 hover:border-white/80 hover:shadow-[var(--shadow-liquid)] hover:shadow-[var(--shadow-glow)]",
           className,
         )}
-        onDragOver={(e) => {
+        onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
           e.preventDefault();
           e.stopPropagation();
         }}
-        onDrop={(e) => {
+        onDrop={(e: React.DragEvent<HTMLDivElement>) => {
           e.preventDefault();
           handleDrop(e);
         }}
-        onClick={(e) => {
+        onClick={(e: React.MouseEvent<HTMLDivElement>) => {
           // Fallback interaction testing for ripples
           if (!reduceMotion && isPrimary) {
             triggerRipple(e.clientX, e.clientY, "rgba(255, 182, 193, 0.4)");

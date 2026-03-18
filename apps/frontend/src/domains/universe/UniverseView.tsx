@@ -2,55 +2,8 @@ import React, { useRef, useState, useEffect } from "react";
 import { motion, useMotionValue } from "framer-motion";
 import { UniverseCard } from "./UniverseCard";
 import { useUiStore } from "../../store/uiStore";
-
-// Mock data generator for cards
-const generateCards = (num: number, canvasSize: number) => {
-  const cards = [];
-  const padding = 200; // Keep away from edges
-  const minDistance = 300; // Minimum distance between cards
-
-  // A simple grid-based generator to ensure spread and avoid excessive overlaps
-  const cols = Math.floor((canvasSize - padding * 2) / minDistance);
-  const rows = Math.floor((canvasSize - padding * 2) / minDistance);
-  const gridSize = Math.min(cols, rows);
-
-  let count = 0;
-  for (let i = 0; i < gridSize && count < num; i++) {
-    for (let j = 0; j < gridSize && count < num; j++) {
-      // Add random offset within the grid cell
-      const xOffset = (Math.random() - 0.5) * (minDistance * 0.8);
-      const yOffset = (Math.random() - 0.5) * (minDistance * 0.8);
-
-      const x = padding + i * minDistance + minDistance / 2 + xOffset;
-      const y = padding + j * minDistance + minDistance / 2 + yOffset;
-
-      cards.push({
-        id: `card-${count}`,
-        x,
-        y,
-        content: `这是第 ${count + 1} 个在星海中漫游的灵魂记录。在这片浩瀚的二维空间里，我们彼此保持距离，却又互相感应。`,
-        time: `${Math.floor(Math.random() * 24)}小时前`,
-        author: `@User${Math.floor(Math.random() * 1000)}`,
-      });
-      count++;
-    }
-  }
-
-  // If we need more cards, randomly place them
-  while (count < num) {
-    cards.push({
-      id: `card-${count}`,
-      x: padding + Math.random() * (canvasSize - padding * 2),
-      y: padding + Math.random() * (canvasSize - padding * 2),
-      content: `额外的灵魂碎片 ${count + 1}。`,
-      time: "刚刚",
-      author: `@User${Math.floor(Math.random() * 1000)}`,
-    });
-    count++;
-  }
-
-  return cards;
-};
+import { useQuery } from "@tanstack/react-query";
+import { getUniverseViewport } from "../../lib/apiClient";
 
 export const UniverseView: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -62,14 +15,68 @@ export const UniverseView: React.FC = () => {
 
   const canvasSize = 4000;
 
+  // Calculate initial viewport offset based on initial state
+  const initialWidth = typeof window !== "undefined" ? window.innerWidth : 1200;
+  const initialHeight = typeof window !== "undefined" ? window.innerHeight : 800;
+  const initialXOffset = -(canvasSize / 2 - initialWidth / 2);
+  const initialYOffset = -(canvasSize / 2 - initialHeight / 2);
+
   // Create motion values to track the canvas position
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
+  const x = useMotionValue(initialXOffset);
+  const y = useMotionValue(initialYOffset);
 
-  const [cards] = useState(() => generateCards(40, canvasSize));
+  // Derive coordinates for API request
+  const [requestCoords, setRequestCoords] = useState({ x: 0, y: 0 });
 
-  // Store active card indices based on distance
-  const [focusIndices, setFocusIndices] = useState<number[]>([]);
+  // Debounce API requests on drag
+  useEffect(() => {
+    let timeoutId: number;
+    const unsubscribeX = x.on('change', (latestX) => {
+      clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => {
+        // Convert screen coordinates to universe coordinates
+        // Center is 0,0 in our virtual coordinate system
+        const virtualX = -(latestX - viewportSize.width / 2);
+        setRequestCoords(prev => ({ ...prev, x: virtualX }));
+      }, 500); // 500ms debounce
+    });
+
+    const unsubscribeY = y.on('change', (latestY) => {
+      clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => {
+        const virtualY = -(latestY - viewportSize.height / 2);
+        setRequestCoords(prev => ({ ...prev, y: virtualY }));
+      }, 500);
+    });
+
+    return () => {
+      unsubscribeX();
+      unsubscribeY();
+      clearTimeout(timeoutId);
+    };
+  }, [x, y, viewportSize]);
+
+  const { data: universeData, isLoading } = useQuery({
+    queryKey: ['universe', 'viewport', requestCoords.x, requestCoords.y],
+    queryFn: () => {
+      // Calculate virtual view width based on physical window
+      const w = viewportSize.width * 2;
+      const h = viewportSize.height * 2;
+      // Coordinates for query top-left corner
+      const reqX = Math.round(requestCoords.x - w / 2);
+      const reqY = Math.round(requestCoords.y - h / 2);
+
+      return getUniverseViewport(reqX, reqY, w, h);
+    },
+    staleTime: 1000 * 30, // 30s stale time
+    placeholderData: (prev) => prev, // Keep old data while fetching
+  });
+
+  const cards = universeData?.items || [];
+  // Use backend provided focus logic or fallback to first 3
+  const focusedIds = universeData?.focus
+    ? [universeData.focus.primary, ...universeData.focus.secondary].filter(Boolean)
+    : [];
 
   useEffect(() => {
     const handleResize = () => {
@@ -80,62 +87,14 @@ export const UniverseView: React.FC = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Center the view initially
+  // Update view when window resizes
   useEffect(() => {
     if (viewportSize.width && viewportSize.height) {
-      // Offset so the center of the canvas is in the center of the screen
-      const initialX = -(canvasSize / 2 - viewportSize.width / 2);
-      const initialY = -(canvasSize / 2 - viewportSize.height / 2);
-      x.set(initialX);
-      y.set(initialY);
+      // Since motion values are updated through interaction mostly,
+      // we only want to ensure our drag constraints stay correct.
+      // We don't reset position on every resize unless it's strictly necessary.
     }
   }, [viewportSize.width, viewportSize.height, x, y, canvasSize]);
-
-  // Calculate distances and update focus
-  useEffect(() => {
-    let isMounted = true;
-    let frameId: number;
-
-    const calculateDistances = () => {
-      if (!isMounted) return;
-
-      const cx = x.get();
-      const cy = y.get();
-
-      // Canvas center in viewport
-      const centerCanvasX = -cx + viewportSize.width / 2;
-      const centerCanvasY = -cy + viewportSize.height / 2;
-
-      // Calculate distance for all cards
-      const distances = cards.map((card, index) => {
-        const dx = card.x - centerCanvasX;
-        const dy = card.y - centerCanvasY;
-        return { index, distance: Math.sqrt(dx * dx + dy * dy) };
-      });
-
-      // Sort by distance and get top 3 closest (1 primary, 2 secondary)
-      distances.sort((a, b) => a.distance - b.distance);
-      const topIndices = distances.slice(0, 3).map((d) => d.index);
-
-      setFocusIndices((prev) => {
-        if (prev.length === topIndices.length && prev.every((v, i) => v === topIndices[i])) return prev;
-        return topIndices;
-      });
-    };
-
-    const updateLoop = () => {
-      calculateDistances();
-      frameId = requestAnimationFrame(updateLoop);
-    };
-
-    // Start tracking
-    frameId = requestAnimationFrame(updateLoop);
-
-    return () => {
-      isMounted = false;
-      cancelAnimationFrame(frameId);
-    };
-  }, [x, y, viewportSize, cards]);
 
   // Use framer-motion's drag constraints to keep the canvas in view
   const dragConstraints = {
@@ -160,6 +119,12 @@ export const UniverseView: React.FC = () => {
         }}
       />
 
+      {isLoading && cards.length === 0 && (
+         <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+            <div className="text-white/50 text-sm tracking-widest font-light animate-pulse">连接星海中...</div>
+         </div>
+      )}
+
       <motion.div
         drag
         dragConstraints={dragConstraints}
@@ -172,17 +137,35 @@ export const UniverseView: React.FC = () => {
         <div className="absolute top-1/2 left-1/2 w-4 h-4 bg-blue-500/20 rounded-full -translate-x-1/2 -translate-y-1/2 blur-sm" />
 
         {cards.map((card, index) => {
-          // Determine focus state: 0 = primary, 1/2 = secondary, -1 = far
-          const focusRank = focusIndices.indexOf(index);
+          // Convert virtual coordinate to physical canvas coordinate
+          // Virtual 0,0 is physical canvasSize/2, canvasSize/2
+          const physicalX = (canvasSize / 2) + card.coord.x;
+          const physicalY = (canvasSize / 2) + card.coord.y;
+
+          let focusRank = -1;
+          if (focusedIds.length > 0) {
+            const idx = focusedIds.indexOf(card.id);
+            focusRank = idx;
+          } else {
+             // Fallback to closest center distance if no focus provided
+             focusRank = index < 3 ? index : -1;
+          }
+
+          // Format relative time simple string
+          const rtf = new Intl.RelativeTimeFormat('zh', { numeric: 'auto' });
+          const daysDifference = Math.round((new Date(card.createdAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+          const timeStr = rtf.format(daysDifference, 'day');
+
+          const content = card.quote ? `${card.moodPhrase}\n\n> ${card.quote}` : card.moodPhrase;
 
           return (
             <UniverseCard
               key={card.id}
-              x={card.x}
-              y={card.y}
-              content={card.content}
-              time={card.time}
-              author={card.author}
+              x={physicalX}
+              y={physicalY}
+              content={content}
+              time={timeStr}
+              author={card.authorName || '匿名星光'}
               focusRank={focusRank}
             />
           );

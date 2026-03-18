@@ -9,24 +9,27 @@ export const AuroraBackground = ({
   const reduceMotion = useUiStore((state) => state.reduceMotion);
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[var(--elysia-ice)] transition-colors duration-700 flex flex-col items-center justify-center">
+    <div className="relative min-h-screen w-full overflow-hidden transition-colors duration-700 flex flex-col items-center justify-center bg-[var(--elysia-ice)] dark:bg-[var(--elysia-ice)]">
+      {/* Abstract Liquid Glass Base Background */}
+      <div className="absolute inset-0 z-0 bg-gradient-to-br from-[var(--elysia-mist)]/10 via-transparent to-[var(--elysia-coral)]/5 dark:from-[var(--elysia-mist)]/5 dark:to-[var(--elysia-coral)]/5" />
+
       {/* Background Gradients */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         {!reduceMotion ? (
           <>
             <motion.div
               animate={{
-                scale: [1, 1.2, 1],
-                x: [0, 50, 0],
-                y: [0, 30, 0],
+                scale: [1, 1.1, 1],
+                x: [0, 30, 0],
+                y: [0, 20, 0],
               }}
               transition={{
-                duration: 12,
+                duration: 20,
                 repeat: Infinity,
                 repeatType: "reverse",
                 ease: "easeInOut",
               }}
-              className="absolute -top-[20%] -left-[10%] w-[70vw] h-[70vw] rounded-full blur-[120px] opacity-60 dark:opacity-40 mix-blend-multiply dark:mix-blend-screen"
+              className="absolute -top-[10%] -left-[10%] w-[60vw] h-[60vw] rounded-full blur-[100px] opacity-40 dark:opacity-20 mix-blend-normal pointer-events-none"
               style={{
                 background:
                   "radial-gradient(circle, var(--elysia-mist) 0%, transparent 70%)",
@@ -35,17 +38,17 @@ export const AuroraBackground = ({
 
             <motion.div
               animate={{
-                scale: [1, 1.3, 1],
-                x: [0, -40, 0],
-                y: [0, 60, 0],
+                scale: [1, 1.15, 1],
+                x: [0, -20, 0],
+                y: [0, 30, 0],
               }}
               transition={{
-                duration: 15,
+                duration: 25,
                 repeat: Infinity,
                 repeatType: "reverse",
                 ease: "easeInOut",
               }}
-              className="absolute top-[10%] -right-[10%] w-[60vw] h-[60vw] rounded-full blur-[100px] opacity-50 dark:opacity-30 mix-blend-multiply dark:mix-blend-screen"
+              className="absolute top-[20%] -right-[10%] w-[50vw] h-[50vw] rounded-full blur-[90px] opacity-30 dark:opacity-15 mix-blend-normal pointer-events-none"
               style={{
                 background:
                   "radial-gradient(circle, var(--elysia-coral) 0%, transparent 70%)",
@@ -54,17 +57,17 @@ export const AuroraBackground = ({
 
             <motion.div
               animate={{
-                scale: [1, 1.1, 1],
-                x: [0, 20, 0],
-                y: [0, -20, 0],
+                scale: [1, 1.05, 1],
+                x: [0, 15, 0],
+                y: [0, -15, 0],
               }}
               transition={{
-                duration: 10,
+                duration: 18,
                 repeat: Infinity,
                 repeatType: "reverse",
                 ease: "easeInOut",
               }}
-              className="absolute -bottom-[10%] left-[20%] w-[50vw] h-[50vw] rounded-full blur-[90px] opacity-40 dark:opacity-20 mix-blend-multiply dark:mix-blend-screen"
+              className="absolute -bottom-[10%] left-[10%] w-[55vw] h-[55vw] rounded-full blur-[110px] opacity-25 dark:opacity-10 mix-blend-normal pointer-events-none"
               style={{
                 background:
                   "radial-gradient(circle, var(--elysia-gold) 0%, transparent 70%)",
@@ -75,21 +78,21 @@ export const AuroraBackground = ({
           // 减弱动画时的静态渐变
           <>
             <div
-              className="absolute -top-[20%] -left-[10%] w-[70vw] h-[70vw] rounded-full blur-[120px] opacity-60 dark:opacity-40 mix-blend-multiply dark:mix-blend-screen"
+              className="absolute -top-[10%] -left-[10%] w-[60vw] h-[60vw] rounded-full blur-[100px] opacity-40 dark:opacity-20 mix-blend-normal pointer-events-none"
               style={{
                 background:
                   "radial-gradient(circle, var(--elysia-mist) 0%, transparent 70%)",
               }}
             />
             <div
-              className="absolute top-[10%] -right-[10%] w-[60vw] h-[60vw] rounded-full blur-[100px] opacity-50 dark:opacity-30 mix-blend-multiply dark:mix-blend-screen"
+              className="absolute top-[20%] -right-[10%] w-[50vw] h-[50vw] rounded-full blur-[90px] opacity-30 dark:opacity-15 mix-blend-normal pointer-events-none"
               style={{
                 background:
                   "radial-gradient(circle, var(--elysia-coral) 0%, transparent 70%)",
               }}
             />
             <div
-              className="absolute -bottom-[10%] left-[20%] w-[50vw] h-[50vw] rounded-full blur-[90px] opacity-40 dark:opacity-20 mix-blend-multiply dark:mix-blend-screen"
+              className="absolute -bottom-[10%] left-[10%] w-[55vw] h-[55vw] rounded-full blur-[110px] opacity-25 dark:opacity-10 mix-blend-normal pointer-events-none"
               style={{
                 background:
                   "radial-gradient(circle, var(--elysia-gold) 0%, transparent 70%)",

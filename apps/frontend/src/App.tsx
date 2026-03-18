@@ -5,13 +5,16 @@ import { CrystalButton } from "./components/ui/CrystalButton";
 import { HomeView } from "./domains/home/HomeView";
 import { UniverseView } from "./domains/universe/UniverseView";
 import { MindMapView } from "./domains/mindmap/MindMapView";
-import { Moon, Sun, Home, Compass, Network, Settings2 } from "lucide-react";
+import { AdminDashboard } from "./domains/admin/AdminDashboard";
+import { AccessApplicationModal } from "./components/ui/AccessApplicationModal";
+import { AppealsModal } from "./components/ui/AppealsModal";
+import { Moon, Sun, Home, Compass, Network, Settings2, Shield } from "lucide-react";
 import { useUiStore } from "./store/uiStore";
 
 function App() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [currentView, setCurrentView] = useState<
-    "home" | "universe" | "mindmap"
+    "home" | "universe" | "mindmap" | "admin"
   >("home");
   const { reduceMotion, toggleReduceMotion } = useUiStore();
 
@@ -86,6 +89,15 @@ function App() {
             <Network className="w-5 h-5 md:w-4 md:h-4" />
             <span className="text-[10px] md:text-sm">记忆之网</span>
           </CrystalButton>
+          <div className="hidden md:block w-px h-6 bg-white/20 dark:bg-white/10 mx-2" />
+          <CrystalButton
+            variant={currentView === "admin" ? "primary" : "ghost"}
+            onClick={() => setCurrentView("admin")}
+            className={`rounded-xl md:rounded-full px-4 md:px-6 py-2 md:py-2 transition-all flex flex-col md:flex-row items-center gap-1 md:gap-2 h-auto ${currentView === "admin" ? (reduceMotion ? "font-bold" : "scale-105") : "opacity-70 hover:opacity-100"}`}
+          >
+            <Shield className="w-5 h-5 md:w-4 md:h-4" />
+            <span className="text-[10px] md:text-sm">治理</span>
+          </CrystalButton>
         </div>
 
         <AnimatePresence mode="wait">
@@ -140,7 +152,27 @@ function App() {
               <MindMapView />
             </motion.div>
           )}
+          {currentView === "admin" && (
+            <motion.div
+              key="admin"
+              initial={
+                reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.95 }
+              }
+              animate={reduceMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 1.05 }}
+              transition={{
+                duration: reduceMotion ? 0.3 : 0.5,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+              className="absolute inset-0 w-full h-full z-[100] bg-slate-50 dark:bg-slate-900"
+            >
+              <AdminDashboard />
+            </motion.div>
+          )}
         </AnimatePresence>
+
+        <AccessApplicationModal />
+        <AppealsModal />
       </div>
     </AuroraBackground>
   );

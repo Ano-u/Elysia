@@ -28,7 +28,7 @@ export const CrystalButton = React.forwardRef<
     const baseStyles =
       "inline-flex items-center justify-center rounded-xl font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-[var(--background)]";
 
-    const variants = {
+    const variants: Record<NonNullable<CrystalButtonProps["variant"]>, string> = {
       primary:
         "bg-white/80 dark:bg-black/40 text-[var(--foreground)] hover:bg-white dark:hover:bg-black/60 border border-white dark:border-white/20 shadow-[var(--shadow-crystal)] hover:shadow-[var(--shadow-liquid)] hover:shadow-[var(--shadow-glow)] backdrop-blur-xl",
       secondary:
@@ -39,7 +39,7 @@ export const CrystalButton = React.forwardRef<
         "hover:bg-white/30 dark:hover:bg-white/10 hover:text-[var(--foreground)] text-[var(--muted-foreground)] backdrop-blur-sm",
     };
 
-    const sizes = {
+    const sizes: Record<NonNullable<CrystalButtonProps["size"]>, string> = {
       sm: "h-9 px-3 text-xs",
       md: "h-10 py-2 px-4 text-sm",
       lg: "h-11 px-8 rounded-2xl text-base",
@@ -58,8 +58,8 @@ export const CrystalButton = React.forwardRef<
         }}
         className={cn(
           baseStyles,
-          variants[variant],
-          sizes[size],
+          variants[variant as NonNullable<CrystalButtonProps["variant"]>],
+          sizes[size as NonNullable<CrystalButtonProps["size"]>],
           "relative overflow-hidden group",
           className,
         )}
