@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LiquidCard } from "../../components/ui/LiquidCard";
@@ -311,8 +311,19 @@ const WarmGuideOverlay: React.FC<{
   );
 };
 
+const BACKGROUND_VIDEO_URL = "/Timeless-Grand-Hall.webm"; // TODO: Swap with CDN URL later
+const BACKGROUND_PHOTO_URL = "/Timeless-Grand-Hall.png";
+
 export const HomeView: React.FC = () => {
   const reduceMotion = useUiStore((state) => state.reduceMotion);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const handleLoadedMetadata = () => {
+    if (videoRef.current && videoRef.current.duration > 0) {
+      videoRef.current.currentTime = Math.random() * videoRef.current.duration;
+    }
+  };
+
   const [showGuide, setShowGuide] = useState<boolean>(() => {
     if (typeof window === "undefined") {
       return false;
@@ -331,6 +342,19 @@ export const HomeView: React.FC = () => {
 
   return (
     <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-20 sm:px-8">
+      {/* Background Video Layer */}
+      <video
+        ref={videoRef}
+        src={BACKGROUND_VIDEO_URL}
+        poster={BACKGROUND_PHOTO_URL}
+        autoPlay
+        muted
+        loop
+        playsInline
+        disablePictureInPicture
+        onLoadedMetadata={handleLoadedMetadata}
+        className="absolute inset-0 w-full h-full object-cover -z-10 opacity-40 dark:opacity-30 mix-blend-screen dark:mix-blend-lighten pointer-events-none"
+      />
       <motion.div
         aria-hidden
         className="absolute inset-0 z-0"
@@ -384,7 +408,7 @@ export const HomeView: React.FC = () => {
           transition={{ duration: 0.8, delay: 0.22 }}
           className="mb-7 text-center sm:mb-10"
         >
-          <h1 className="font-elysia-logo text-[4.6rem] font-medium tracking-[0.03em] text-transparent bg-gradient-to-b from-[#fffefd] via-[#fff4fb] to-[#eaf0ff] bg-clip-text drop-shadow-[0_6px_18px_rgba(245,236,250,0.92)] sm:text-[5.4rem]">
+          <h1 className="font-elysia-logo text-[4.6rem] font-medium tracking-[0.03em] text-transparent bg-gradient-to-b from-[#fffefd] via-[#fff4fb] to-[#eaf0ff] bg-clip-text drop-shadow-[0_6px_18px_rgba(245,236,250,0.92)] sm:text-[5.4rem] pb-2">
             Elysia
           </h1>
           <p className="mt-3 font-elysia-display text-lg text-slate-600/88 dark:text-slate-200/90">
