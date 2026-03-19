@@ -294,7 +294,7 @@ export const HomeView: React.FC = () => {
   };
 
   return (
-    <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-20 sm:px-8">
+    <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden px-4 pb-[calc(5.75rem+env(safe-area-inset-bottom))] pt-20 sm:px-8 md:pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <div
         aria-hidden
         className="absolute inset-0 z-0 overflow-hidden pointer-events-none"
@@ -374,9 +374,9 @@ export const HomeView: React.FC = () => {
           initial={false}
           animate={showOpening ? { opacity: 0, y: 48 } : { opacity: 1, y: 0 }}
           transition={{ duration: 0.82, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-          className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1.25fr)_minmax(0,1fr)] gap-4 overflow-hidden lg:grid-cols-[1.25fr_0.95fr] lg:grid-rows-[minmax(0,1fr)] lg:gap-6"
+          className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1.25fr)_minmax(0,1fr)] gap-4 overflow-visible lg:grid-cols-[1.25fr_0.95fr] lg:grid-rows-[minmax(0,1fr)] lg:gap-6"
         >
-          <LiquidCard className="relative flex h-full min-h-0 flex-col overflow-hidden p-6 sm:p-8 bg-white/45 dark:bg-black/23">
+          <LiquidCard className="relative flex h-full min-h-0 flex-col overflow-visible p-6 sm:p-8 bg-white/45 dark:bg-black/23">
             <ProgressiveInput
               guideStep={showGuide ? guideStep : null}
               isGuideActive={showGuide}

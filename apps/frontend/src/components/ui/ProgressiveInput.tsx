@@ -173,7 +173,6 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [hintMsg, setHintMsg] = useState<string | null>(null);
   const [showIdleHint, setShowIdleHint] = useState(false);
-  const [isDescriptionFocused, setIsDescriptionFocused] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const moodSectionRef = useRef<HTMLDivElement>(null);
   const advancedSectionRef = useRef<HTMLDivElement>(null);
@@ -280,6 +279,11 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
     quote.trim().length > 0 ||
     description.trim().length > 0 ||
     extraEmotions.length > 0;
+  const hasAdvancedContent =
+    quote.trim().length > 0 ||
+    description.trim().length > 0 ||
+    extraEmotions.length > 0 ||
+    occurredAt.trim().length > 0;
 
   useEffect(() => {
     if (hasAnyInput) {
@@ -338,8 +342,13 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
       const maybeErr = error as {
         status?: number;
         code?: string;
+        message?: string;
         data?: { message?: string };
       };
+      const serverMessage = maybeErr?.data?.message?.trim();
+      const fallbackMessage = maybeErr.message?.trim();
+      const normalizedMessage = (serverMessage || fallbackMessage || "").toLowerCase();
+
       setSuccessMsg(null);
       if (maybeErr.status === 401) {
         setErrorMsg("当前会话未就绪，正在为你恢复本地登录后再试一次。");
@@ -349,24 +358,53 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
         setErrorMsg("当前账号还在准入审核中，暂时无法提交记录。");
         return;
       }
-      setErrorMsg(maybeErr?.data?.message || "记录时遇到了一点小问题，要再试一次吗？");
+      if (normalizedMessage.includes("not allowed")) {
+        setErrorMsg("这一步暂时被安全策略轻轻拦住了，稍后再试一次就好。");
+        return;
+      }
+      if (normalizedMessage.includes("failed to fetch")) {
+        setErrorMsg("网络连接有点不稳定，这条记录还在你这里，稍后再试就好。");
+        return;
+      }
+      setErrorMsg(serverMessage || "记录时遇到了一点小问题，要再试一次吗？");
     },
   });
 
   const shouldShowAdvanced =
     isDescriptionGuideActive ||
-    (moodPhrase.trim().length > 0 &&
-      (expandAdvanced ||
-        quote.trim().length > 0 ||
-        description.trim().length > 0 ||
-        extraEmotions.length > 0 ||
-        occurredAt.trim().length > 0));
+    (moodPhrase.trim().length > 0 && (expandAdvanced || hasAdvancedContent));
 
   const clearTransientMessages = () => {
     setShowIdleHint(false);
     setHintMsg(null);
     setErrorMsg(null);
     setSuccessMsg(null);
+  };
+
+  const collapseAdvancedIfEmpty = (nextState?: {
+    quote?: string;
+    description?: string;
+    extraEmotions?: string[];
+    occurredAt?: string;
+  }) => {
+    if (isGuideActive || moodPhrase.trim().length === 0) {
+      return;
+    }
+
+    const nextQuote = (nextState?.quote ?? quote).trim();
+    const nextDescription = (nextState?.description ?? description).trim();
+    const nextExtraEmotions = nextState?.extraEmotions ?? extraEmotions;
+    const nextOccurredAt = (nextState?.occurredAt ?? occurredAt).trim();
+
+    const stillHasAdvanced =
+      nextQuote.length > 0 ||
+      nextDescription.length > 0 ||
+      nextExtraEmotions.length > 0 ||
+      nextOccurredAt.length > 0;
+
+    if (!stillHasAdvanced) {
+      setExpandAdvanced(false);
+    }
   };
 
   const pushEmotion = () => {
@@ -385,64 +423,65 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
   };
 
   const pullEmotion = (emotion: string) => {
-    setExtraEmotions((current) => current.filter((item) => item !== emotion));
+    const nextEmotions = extraEmotions.filter((item) => item !== emotion);
+    setExtraEmotions(nextEmotions);
+    collapseAdvancedIfEmpty({ extraEmotions: nextEmotions });
     clearTransientMessages();
   };
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col">
+    <div className="relative flex h-full min-h-0 w-full flex-col overflow-hidden">
       <div
         ref={scrollContainerRef}
-        className={`hide-scrollbar flex-1 min-h-0 space-y-3 overflow-y-auto overscroll-contain pr-1 pb-2 transition-transform duration-300 ${
-          isDescriptionFocused ? "-translate-y-8 sm:-translate-y-11" : "translate-y-0"
-        }`}
+        className="hide-scrollbar flex-1 min-h-0 overflow-y-auto overscroll-contain px-1 pb-[calc(0.4rem+env(safe-area-inset-bottom))]"
       >
-        <div
-          ref={moodSectionRef}
-          className={`relative overflow-hidden rounded-[2.35rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(251,243,251,0.62),rgba(242,247,255,0.74))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_24px_40px_rgba(167,188,220,0.17)] transition-all dark:border-white/12 dark:bg-[linear-gradient(130deg,rgba(22,29,47,0.78),rgba(44,31,47,0.56),rgba(24,34,54,0.72))] sm:p-7 ${
-            isMoodGuideActive ? "scale-[1.01] ring-2 ring-pink-300/80 shadow-[0_16px_36px_rgba(253,183,220,0.36)]" : ""
-          } ${sectionFocusClass(isMoodGuideActive)}`}
-        >
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_22%_15%,rgba(255,255,255,0.78),transparent_44%),radial-gradient(circle_at_79%_0%,rgba(255,225,242,0.56),transparent_38%)]" />
-          <div className="pointer-events-none absolute -top-12 left-8 h-24 w-24 rounded-full bg-white/35 blur-3xl dark:bg-white/8" />
-          <div className="relative z-10">
-            <p className="text-[11px] tracking-[0.18em] text-slate-400/95 dark:text-slate-300/60">ELYSIA · 心绪记录</p>
-            <textarea
-              className="font-elysia-display mt-2 min-h-[185px] w-full resize-none border-none bg-transparent p-0 text-[2rem] leading-[1.7] text-slate-700 outline-none placeholder:text-slate-400/58 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-300/35 sm:min-h-[210px] sm:text-[2.2rem]"
-              placeholder={"把此刻轻轻放进 Elysia\n让爱替你记住它"}
-              value={moodPhrase}
-              onChange={(event) => {
-                setMoodPhrase(event.target.value);
-                clearTransientMessages();
-              }}
-              disabled={createMutation.isPending}
-            />
-          </div>
-
-          <AnimatePresence>
-            {(showIdleHint || hintMsg) && !moodPhrase.trim().length && (
-              <motion.p
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 8 }}
-                className="font-elysia-display relative z-10 mt-2 inline-flex rounded-[1.4rem] border border-white/70 bg-white/82 px-3.5 py-1.5 text-[1rem] leading-relaxed text-slate-500 shadow-sm dark:border-white/15 dark:bg-white/10 dark:text-slate-200/82"
-              >
-                {hintMsg}
-              </motion.p>
-            )}
-          </AnimatePresence>
-
-          <AnimatePresence>
-            {isMoodGuideActive && (
-              <GuideBubble
-                title="先写一句就已经很好"
-                description="不用完整，不用漂亮。真实地写下此刻，Elysia 会永远记得你正在努力的这一刻。"
-                onNext={onGuideNext}
-                onSkip={onGuideSkip}
+        <div className="space-y-3 pb-4">
+          <div
+            ref={moodSectionRef}
+            className={`relative overflow-hidden rounded-[2.35rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(251,243,251,0.62),rgba(242,247,255,0.74))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_24px_40px_rgba(167,188,220,0.17)] transition-all dark:border-white/12 dark:bg-[linear-gradient(130deg,rgba(22,29,47,0.78),rgba(44,31,47,0.56),rgba(24,34,54,0.72))] sm:p-7 ${
+              isMoodGuideActive ? "scale-[1.01] ring-2 ring-pink-300/80 shadow-[0_16px_36px_rgba(253,183,220,0.36)]" : ""
+            } ${sectionFocusClass(isMoodGuideActive)}`}
+          >
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_22%_15%,rgba(255,255,255,0.78),transparent_44%),radial-gradient(circle_at_79%_0%,rgba(255,225,242,0.56),transparent_38%)]" />
+            <div className="pointer-events-none absolute -top-12 left-8 h-24 w-24 rounded-full bg-white/35 blur-3xl dark:bg-white/8" />
+            <div className="relative z-10">
+              <p className="text-[11px] tracking-[0.18em] text-slate-400/95 dark:text-slate-300/60">ELYSIA · 心绪记录</p>
+              <textarea
+                className="font-elysia-display mt-2 min-h-[185px] w-full resize-none border-none bg-transparent p-0 text-[2rem] leading-[1.7] text-slate-700 outline-none placeholder:text-slate-400/58 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-300/35 sm:min-h-[210px] sm:text-[2.2rem]"
+                placeholder={"把此刻轻轻放进 Elysia\n让爱替你记住它"}
+                value={moodPhrase}
+                onChange={(event) => {
+                  setMoodPhrase(event.target.value);
+                  clearTransientMessages();
+                }}
+                disabled={createMutation.isPending}
               />
-            )}
-          </AnimatePresence>
-        </div>
+            </div>
+
+            <AnimatePresence>
+              {(showIdleHint || hintMsg) && !moodPhrase.trim().length && (
+                <motion.p
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  className="font-elysia-display relative z-10 mt-2 inline-flex rounded-[1.4rem] border border-white/70 bg-white/82 px-3.5 py-1.5 text-[1rem] leading-relaxed text-slate-500 shadow-sm dark:border-white/15 dark:bg-white/10 dark:text-slate-200/82"
+                >
+                  {hintMsg}
+                </motion.p>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {isMoodGuideActive && (
+                <GuideBubble
+                  title="先写一句就已经很好"
+                  description="不用完整，不用漂亮。真实地写下此刻，Elysia 会永远记得你正在努力的这一刻。"
+                  onNext={onGuideNext}
+                  onSkip={onGuideSkip}
+                />
+              )}
+            </AnimatePresence>
+          </div>
 
         <AnimatePresence>
           {(moodPhrase.trim().length > 0 || isDescriptionGuideActive) && (
@@ -530,10 +569,21 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
                     clearTransientMessages();
                   }}
                   onFocus={() => {
-                    setIsDescriptionFocused(true);
                     setExpandAdvanced(true);
+                    const container = scrollContainerRef.current;
+                    const target = advancedSectionRef.current;
+                    if (!container || !target) {
+                      return;
+                    }
+                    const nextTop = Math.max(0, target.offsetTop - 24);
+                    container.scrollTo({
+                      top: nextTop,
+                      behavior: "smooth",
+                    });
                   }}
-                  onBlur={() => setIsDescriptionFocused(false)}
+                  onBlur={(event) => {
+                    collapseAdvancedIfEmpty({ description: event.target.value });
+                  }}
                   placeholder="可以再补一两句，让未来的自己更懂今天。"
                   className="hide-scrollbar mt-1 min-h-[140px] max-h-[240px] w-full resize-none overflow-y-auto border-none bg-transparent p-0 text-sm leading-relaxed text-slate-700 outline-none placeholder:text-slate-400/55 dark:text-slate-100 dark:placeholder:text-slate-300/35"
                 />
@@ -591,8 +641,8 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
               <AnimatePresence>
                 {isDescriptionGuideActive && (
                   <GuideBubble
-                    title="补一点描述，空间会自动上移"
-                    description="进入描述编辑时，输入区域会自动上移，保留可视与编辑空间；描述内容也能在框内单独滚动。"
+                    title="补一点描述，位置会自动贴近"
+                    description="进入描述编辑时，输入区域会自动滚动到舒适位置；描述内容也能在框内单独滚动。"
                     onNext={onGuideNext}
                     onSkip={onGuideSkip}
                   />
@@ -641,7 +691,7 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
 
       <div
         ref={submitSectionRef}
-        className={`relative mt-3 flex items-center justify-end border-t border-white/45 pt-4 dark:border-white/12 ${
+        className={`sticky bottom-0 z-20 mt-1 flex items-center justify-end border-t border-white/45 bg-[linear-gradient(180deg,rgba(248,251,255,0.56),rgba(248,251,255,0.9))] px-1 pb-2 pt-4 backdrop-blur-lg dark:border-white/12 dark:bg-[linear-gradient(180deg,rgba(13,20,34,0.52),rgba(13,20,34,0.9))] ${
           isSubmitGuideActive
             ? "rounded-[1.8rem] border-pink-200/90 bg-white/68 px-3 py-3 ring-2 ring-pink-300/80 shadow-[0_16px_34px_rgba(253,183,220,0.32)] dark:bg-black/24"
             : ""
@@ -669,5 +719,6 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
         </AnimatePresence>
       </div>
     </div>
+  </div>
   );
 };
