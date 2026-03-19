@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LiquidCard } from "../../components/ui/LiquidCard";
@@ -13,8 +13,6 @@ import {
 } from "../../lib/apiClient";
 import type { PublicationStatus, RecordSummary } from "../../types/api";
 
-const BRIDGE_BG_URL =
-  "https://img2-tc.tapimg.com/moment/etag/FpPUtSEl5fZvpOCCmhFVlWDqIFXr.png/_tap_ugc.jpg";
 const ONBOARDING_STORAGE_KEY = "elysia-warm-guide-v1";
 
 const STATUS_LABEL: Record<PublicationStatus, string> = {
@@ -311,8 +309,19 @@ const WarmGuideOverlay: React.FC<{
   );
 };
 
+const BACKGROUND_VIDEO_URL = "/Timeless-Grand-Hall.webm"; // TODO: Swap with CDN URL later
+const BACKGROUND_PHOTO_URL = "/Timeless-Grand-Hall.png";
+
 export const HomeView: React.FC = () => {
   const reduceMotion = useUiStore((state) => state.reduceMotion);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const handleLoadedMetadata = () => {
+    if (videoRef.current && videoRef.current.duration > 0) {
+      videoRef.current.currentTime = Math.random() * videoRef.current.duration;
+    }
+  };
+
   const [showGuide, setShowGuide] = useState<boolean>(() => {
     if (typeof window === "undefined") {
       return false;
@@ -331,36 +340,27 @@ export const HomeView: React.FC = () => {
 
   return (
     <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-20 sm:px-8">
-      <motion.div
+      {/* Background Video Layer — pure CSS animation for GPU compositing */}
+      <div
         aria-hidden
-        className="absolute inset-0 z-0"
-        animate={
-          reduceMotion
-            ? undefined
-            : {
-                scale: [1.02, 1.06, 1.02],
-                x: [0, -16, 0],
-                y: [0, 12, 0],
-              }
-        }
-        transition={
-          reduceMotion
-            ? undefined
-            : {
-                duration: 24,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }
-        }
-        style={{
-          backgroundImage: `url(${BRIDGE_BG_URL})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          filter: "saturate(0.95) brightness(1.08)",
-        }}
-      />
+        className={`absolute inset-0 z-0 overflow-hidden pointer-events-none ${reduceMotion ? '' : 'animate-bg-drift'}`}
+        style={{ filter: "saturate(0.95) brightness(1.08)" }}
+      >
+        <video
+          ref={videoRef}
+          src={BACKGROUND_VIDEO_URL}
+          poster={BACKGROUND_PHOTO_URL}
+          autoPlay
+          muted
+          loop
+          playsInline
+          disablePictureInPicture
+          onLoadedMetadata={handleLoadedMetadata}
+          className="w-full h-full object-cover opacity-72 dark:opacity-10 mix-blend-screen dark:mix-blend-lighten pointer-events-none"
+        />
+      </div>
 
-      <div className="absolute inset-0 z-[1] bg-gradient-to-b from-white/45 via-white/72 to-white/86 dark:from-slate-900/35 dark:via-slate-900/68 dark:to-slate-900/84" />
+      {/* <div className="absolute inset-0 z-[1] bg-gradient-to-b from-white/45 via-white/72 to-white/86 dark:from-slate-900/35 dark:via-slate-900/68 dark:to-slate-900/84" /> */}
       <div className="absolute inset-0 z-[2] pointer-events-none bg-[radial-gradient(circle_at_20%_14%,rgba(255,255,255,0.7),transparent_45%),radial-gradient(circle_at_82%_12%,rgba(255,231,242,0.52),transparent_38%),radial-gradient(circle_at_50%_90%,rgba(214,236,255,0.34),transparent_52%)]" />
       <div className="pointer-events-none absolute inset-x-[9%] top-[7%] z-[3] h-[53%] rounded-[44%_44%_8%_8%/58%_58%_8%_8%] border border-white/45 bg-gradient-to-b from-white/26 to-transparent dark:border-white/10 dark:from-white/5" />
       <div className="pointer-events-none absolute inset-x-[16%] top-[12%] z-[3] h-[43%] rounded-[42%_42%_8%_8%/56%_56%_8%_8%] border border-white/35 dark:border-white/8" />
@@ -384,7 +384,7 @@ export const HomeView: React.FC = () => {
           transition={{ duration: 0.8, delay: 0.22 }}
           className="mb-7 text-center sm:mb-10"
         >
-          <h1 className="font-elysia-logo text-[4.6rem] font-medium tracking-[0.03em] text-transparent bg-gradient-to-b from-[#fffefd] via-[#fff4fb] to-[#eaf0ff] bg-clip-text drop-shadow-[0_6px_18px_rgba(245,236,250,0.92)] sm:text-[5.4rem]">
+          <h1 className="font-elysia-logo text-[4.6rem] font-medium tracking-[0.03em] text-transparent bg-gradient-to-b from-[#fffefd] via-[#fff4fb] to-[#eaf0ff] bg-clip-text drop-shadow-[0_6px_18px_rgba(245,236,250,0.92)] sm:text-[5.4rem] pb-2">
             Elysia
           </h1>
           <p className="mt-3 font-elysia-display text-lg text-slate-600/88 dark:text-slate-200/90">

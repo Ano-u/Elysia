@@ -86,7 +86,7 @@
     /* Crystal & Liquid Textures */
     --shadow-crystal: 0 10px 35px rgba(135, 171, 214, 0.17);
     --shadow-liquid: inset 0 0 26px rgba(255, 255, 255, 0.72), 0 12px 34px rgba(190, 214, 242, 0.25);
-    --shadow-glow: 0 0 26px rgba(255, 228, 196, 0.45);
+    --shadow-glow: 0 0 20px rgba(244, 194, 194, 0.5);
 
     /* Transitions */
     --transition-main: 300ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -132,7 +132,8 @@
     /* Crystal & Liquid Textures - Dark Mode */
     --shadow-crystal: 0 10px 35px rgba(0, 0, 0, 0.42);
     --shadow-liquid: inset 0 0 22px rgba(196, 225, 255, 0.12), 0 12px 32px rgba(0, 0, 0, 0.35);
-    --shadow-glow: 0 0 22px rgba(255, 214, 175, 0.2);
+    --shadow-glow: 0 0 20px rgba(244, 194, 194, 0.3);
+
   }
 }
 
@@ -188,5 +189,21 @@
   }
   .hide-scrollbar::-webkit-scrollbar {
     display: none; /* Chrome, Safari and Opera */
+  }
+
+  @keyframes bg-drift {
+    0%, 100% { transform: scale(1.02) translateX(0) translateY(0); }
+    50%      { transform: scale(1.06) translateX(-16px) translateY(12px); }
+  }
+
+  .animate-bg-drift {
+    animation: bg-drift 24s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-bg-drift {
+      animation: none;
+    }
   }
 }
