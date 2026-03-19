@@ -74,7 +74,7 @@ export const ActionPairRow: React.FC<ActionPairRowProps> = ({
             disabled={isPending}
             className="w-12 h-12 rounded-full shadow-lg border-2 border-white/80 dark:border-white/20 hover:scale-110 active:scale-95 transition-all"
           >
-            <div className={`${isPending ? "animate-spin" : "group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"}`}>
+            <div className={`${isPending ? "animate-spin" : "transition-transform"}`}>
               {currentIcons.left}
             </div>
           </CrystalButton>

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LiquidCard } from "./LiquidCard";
 import { ActionPairRow } from "./ActionPairRow";
-import { ChevronDown, ChevronUp, Tag as TagIcon, Hash } from "lucide-react";
+import { ChevronDown, ChevronUp, Tag as TagIcon, Quote } from "lucide-react";
 
 interface MainInputCardProps {
   moodPhrase: string;
@@ -64,9 +64,9 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
             <textarea
               autoFocus={hasValue}
               className={`font-elysia-display w-full resize-none border-none bg-transparent p-0 outline-none placeholder:text-slate-400/40 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-300/20 transition-all duration-700 ease-in-out ${
-                isLanding ? "text-[2.8rem] min-h-[140px]" : isCompact ? "text-2xl min-h-[40px] font-bold" : "text-[2.2rem] min-h-[120px]"
+                isLanding ? "text-[2.2rem] min-h-[120px]" : isCompact ? "text-2xl min-h-[40px] font-bold" : "text-[2.4rem] min-h-[140px]"
               }`}
-              placeholder="把此刻轻轻放进 Elysia..."
+              placeholder="把此刻轻轻放进礼堂，让爱替你记住它"
               value={moodPhrase}
               onChange={(e) => setMoodPhrase(e.target.value)}
               onFocus={() => setIsFocused(true)}
@@ -95,7 +95,10 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                         className="flex flex-col gap-2"
                       >
                         <span className="text-[10px] tracking-widest text-slate-400 uppercase font-bold flex items-center gap-1">
-                          <Hash className="w-3 h-3" /> 今日誓言
+                          <Quote
+                            className="w-3 h-3"
+                            style={{ transform: 'scale(-1, -1)' }}
+                          /> 今日誓言
                         </span>
                         <input
                           type="text"
@@ -103,8 +106,8 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                           onChange={(e) => setQuote(e.target.value)}
                           onFocus={() => setIsQuoteFocused(true)}
                           onBlur={() => setIsQuoteFocused(false)}
-                          placeholder="..."
-                          className="w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-3 text-lg italic text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 transition-all shadow-inner"
+                          placeholder="想把哪句话做成今日誓言..."
+                          className="w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-3 text-base italic text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 transition-all shadow-inner"
                         />
                       </motion.div>
                     ) : (
@@ -116,7 +119,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                         className="relative pl-6 py-1 cursor-pointer group"
                       >
                         <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-pink-300/60 rounded-full group-hover:bg-pink-400 transition-colors" />
-                        <p className="italic text-slate-600 dark:text-slate-300 text-lg leading-relaxed">
+                        <p className="italic text-slate-600 dark:text-slate-300 text-base leading-relaxed">
                           {quote}
                         </p>
                       </motion.div>
@@ -133,7 +136,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                     {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     详细描述
                   </button>
-                  
+
                   <AnimatePresence>
                     {showDetails && (
                       <motion.div
@@ -149,15 +152,15 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                             onFocus={() => setIsDescFocused(true)}
                             onBlur={() => setIsDescFocused(false)}
                             placeholder="补一两句细节，让未来的自己更懂今天..."
-                            className="w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-4 text-base text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 min-h-[140px] resize-none shadow-inner"
+                            className="w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-4 text-sm text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 min-h-[140px] resize-none shadow-inner"
                           />
                         ) : (
-                          <div 
+                          <div
                             onClick={() => setIsDescFocused(true)}
                             className="flex flex-col gap-4 pl-6 cursor-pointer"
                           >
                             {description.split("\n").filter(p => p.trim()).map((p, i) => (
-                              <div key={i} className="relative text-slate-500 dark:text-slate-400 text-base leading-relaxed">
+                              <div key={i} className="relative text-slate-500 dark:text-slate-400 text-sm leading-relaxed">
                                 <div className="absolute -left-6 top-2.5 w-1.5 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
                                 {p}
                               </div>
@@ -188,8 +191,8 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                 key={tag}
                 onClick={() => toggleTag(tag)}
                 className={`px-4 py-1.5 rounded-full text-xs font-bold border-2 transition-all ${
-                  active 
-                    ? "bg-pink-100 dark:bg-pink-900/40 border-pink-200 dark:border-pink-800 text-pink-600 dark:text-pink-300 shadow-glow" 
+                  active
+                    ? "bg-pink-100 dark:bg-pink-900/40 border-pink-200 dark:border-pink-800 text-pink-600 dark:text-pink-300 shadow-glow"
                     : "bg-white/20 dark:bg-black/20 border-white/60 dark:border-white/10 text-slate-500 hover:border-pink-200"
                 }`}
               >

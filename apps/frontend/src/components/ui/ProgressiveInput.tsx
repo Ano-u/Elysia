@@ -448,7 +448,7 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
               <p className="text-[11px] tracking-[0.18em] text-slate-400/95 dark:text-slate-300/60">ELYSIA · 心绪记录</p>
               <textarea
                 className="font-elysia-display mt-2 min-h-[185px] w-full resize-none border-none bg-transparent p-0 text-[2rem] leading-[1.7] text-slate-700 outline-none placeholder:text-slate-400/58 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-300/35 sm:min-h-[210px] sm:text-[2.2rem]"
-                placeholder={"把此刻轻轻放进 Elysia\n让爱替你记住它"}
+                placeholder={"把此刻轻轻放进礼堂，让爱替你记住它"}
                 value={moodPhrase}
                 onChange={(event) => {
                   setMoodPhrase(event.target.value);

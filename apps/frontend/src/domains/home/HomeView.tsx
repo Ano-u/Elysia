@@ -48,32 +48,6 @@ function readInitialDraft(): DraftPayload {
   }
 }
 
-const FloatingPetals: React.FC = () => (
-  <div className="pointer-events-none absolute inset-0 z-[4] overflow-hidden">
-    {[...Array(7)].map((_, i) => (
-      <motion.span
-        key={i}
-        animate={{
-          y: [0, -20, 0],
-          x: [0, 10, 0],
-          rotate: [0, 10, 0],
-        }}
-        transition={{
-          duration: 5 + i,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-        className="absolute h-3 w-3 rounded-full bg-gradient-to-br from-pink-50 to-pink-200/40 blur-[1px]"
-        style={{
-          left: `${10 + i * 15}%`,
-          top: `${20 + (i % 3) * 20}%`,
-          opacity: 0.4,
-        }}
-      />
-    ))}
-  </div>
-);
-
 const TEST_DATA: RecordSummary[] = [
   {
     id: "test-1",
@@ -143,8 +117,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
     return () => clearTimeout(timer);
   }, [draft]);
 
-  const mindMapProgress = onboardingData ? onboardingData.progress.completed_days.length / 7 : 0;
-  const isMindMapActive = mindMapProgress >= 1;
+  const mindMapProgress = onboardingData ? onboardingData.progress.completed_days.length : 0;
+  const isMindMapActive = mindMapProgress >= 7;
 
   const allItems = [...TEST_DATA, ...(feedData?.items ?? [])].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -159,7 +133,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         <motion.div
           animate={{ scale: [1, 1.05, 1], x: [0, -10, 0], y: [0, 5, 0] }}
-          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+          transition={{ duration: 40, repeat: Infinity, ease: "easeInOut" }}
           className="absolute inset-0"
         >
           <video
@@ -170,10 +144,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
           />
         </motion.div>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_14%,rgba(255,255,255,0.7),transparent_45%),radial-gradient(circle_at_82%_12%,rgba(255,231,242,0.52),transparent_38%),radial-gradient(circle_at_50%_90%,rgba(214,236,255,0.3),transparent_50%)]" />
-        <FloatingPetals />
       </div>
 
-      <div className="relative z-10 flex flex-col items-center max-w-6xl mx-auto px-4 pt-16 pb-32 gap-32">
+      <div className="relative z-10 flex flex-col items-center max-w-6xl mx-auto px-4 pt-16 pb-32 gap-16">
         {/* Section 1: Landing Header & Input */}
         <section className="w-full flex flex-col items-center gap-16">
           <motion.div
@@ -207,7 +180,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
         </section>
 
         {/* Section 2: HomeTimeline */}
-        <section className="w-full flex flex-col gap-16 relative max-w-4xl">
+        <section className="w-full flex flex-col gap-10 relative max-w-4xl">
           {/* Vertical Guide Line */}
           <div className="absolute left-[-2.5rem] top-0 bottom-0 w-[2px] bg-gradient-to-b from-slate-200 via-slate-300 to-transparent dark:from-white/5 dark:via-white/10 hidden lg:block" />
 
@@ -221,12 +194,12 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
               onLeftClick={() => setShowOnlyPublic(!showOnlyPublic)}
               onRightClick={() => onNavigate("mindmap")}
               isRightActive={isMindMapActive}
-              rightActiveLabel={isMindMapActive ? "织网已就绪" : `激活进度 ${Math.round(mindMapProgress * 100)}%`}
+              rightActiveLabel={isMindMapActive ? "织网已就绪" : `激活进度 ${mindMapProgress}/7`}
               progress={mindMapProgress}
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-20 px-6">
+          <div className="grid grid-cols-1 gap-10 px-6">
             {isFeedLoading ? (
               <p className="text-center text-slate-400 py-20 font-elysia-display text-xl">正在捧起你最近的心情片段...</p>
             ) : filteredItems.length === 0 ? (
@@ -272,7 +245,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
   return (
     <div className="flex flex-col gap-4 group relative">
       {/* Time & Status Above Card */}
-      <div className="flex items-center justify-between px-6 text-xs text-slate-400 font-bold tracking-widest uppercase">
+      <div className="flex items-center justify-between px-10 text-xs text-slate-400 font-bold tracking-widest uppercase">
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4 text-pink-300" />
           {new Date(item.createdAt).toLocaleString("zh-CN", {
@@ -322,19 +295,19 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
         </div>
 
         {item.quote && (
-          <div className="relative pl-8 py-1">
+          <div className="relative pl-4 py-1 my-6">
             <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-pink-300/60 rounded-full shadow-glow" />
-            <p className="italic text-slate-600 dark:text-slate-300 text-xl leading-relaxed font-medium">
+            <p className="italic text-slate-600 dark:text-slate-300 text-base leading-relaxed font-medium">
               {item.quote}
             </p>
           </div>
         )}
 
         {item.description && (
-          <div className="flex flex-col gap-6 pl-8">
+          <div className="flex flex-col gap-2 pl-4">
             {item.description.split("\n").filter(p => p.trim()).map((p, i) => (
-              <div key={i} className="relative text-slate-500 dark:text-slate-400 text-lg leading-loose">
-                <div className="absolute -left-8 top-4 w-2 h-2 bg-slate-200 dark:bg-slate-800 rounded-full" />
+              <div key={i} className="relative text-slate-500 dark:text-slate-400 text-sm/1 leading-loose">
+                <div className="absolute -left-4 top-3 w-2 h-2 bg-slate-200 dark:bg-slate-800 rounded-full" />
                 {p}
               </div>
             ))}
