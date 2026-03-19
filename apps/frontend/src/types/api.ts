@@ -158,7 +158,11 @@ export interface CreateRecordRequest {
 export interface RecordSummary {
   id: string;
   moodPhrase: string;
+  quote?: string | null;
+  extraEmotions?: string[] | null;
   description: string | null;
+  imageIds?: string[] | null;
+  drawingId?: string | null;
   visibilityIntent: VisibilityIntent;
   publicationStatus: PublicationStatus;
   isPublic: boolean;

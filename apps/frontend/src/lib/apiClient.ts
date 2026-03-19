@@ -25,7 +25,11 @@ import type {
 type RawRecordSummary = {
   id: string;
   mood_phrase: string;
+  quote?: string | null;
+  extra_emotions?: string[] | null;
   description: string | null;
+  image_ids?: string[] | null;
+  drawing_id?: string | null;
   visibility_intent: 'private' | 'public';
   publication_status: PublicationStatus;
   is_public: boolean;
@@ -109,7 +113,11 @@ function mapRecordSummary(raw: RawRecordSummary): RecordSummary {
   return {
     id: raw.id,
     moodPhrase: raw.mood_phrase,
+    quote: raw.quote,
+    extraEmotions: raw.extra_emotions,
     description: raw.description,
+    imageIds: raw.image_ids,
+    drawingId: raw.drawing_id,
     visibilityIntent: raw.visibility_intent,
     publicationStatus: raw.publication_status,
     isPublic: raw.is_public,
