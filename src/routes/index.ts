@@ -17,14 +17,8 @@ import { aiRoutes } from "./ai.js";
 import { accessRoutes } from "./access.js";
 import { adminRoutes } from "./admin.js";
 import { appealRoutes } from "./appeals.js";
-import { registerSocket } from "../lib/realtime.js";
 
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/ws", { websocket: true }, (connection) => {
-    registerSocket(connection);
-    connection.socket.send(JSON.stringify({ event: "system.connected", at: new Date().toISOString() }));
-  });
-
   await app.register(systemRoutes);
   await app.register(locationRoutes);
   await app.register(authRoutes);
