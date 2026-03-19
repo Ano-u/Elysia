@@ -26,7 +26,7 @@ export const CrystalButton = React.forwardRef<
     ref,
   ) => {
     const baseStyles =
-      "inline-flex items-center justify-center rounded-xl font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-[var(--background)]";
+      "inline-flex items-center justify-center rounded-2xl font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-[var(--background)]";
 
     const variants: Record<NonNullable<CrystalButtonProps["variant"]>, string> = {
       primary:
@@ -42,7 +42,7 @@ export const CrystalButton = React.forwardRef<
     const sizes: Record<NonNullable<CrystalButtonProps["size"]>, string> = {
       sm: "h-9 px-3 text-xs",
       md: "h-10 py-2 px-4 text-sm",
-      lg: "h-11 px-8 rounded-2xl text-base",
+      lg: "h-11 px-8 rounded-[1.35rem] text-base",
       icon: "h-10 w-10",
     };
 
@@ -66,7 +66,7 @@ export const CrystalButton = React.forwardRef<
         {...props}
       >
         {/* Subtle Shine Effect */}
-        <span className="absolute inset-0 z-0 overflow-hidden rounded-xl">
+        <span className="absolute inset-0 z-0 overflow-hidden rounded-2xl">
           <span className="absolute top-0 left-0 w-full h-full bg-gradient-to-tr from-white/0 via-white/40 to-white/0 transform -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
         </span>
 

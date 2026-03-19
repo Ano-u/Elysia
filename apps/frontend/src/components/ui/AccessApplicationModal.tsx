@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getAccessApplicationStatus, submitAccessApplication } from '../../lib/apiClient';
+import { getAccessApplicationStatus, getAuthMe, submitAccessApplication } from '../../lib/apiClient';
 import { LiquidCard } from './LiquidCard';
 
 export const AccessApplicationModal: React.FC = () => {
   const queryClient = useQueryClient();
+  const authQuery = useQuery({
+    queryKey: ['auth-me'],
+    queryFn: getAuthMe,
+    retry: false,
+  });
   const { data, isLoading } = useQuery({
     queryKey: ['access-application-status'],
     queryFn: getAccessApplicationStatus,
@@ -29,6 +34,7 @@ export const AccessApplicationModal: React.FC = () => {
 
   // Only show if we know the user needs to apply (not_submitted or pending or rejected)
   // If undefined or approved, we render nothing
+  if (authQuery.data?.user?.role === 'admin') return null;
   if (isLoading || !data) return null;
   if (data.accessStatus === 'approved') return null;
 
@@ -43,7 +49,7 @@ export const AccessApplicationModal: React.FC = () => {
         <LiquidCard className="p-8">
           <div className="text-center mb-8">
             <h2 className="font-elysia-display text-3xl text-slate-800 dark:text-slate-200 mb-2">
-              欢迎来到永恒礼堂
+              欢迎来到 Elysia
             </h2>
             <p className="font-elysia-poem text-[1.45rem] leading-none text-slate-500/90 dark:text-slate-300/80">
               真诚的心意，会被认真听见。

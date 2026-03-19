@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createRecord, getNudgeRecommendations, submitNudgeFeedback } from "../../lib/apiClient";
+import { createRecord, getNudgeRecommendations } from "../../lib/apiClient";
+import { readAdminInspirationTexts } from "../../lib/inspirationStore";
 import type { VisibilityIntent } from "../../types/api";
 
 type DraftPayload = {
@@ -13,40 +14,59 @@ type DraftPayload = {
   visibilityIntent: VisibilityIntent;
 };
 
-const DRAFT_KEY = "elysia-home-draft-v2";
-const INSPIRATIONS = [
+type ProgressiveInputProps = {
+  guideStep?: number | null;
+  isGuideActive?: boolean;
+  onGuideNext?: () => void;
+  onGuideSkip?: () => void;
+};
+
+const DRAFT_KEY = "elysia-home-draft-v3";
+const FALLBACK_INSPIRATIONS = [
   "先写一小句: 今天的我，想被温柔地抱一下。",
   "先记一个词也好: 花、光、想念、勇气。",
-  "把最真实的那一瞬交给礼堂，它会替你珍藏。",
+  "把最真实的那一瞬交给 Elysia，它会替你珍藏。",
   "不必完美，真诚地写下，就已经很美了。",
 ];
 
-function pickFallbackInspiration(): string {
-  return INSPIRATIONS[Math.floor(Math.random() * INSPIRATIONS.length)];
+function pickRandom(items: string[]): string {
+  return items[Math.floor(Math.random() * items.length)] ?? FALLBACK_INSPIRATIONS[0];
+}
+
+function dedupeInspirations(items: string[]): string[] {
+  const bucket = new Set<string>();
+  const output: string[] = [];
+  for (const item of items) {
+    const normalized = item.trim();
+    if (!normalized) {
+      continue;
+    }
+    if (bucket.has(normalized)) {
+      continue;
+    }
+    bucket.add(normalized);
+    output.push(normalized);
+  }
+  return output;
 }
 
 function readInitialDraft(): DraftPayload {
+  const emptyDraft: DraftPayload = {
+    moodPhrase: "",
+    quote: "",
+    description: "",
+    extraEmotions: [],
+    occurredAt: "",
+    visibilityIntent: "private",
+  };
+
   if (typeof window === "undefined") {
-    return {
-      moodPhrase: "",
-      quote: "",
-      description: "",
-      extraEmotions: [],
-      occurredAt: "",
-      visibilityIntent: "private",
-    };
+    return emptyDraft;
   }
 
   const raw = window.localStorage.getItem(DRAFT_KEY);
   if (!raw) {
-    return {
-      moodPhrase: "",
-      quote: "",
-      description: "",
-      extraEmotions: [],
-      occurredAt: "",
-      visibilityIntent: "private",
-    };
+    return emptyDraft;
   }
 
   try {
@@ -61,14 +81,7 @@ function readInitialDraft(): DraftPayload {
     };
   } catch {
     window.localStorage.removeItem(DRAFT_KEY);
-    return {
-      moodPhrase: "",
-      quote: "",
-      description: "",
-      extraEmotions: [],
-      occurredAt: "",
-      visibilityIntent: "private",
-    };
+    return emptyDraft;
   }
 }
 
@@ -83,7 +96,62 @@ function toIsoDateTime(value: string): string | undefined {
   return date.toISOString();
 }
 
-export const ProgressiveInput: React.FC = () => {
+const GuideBubble: React.FC<{
+  title: string;
+  description: string;
+  placement?: "top-right" | "bottom-right";
+  onNext?: () => void;
+  onSkip?: () => void;
+}> = ({ title, description, placement = "top-right", onNext, onSkip }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+    animate={{ opacity: 1, y: 0, scale: 1 }}
+    exit={{ opacity: 0, y: 8, scale: 0.98 }}
+    transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+    className={`z-[95] w-[22rem] max-w-[calc(100%-0.75rem)] rounded-[1.55rem] border border-white/85 bg-[linear-gradient(140deg,rgba(255,247,255,0.94),rgba(249,238,255,0.9),rgba(236,246,255,0.93))] px-4 py-3 text-sm shadow-[0_16px_34px_rgba(182,135,255,0.2),0_8px_20px_rgba(255,174,222,0.28)] backdrop-blur-3xl dark:border-white/25 dark:bg-[linear-gradient(140deg,rgba(36,24,58,0.9),rgba(44,30,70,0.88),rgba(24,36,64,0.9))] ${
+      placement === "bottom-right"
+        ? "absolute right-0 bottom-full mb-3 sm:right-2"
+        : "absolute right-3 top-3"
+    }`}
+    onClick={(event: React.MouseEvent<HTMLDivElement>) => event.stopPropagation()}
+  >
+    <p className="font-elysia-display text-lg text-transparent bg-clip-text bg-gradient-to-r from-[#fff6ff] via-[#ffd8f4] to-[#cae6ff] [text-shadow:0_0_14px_rgba(245,176,255,0.62),0_1px_0_rgba(58,33,89,0.45)]">
+      {title}
+    </p>
+    <p className="mt-1 font-elysia-display text-sm leading-relaxed text-[#624f7f] [text-shadow:0_1px_0_rgba(255,255,255,0.6)] dark:text-[#f1e9ff] dark:[text-shadow:0_1px_0_rgba(16,8,33,0.75)]">
+      {description}
+    </p>
+    <div className="mt-3 flex items-center justify-end gap-2 text-xs">
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onSkip?.();
+        }}
+        className="rounded-full border border-white/70 bg-white/85 px-3 py-1.5 text-slate-500 hover:bg-white dark:border-white/20 dark:bg-white/10 dark:text-slate-200"
+      >
+        跳过
+      </button>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onNext?.();
+        }}
+        className="rounded-full bg-slate-900 px-3 py-1.5 text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+      >
+        下一步
+      </button>
+    </div>
+  </motion.div>
+);
+
+export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
+  guideStep = null,
+  isGuideActive = false,
+  onGuideNext,
+  onGuideSkip,
+}) => {
   const [initialDraft] = useState<DraftPayload>(() => readInitialDraft());
 
   const [moodPhrase, setMoodPhrase] = useState(initialDraft.moodPhrase);
@@ -105,8 +173,65 @@ export const ProgressiveInput: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [hintMsg, setHintMsg] = useState<string | null>(null);
   const [showIdleHint, setShowIdleHint] = useState(false);
+  const [isDescriptionFocused, setIsDescriptionFocused] = useState(false);
+  const moodSectionRef = useRef<HTMLDivElement>(null);
+  const advancedSectionRef = useRef<HTMLDivElement>(null);
+  const submitSectionRef = useRef<HTMLDivElement>(null);
 
   const queryClient = useQueryClient();
+
+  const isMoodGuideActive = isGuideActive && guideStep === 0;
+  const isDescriptionGuideActive = isGuideActive && guideStep === 1;
+  const isSubmitGuideActive = isGuideActive && guideStep === 2;
+  const shouldBlurOthers = isGuideActive;
+
+  const sectionFocusClass = (active: boolean): string => {
+    if (!shouldBlurOthers) {
+      return "";
+    }
+    if (active) {
+      return "relative z-[72] opacity-100 blur-0 pointer-events-auto";
+    }
+    return "pointer-events-none opacity-36 blur-[2.4px] saturate-[0.78] contrast-[0.88]";
+  };
+
+  const nudgeMutation = useMutation({
+    mutationFn: async () => {
+      const result = await getNudgeRecommendations();
+      return result.items ?? [];
+    },
+    onSuccess: (items) => {
+      const merged = dedupeInspirations([...(items ?? []), ...readAdminInspirationTexts(), ...FALLBACK_INSPIRATIONS]);
+      setHintMsg(pickRandom(merged));
+      setShowIdleHint(true);
+    },
+    onError: () => {
+      const merged = dedupeInspirations([...readAdminInspirationTexts(), ...FALLBACK_INSPIRATIONS]);
+      setHintMsg(pickRandom(merged));
+      setShowIdleHint(true);
+    },
+  });
+  const requestIdleInspiration = nudgeMutation.mutate;
+
+  useEffect(() => {
+    if (!isGuideActive) {
+      return;
+    }
+
+    const target = isMoodGuideActive
+      ? moodSectionRef.current
+      : isDescriptionGuideActive
+      ? advancedSectionRef.current
+      : isSubmitGuideActive
+      ? submitSectionRef.current
+      : null;
+
+    target?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+      inline: "nearest",
+    });
+  }, [isGuideActive, isMoodGuideActive, isDescriptionGuideActive, isSubmitGuideActive]);
 
   const draftPayload = useMemo<DraftPayload>(
     () => ({
@@ -139,34 +264,27 @@ export const ProgressiveInput: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [draftPayload, moodPhrase, quote, description, extraEmotions, occurredAt]);
 
-  useEffect(() => {
-    const hasAnyInput =
-      moodPhrase.trim().length > 0 ||
-      quote.trim().length > 0 ||
-      description.trim().length > 0 ||
-      extraEmotions.length > 0;
+  const hasAnyInput =
+    moodPhrase.trim().length > 0 ||
+    quote.trim().length > 0 ||
+    description.trim().length > 0 ||
+    extraEmotions.length > 0;
 
+  useEffect(() => {
     if (hasAnyInput) {
       return;
     }
 
     const timer = window.setTimeout(() => {
-      setShowIdleHint(true);
-      setHintMsg("你只要写下一句，礼堂就会为你亮一盏灯。");
-    }, 8000);
+      requestIdleInspiration();
+    }, 7000);
 
     return () => window.clearTimeout(timer);
-  }, [moodPhrase, quote, description, extraEmotions]);
+  }, [hasAnyInput, requestIdleInspiration]);
 
   useEffect(() => {
-    const hasDraft =
-      moodPhrase.trim().length > 0 ||
-      quote.trim().length > 0 ||
-      description.trim().length > 0 ||
-      extraEmotions.length > 0;
-
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (!hasDraft) {
+      if (!hasAnyInput) {
         return;
       }
       event.preventDefault();
@@ -175,7 +293,7 @@ export const ProgressiveInput: React.FC = () => {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [moodPhrase, quote, description, extraEmotions]);
+  }, [hasAnyInput]);
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -198,6 +316,7 @@ export const ProgressiveInput: React.FC = () => {
       setExpandAdvanced(false);
       setErrorMsg(null);
       setShowIdleHint(false);
+      setHintMsg(null);
       setSuccessMsg(`已记录: ${response.publishStatus.label}`);
       localStorage.removeItem(DRAFT_KEY);
       queryClient.invalidateQueries({ queryKey: ["home-feed"] });
@@ -205,50 +324,38 @@ export const ProgressiveInput: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ["mindmap", "me"] });
     },
     onError: (error: unknown) => {
-      const maybeErr = error as { data?: { message?: string } };
+      const maybeErr = error as {
+        status?: number;
+        code?: string;
+        data?: { message?: string };
+      };
       setSuccessMsg(null);
+      if (maybeErr.status === 401) {
+        setErrorMsg("当前会话未就绪，正在为你恢复本地登录后再试一次。");
+        return;
+      }
+      if (maybeErr.code === "ACCESS_GATE_BLOCKED") {
+        setErrorMsg("当前账号还在准入审核中，暂时无法提交记录。");
+        return;
+      }
       setErrorMsg(maybeErr?.data?.message || "记录时遇到了一点小问题，要再试一次吗？");
     },
   });
 
-  const nudgeMutation = useMutation({
-    mutationFn: async ({ source }: { source: "idle" | "manual" }) => {
-      const result = await getNudgeRecommendations();
-      if (source === "manual") {
-        void submitNudgeFeedback({
-          action: "manual_trigger",
-          context: { source: "home-inspiration" },
-        }).catch(() => undefined);
-      }
-      return result.items ?? [];
-    },
-    onSuccess: (items) => {
-      const fromApi = items.filter(Boolean);
-      setHintMsg(fromApi.length ? fromApi[Math.floor(Math.random() * fromApi.length)] : pickFallbackInspiration());
-      setShowIdleHint(true);
-    },
-    onError: () => {
-      setHintMsg(pickFallbackInspiration());
-      setShowIdleHint(true);
-    },
-  });
-
   const shouldShowAdvanced =
-    moodPhrase.trim().length > 0 &&
-    (expandAdvanced ||
-      quote.trim().length > 0 ||
-      description.trim().length > 0 ||
-      extraEmotions.length > 0 ||
-      occurredAt.trim().length > 0);
+    isDescriptionGuideActive ||
+    (moodPhrase.trim().length > 0 &&
+      (expandAdvanced ||
+        quote.trim().length > 0 ||
+        description.trim().length > 0 ||
+        extraEmotions.length > 0 ||
+        occurredAt.trim().length > 0));
 
   const clearTransientMessages = () => {
     setShowIdleHint(false);
+    setHintMsg(null);
     setErrorMsg(null);
     setSuccessMsg(null);
-  };
-
-  const requestInspiration = (source: "idle" | "manual") => {
-    nudgeMutation.mutate({ source });
   };
 
   const pushEmotion = () => {
@@ -272,218 +379,262 @@ export const ProgressiveInput: React.FC = () => {
   };
 
   return (
-    <div className="relative flex h-full w-full flex-col">
-      <div className="relative overflow-hidden rounded-[2.25rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(251,243,251,0.62),rgba(242,247,255,0.74))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_24px_40px_rgba(167,188,220,0.17)] dark:border-white/12 dark:bg-[linear-gradient(130deg,rgba(22,29,47,0.78),rgba(44,31,47,0.56),rgba(24,34,54,0.72))] sm:p-7">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_22%_15%,rgba(255,255,255,0.78),transparent_44%),radial-gradient(circle_at_79%_0%,rgba(255,225,242,0.56),transparent_38%)]" />
-        <div className="pointer-events-none absolute -top-12 left-8 h-24 w-24 rounded-full bg-white/35 blur-3xl dark:bg-white/8" />
-        <div className="relative z-10">
-          <p className="text-[11px] tracking-[0.18em] text-slate-400/95 dark:text-slate-300/60">SPACE STATION · 永恒礼堂记录</p>
-        <textarea
-          className="font-elysia-display mt-2 min-h-[185px] w-full resize-none border-none bg-transparent p-0 text-[2rem] leading-[1.75] text-slate-700 outline-none placeholder:text-slate-400/58 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-300/35 sm:min-h-[210px] sm:text-[2.2rem]"
-          placeholder="把此刻轻轻放进礼堂，让爱替你记住它..."
-          value={moodPhrase}
-          onChange={(event) => {
-            setMoodPhrase(event.target.value);
-            clearTransientMessages();
-          }}
-          disabled={createMutation.isPending}
-        />
+    <div className="relative flex h-full min-h-0 w-full flex-col">
+      <div
+        className={`hide-scrollbar flex-1 min-h-0 space-y-3 overflow-y-auto pr-1 pb-2 transition-transform duration-300 ${
+          isDescriptionFocused ? "-translate-y-8 sm:-translate-y-11" : "translate-y-0"
+        }`}
+      >
+        <div
+          ref={moodSectionRef}
+          className={`relative overflow-hidden rounded-[2.35rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(251,243,251,0.62),rgba(242,247,255,0.74))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_24px_40px_rgba(167,188,220,0.17)] transition-all dark:border-white/12 dark:bg-[linear-gradient(130deg,rgba(22,29,47,0.78),rgba(44,31,47,0.56),rgba(24,34,54,0.72))] sm:p-7 ${
+            isMoodGuideActive ? "scale-[1.01] ring-2 ring-pink-300/80 shadow-[0_16px_36px_rgba(253,183,220,0.36)]" : ""
+          } ${sectionFocusClass(isMoodGuideActive)}`}
+        >
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_22%_15%,rgba(255,255,255,0.78),transparent_44%),radial-gradient(circle_at_79%_0%,rgba(255,225,242,0.56),transparent_38%)]" />
+          <div className="pointer-events-none absolute -top-12 left-8 h-24 w-24 rounded-full bg-white/35 blur-3xl dark:bg-white/8" />
+          <div className="relative z-10">
+            <p className="text-[11px] tracking-[0.18em] text-slate-400/95 dark:text-slate-300/60">ELYSIA · 心绪记录</p>
+            <textarea
+              className="font-elysia-display mt-2 min-h-[185px] w-full resize-none border-none bg-transparent p-0 text-[2rem] leading-[1.7] text-slate-700 outline-none placeholder:text-slate-400/58 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-300/35 sm:min-h-[210px] sm:text-[2.2rem]"
+              placeholder={"把此刻轻轻放进 Elysia\n让爱替你记住它"}
+              value={moodPhrase}
+              onChange={(event) => {
+                setMoodPhrase(event.target.value);
+                clearTransientMessages();
+              }}
+              disabled={createMutation.isPending}
+            />
+          </div>
+
+          <AnimatePresence>
+            {(showIdleHint || hintMsg) && !moodPhrase.trim().length && (
+              <motion.p
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                className="font-elysia-display relative z-10 mt-2 inline-flex rounded-[1.4rem] border border-white/70 bg-white/82 px-3.5 py-1.5 text-[1rem] leading-relaxed text-slate-500 shadow-sm dark:border-white/15 dark:bg-white/10 dark:text-slate-200/82"
+              >
+                {hintMsg}
+              </motion.p>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {isMoodGuideActive && (
+              <GuideBubble
+                title="先写一句就已经很好"
+                description="不用完整，不用漂亮。真实地写下此刻，Elysia 会永远记得你正在努力的这一刻。"
+                onNext={onGuideNext}
+                onSkip={onGuideSkip}
+              />
+            )}
+          </AnimatePresence>
         </div>
 
         <AnimatePresence>
-          {(showIdleHint || hintMsg) && !moodPhrase.trim().length && (
-            <motion.p
-              initial={{ opacity: 0, y: 8 }}
+          {(moodPhrase.trim().length > 0 || isDescriptionGuideActive) && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              className="font-elysia-poem relative z-10 mt-2 inline-flex rounded-full border border-white/70 bg-white/78 px-3 py-1 text-xl leading-none text-slate-500 shadow-sm dark:border-white/15 dark:bg-white/10 dark:text-slate-200/82"
+              exit={{ opacity: 0, y: 10 }}
+              className={`mt-1 grid gap-3 sm:grid-cols-2 ${sectionFocusClass(false)}`}
             >
-              {hintMsg}
-            </motion.p>
+              <label className="rounded-[1.6rem] border border-white/55 bg-white/62 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-white/12 dark:bg-black/22">
+                <span className="text-xs text-slate-500 dark:text-slate-300/70">金句</span>
+                <input
+                  type="text"
+                  value={quote}
+                  onChange={(event) => {
+                    setQuote(event.target.value);
+                    setExpandAdvanced(true);
+                    clearTransientMessages();
+                  }}
+                  placeholder="想把哪句话做成今日誓言..."
+                  className="mt-1 w-full border-none bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400/55 dark:text-slate-100 dark:placeholder:text-slate-300/35"
+                />
+              </label>
+
+              <label className="rounded-[1.6rem] border border-white/55 bg-white/62 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-white/12 dark:bg-black/22">
+                <span className="text-xs text-slate-500 dark:text-slate-300/70">附加情绪</span>
+                <input
+                  type="text"
+                  value={emotionInput}
+                  onChange={(event) => {
+                    setEmotionInput(event.target.value);
+                    clearTransientMessages();
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === ",") {
+                      event.preventDefault();
+                      pushEmotion();
+                    }
+                  }}
+                  onBlur={pushEmotion}
+                  placeholder="温柔、热烈、想念..."
+                  className="mt-1 w-full border-none bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400/55 dark:text-slate-100 dark:placeholder:text-slate-300/35"
+                />
+              </label>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {extraEmotions.length > 0 && (
+          <div className={`mt-2 flex flex-wrap gap-2 ${sectionFocusClass(false)}`}>
+            {extraEmotions.map((emotion) => (
+              <button
+                key={emotion}
+                type="button"
+                onClick={() => pullEmotion(emotion)}
+                className="group rounded-full border border-pink-100/80 bg-pink-50/88 px-3 py-1 text-xs text-pink-600 transition-colors hover:border-rose-300/90 hover:bg-rose-500 hover:text-white dark:border-pink-300/20 dark:bg-pink-900/25 dark:text-pink-200 dark:hover:bg-rose-500"
+                aria-label={`移除情绪 ${emotion}`}
+              >
+                <span className="group-hover:hidden">{emotion}</span>
+                <span className="hidden group-hover:inline">移除</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <AnimatePresence>
+          {shouldShowAdvanced && (
+            <motion.div
+              ref={advancedSectionRef}
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className={`relative mt-2 space-y-3 overflow-hidden rounded-[1.9rem] p-1 transition-all ${
+                isDescriptionGuideActive
+                  ? "ring-2 ring-pink-300/80 shadow-[0_16px_36px_rgba(253,183,220,0.34)]"
+                  : ""
+              } ${sectionFocusClass(isDescriptionGuideActive)}`}
+            >
+              <label className="block rounded-[1.6rem] border border-white/55 bg-white/58 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] dark:border-white/12 dark:bg-black/22">
+                <span className="text-xs text-slate-500 dark:text-slate-300/70">描述</span>
+                <textarea
+                  value={description}
+                  onChange={(event) => {
+                    setDescription(event.target.value);
+                    clearTransientMessages();
+                  }}
+                  onFocus={() => {
+                    setIsDescriptionFocused(true);
+                    setExpandAdvanced(true);
+                  }}
+                  onBlur={() => setIsDescriptionFocused(false)}
+                  placeholder="可以再补一两句，让未来的自己更懂今天。"
+                  className="hide-scrollbar mt-1 min-h-[140px] max-h-[240px] w-full resize-none overflow-y-auto border-none bg-transparent p-0 text-sm leading-relaxed text-slate-700 outline-none placeholder:text-slate-400/55 dark:text-slate-100 dark:placeholder:text-slate-300/35"
+                />
+              </label>
+
+              <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                <label className="rounded-[1.6rem] border border-white/55 bg-white/58 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] dark:border-white/12 dark:bg-black/22">
+                  <span className="text-xs text-slate-500 dark:text-slate-300/70">记录时间</span>
+                  <input
+                    type="datetime-local"
+                    value={occurredAt}
+                    onChange={(event) => {
+                      setOccurredAt(event.target.value);
+                      clearTransientMessages();
+                    }}
+                    className="mt-1 w-full border-none bg-transparent p-0 text-sm text-slate-700 outline-none dark:text-slate-100"
+                  />
+                </label>
+
+                <div className="rounded-[1.6rem] border border-white/55 bg-white/58 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] dark:border-white/12 dark:bg-black/22">
+                  <p className="px-2 pb-1 text-xs text-slate-500 dark:text-slate-300/70">可见性</p>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVisibilityIntent("private");
+                        clearTransientMessages();
+                      }}
+                      className={`rounded-[1.05rem] px-3 py-2 text-xs transition-all ${
+                        visibilityIntent === "private"
+                          ? "bg-white text-slate-700 shadow-sm dark:bg-white/20 dark:text-white"
+                          : "text-slate-500 hover:bg-white/65 dark:text-slate-300 dark:hover:bg-white/10"
+                      }`}
+                    >
+                      仅自己
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVisibilityIntent("public");
+                        clearTransientMessages();
+                      }}
+                      className={`rounded-[1.05rem] px-3 py-2 text-xs transition-all ${
+                        visibilityIntent === "public"
+                          ? "bg-white text-slate-700 shadow-sm dark:bg-white/20 dark:text-white"
+                          : "text-slate-500 hover:bg-white/65 dark:text-slate-300 dark:hover:bg-white/10"
+                      }`}
+                    >
+                      公开申请
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <AnimatePresence>
+                {isDescriptionGuideActive && (
+                  <GuideBubble
+                    title="补一点描述，空间会自动上移"
+                    description="进入描述编辑时，输入区域会自动上移，保留可视与编辑空间；描述内容也能在框内单独滚动。"
+                    onNext={onGuideNext}
+                    onSkip={onGuideSkip}
+                  />
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {moodPhrase.trim().length > 0 && !shouldShowAdvanced && (
+          <button
+            type="button"
+            onClick={() => setExpandAdvanced(true)}
+            className={`mt-1 self-start text-xs text-slate-500 underline decoration-dotted underline-offset-4 transition-colors hover:text-slate-700 dark:text-slate-300/80 dark:hover:text-slate-100 ${sectionFocusClass(false)}`}
+          >
+            再补一点细节
+          </button>
+        )}
+
+        <AnimatePresence>
+          {errorMsg && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              className={`mt-1 rounded-[1.4rem] border border-amber-200/70 bg-amber-50/65 px-3 py-2 text-sm text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-200 ${sectionFocusClass(false)}`}
+            >
+              {errorMsg}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {successMsg && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              className={`mt-1 rounded-[1.4rem] border border-emerald-200/70 bg-emerald-50/70 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-900/20 dark:text-emerald-200 ${sectionFocusClass(false)}`}
+            >
+              {successMsg}
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      <AnimatePresence>
-        {moodPhrase.trim().length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="mt-4 grid gap-3 sm:grid-cols-2"
-          >
-            <label className="rounded-2xl border border-white/55 bg-white/62 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-white/12 dark:bg-black/22">
-              <span className="text-xs text-slate-500 dark:text-slate-300/70">金句</span>
-              <input
-                type="text"
-                value={quote}
-                onChange={(event) => {
-                  setQuote(event.target.value);
-                  setExpandAdvanced(true);
-                  clearTransientMessages();
-                }}
-                placeholder="想把哪句话做成今日誓言..."
-                className="mt-1 w-full border-none bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400/55 dark:text-slate-100 dark:placeholder:text-slate-300/35"
-              />
-            </label>
-
-            <label className="rounded-2xl border border-white/55 bg-white/62 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] dark:border-white/12 dark:bg-black/22">
-              <span className="text-xs text-slate-500 dark:text-slate-300/70">附加情绪</span>
-              <input
-                type="text"
-                value={emotionInput}
-                onChange={(event) => {
-                  setEmotionInput(event.target.value);
-                  clearTransientMessages();
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === ",") {
-                    event.preventDefault();
-                    pushEmotion();
-                  }
-                }}
-                onBlur={pushEmotion}
-                placeholder="温柔、热烈、想念..."
-                className="mt-1 w-full border-none bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400/55 dark:text-slate-100 dark:placeholder:text-slate-300/35"
-              />
-            </label>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {extraEmotions.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-2">
-          {extraEmotions.map((emotion) => (
-            <button
-              key={emotion}
-              type="button"
-              onClick={() => pullEmotion(emotion)}
-              className="rounded-full border border-pink-100/80 bg-pink-50/88 px-2.5 py-1 text-xs text-pink-600 transition-colors hover:bg-pink-100 dark:border-pink-300/20 dark:bg-pink-900/25 dark:text-pink-200 dark:hover:bg-pink-900/40"
-            >
-              {emotion} · 移除
-            </button>
-          ))}
-        </div>
-      )}
-
-      <AnimatePresence>
-        {shouldShowAdvanced && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mt-3 space-y-3 overflow-hidden"
-          >
-            <label className="block rounded-2xl border border-white/55 bg-white/58 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] dark:border-white/12 dark:bg-black/22">
-              <span className="text-xs text-slate-500 dark:text-slate-300/70">展开描述</span>
-              <textarea
-                value={description}
-                onChange={(event) => {
-                  setDescription(event.target.value);
-                  clearTransientMessages();
-                }}
-                placeholder="可以再补一两句，让未来的自己更懂今天。"
-                className="mt-1 min-h-[84px] w-full resize-y border-none bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400/55 dark:text-slate-100 dark:placeholder:text-slate-300/35"
-              />
-            </label>
-
-            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-              <label className="rounded-2xl border border-white/55 bg-white/58 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] dark:border-white/12 dark:bg-black/22">
-                <span className="text-xs text-slate-500 dark:text-slate-300/70">记录时间</span>
-                <input
-                  type="datetime-local"
-                  value={occurredAt}
-                  onChange={(event) => {
-                    setOccurredAt(event.target.value);
-                    clearTransientMessages();
-                  }}
-                  className="mt-1 w-full border-none bg-transparent p-0 text-sm text-slate-700 outline-none dark:text-slate-100"
-                />
-              </label>
-
-              <div className="rounded-2xl border border-white/55 bg-white/58 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)] dark:border-white/12 dark:bg-black/22">
-                <p className="px-2 pb-1 text-xs text-slate-500 dark:text-slate-300/70">可见性</p>
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setVisibilityIntent("private");
-                      clearTransientMessages();
-                    }}
-                    className={`rounded-xl px-3 py-2 text-xs transition-all ${
-                      visibilityIntent === "private"
-                        ? "bg-white text-slate-700 shadow-sm dark:bg-white/20 dark:text-white"
-                        : "text-slate-500 hover:bg-white/65 dark:text-slate-300 dark:hover:bg-white/10"
-                    }`}
-                  >
-                    仅自己
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setVisibilityIntent("public");
-                      clearTransientMessages();
-                    }}
-                    className={`rounded-xl px-3 py-2 text-xs transition-all ${
-                      visibilityIntent === "public"
-                        ? "bg-white text-slate-700 shadow-sm dark:bg-white/20 dark:text-white"
-                        : "text-slate-500 hover:bg-white/65 dark:text-slate-300 dark:hover:bg-white/10"
-                    }`}
-                  >
-                    公开申请
-                  </button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {moodPhrase.trim().length > 0 && !shouldShowAdvanced && (
-        <button
-          type="button"
-          onClick={() => setExpandAdvanced(true)}
-          className="mt-3 self-start text-xs text-slate-500 underline decoration-dotted underline-offset-4 transition-colors hover:text-slate-700 dark:text-slate-300/80 dark:hover:text-slate-100"
-        >
-          再补一点细节
-        </button>
-      )}
-
-      <AnimatePresence>
-        {errorMsg && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 6 }}
-            className="mt-3 rounded-2xl border border-amber-200/70 bg-amber-50/65 px-3 py-2 text-sm text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-200"
-          >
-            {errorMsg}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {successMsg && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 6 }}
-            className="mt-3 rounded-2xl border border-emerald-200/70 bg-emerald-50/70 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-900/20 dark:text-emerald-200"
-          >
-            {successMsg}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/45 pt-4 dark:border-white/12">
-        <button
-          type="button"
-          onClick={() => requestInspiration("manual")}
-          disabled={nudgeMutation.isPending}
-          className="rounded-full border border-white/65 bg-white/75 px-3 py-1.5 text-xs text-slate-500 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/15 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
-        >
-          {nudgeMutation.isPending ? "灵感赶来中..." : "给我一句爱莉式灵感"}
-        </button>
+      <div
+        ref={submitSectionRef}
+        className={`relative mt-3 flex items-center justify-end border-t border-white/45 pt-4 dark:border-white/12 ${
+          isSubmitGuideActive
+            ? "rounded-[1.8rem] border-pink-200/90 bg-white/68 px-3 py-3 ring-2 ring-pink-300/80 shadow-[0_16px_34px_rgba(253,183,220,0.32)] dark:bg-black/24"
+            : ""
+        } ${sectionFocusClass(isSubmitGuideActive)}`}
+      >
         <button
           type="button"
           onClick={() => createMutation.mutate()}
@@ -492,6 +643,18 @@ export const ProgressiveInput: React.FC = () => {
         >
           {createMutation.isPending ? "记录中..." : "留下痕迹"}
         </button>
+
+        <AnimatePresence>
+          {isSubmitGuideActive && (
+            <GuideBubble
+              title="最后一步，轻轻提交"
+              description="写下就好，不必一次写满。你的每一次真诚记录，都会在 Elysia 里被温柔安放。"
+              placement="bottom-right"
+              onNext={onGuideNext}
+              onSkip={onGuideSkip}
+            />
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

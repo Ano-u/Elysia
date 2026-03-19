@@ -27,7 +27,7 @@ export const LiquidCard = React.forwardRef<HTMLDivElement, LiquidCardProps>(
         }
         transition={getTransition(reduceMotion)}
         className={cn(
-          "relative rounded-2xl p-6",
+          "relative rounded-[2rem] p-6",
           // 在 reduceMotion 开启时降级背景模糊为普通半透明背景
           reduceMotion
             ? "bg-white/70 dark:bg-black/40 border border-white/60 dark:border-white/10"
@@ -43,7 +43,7 @@ export const LiquidCard = React.forwardRef<HTMLDivElement, LiquidCardProps>(
         {...props}
       >
         {/* Subtle Inner Reflection */}
-        <div className="absolute inset-0 rounded-2xl pointer-events-none ring-1 ring-inset ring-white/20 dark:ring-white/5 mix-blend-overlay" />
+        <div className="absolute inset-0 rounded-[2rem] pointer-events-none ring-1 ring-inset ring-white/20 dark:ring-white/5 mix-blend-overlay" />
 
         {/* Glass Edge Highlight */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/80 dark:via-white/30 to-transparent pointer-events-none opacity-50" />

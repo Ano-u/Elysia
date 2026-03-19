@@ -4,14 +4,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Compass,
   Home,
-  LogOut,
   Moon,
   Network,
   Settings2,
   Shield,
   Sun,
-  User,
-  UserCog,
 } from "lucide-react";
 import { AuroraBackground } from "./components/layout/AuroraBackground";
 import { CrystalButton } from "./components/ui/CrystalButton";
@@ -21,7 +18,7 @@ import { HomeView } from "./domains/home/HomeView";
 import { UniverseView } from "./domains/universe/UniverseView";
 import { MindMapView } from "./domains/mindmap/MindMapView";
 import { AdminDashboard } from "./domains/admin/AdminDashboard";
-import { logout, getAuthMe, switchUser } from "./lib/apiClient";
+import { getAuthMe, switchUser } from "./lib/apiClient";
 import { useUiStore } from "./store/uiStore";
 
 type AppView = "home" | "universe" | "mindmap" | "admin";
@@ -74,23 +71,45 @@ function App() {
     retry: false,
   });
 
-  const logoutMutation = useMutation({
-    mutationFn: logout,
+  const ensureDevAdminMutation = useMutation({
+    mutationFn: () =>
+      switchUser({
+        username: "local_admin",
+        displayName: "本地管理员",
+        role: "admin",
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries();
-      setCurrentView("home");
+      queryClient.invalidateQueries({ queryKey: ["auth-me"] });
     },
   });
+  const ensureDevAdmin = ensureDevAdminMutation.mutate;
 
-  const devSwitchMutation = useMutation({
-    mutationFn: switchUser,
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-    },
-  });
-
-  const canOpenAdmin = isLocalDev || authQuery.data?.user?.role === "admin";
+  const canOpenAdmin = authQuery.data?.user?.role === "admin";
   const activeView: AppView = !canOpenAdmin && currentView === "admin" ? "home" : currentView;
+
+  useEffect(() => {
+    if (
+      !isLocalDev ||
+      authQuery.isLoading ||
+      authQuery.isFetching ||
+      ensureDevAdminMutation.isPending ||
+      ensureDevAdminMutation.isError
+    ) {
+      return;
+    }
+    if (authQuery.data?.user?.role === "admin") {
+      return;
+    }
+    ensureDevAdmin();
+  }, [
+    isLocalDev,
+    authQuery.isLoading,
+    authQuery.isFetching,
+    authQuery.data?.user?.role,
+    ensureDevAdminMutation.isPending,
+    ensureDevAdminMutation.isError,
+    ensureDevAdmin,
+  ]);
 
   useEffect(() => {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
@@ -167,7 +186,7 @@ function App() {
     icon: ComponentType<{ className?: string }>;
     visible: boolean;
   }> = [
-    { id: "home", label: "礼堂空间站", icon: Home, visible: true },
+    { id: "home", label: "Elysia 记录", icon: Home, visible: true },
     { id: "universe", label: "星海回响", icon: Compass, visible: true },
     { id: "mindmap", label: "记忆织网", icon: Network, visible: true },
     { id: "admin", label: "治理控制台", icon: Shield, visible: canOpenAdmin },
@@ -176,53 +195,6 @@ function App() {
   return (
     <AuroraBackground>
       <div className="relative h-screen w-full overflow-hidden">
-        {isLocalDev && (
-          <div className="absolute left-4 top-5 z-[80] flex items-center gap-2 rounded-2xl border border-white/30 bg-white/45 p-2 text-xs text-slate-600 shadow-[var(--shadow-crystal)] backdrop-blur-xl dark:border-white/10 dark:bg-black/35 dark:text-slate-300">
-            <CrystalButton
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                devSwitchMutation.mutate({
-                  username: "local_user",
-                  displayName: "本地普通用户",
-                  role: "user",
-                })
-              }
-              className="rounded-xl"
-              title="切到普通用户"
-            >
-              <User className="mr-1 h-3.5 w-3.5" />
-              普通
-            </CrystalButton>
-            <CrystalButton
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                devSwitchMutation.mutate({
-                  username: "local_admin",
-                  displayName: "本地管理员",
-                  role: "admin",
-                })
-              }
-              className="rounded-xl"
-              title="切到管理员"
-            >
-              <UserCog className="mr-1 h-3.5 w-3.5" />
-              管理
-            </CrystalButton>
-            <CrystalButton
-              variant="ghost"
-              size="sm"
-              onClick={() => logoutMutation.mutate()}
-              className="rounded-xl"
-              title="退出登录"
-            >
-              <LogOut className="mr-1 h-3.5 w-3.5" />
-              退出
-            </CrystalButton>
-          </div>
-        )}
-
         <motion.div
           initial={false}
           animate={{
@@ -239,7 +211,7 @@ function App() {
             size="icon"
             onClick={toggleReduceMotion}
             className="rounded-full"
-            title={reduceMotion ? "恢复礼堂动态光影" : "减弱动态光影"}
+            title={reduceMotion ? "恢复 Elysia 动态光影" : "减弱 Elysia 动态光影"}
           >
             <Settings2 className={`h-5 w-5 ${reduceMotion ? "opacity-50" : "opacity-100"}`} />
           </CrystalButton>
@@ -281,7 +253,7 @@ function App() {
                         }
                         setCurrentView(tab.id);
                       }}
-                      className={`h-auto rounded-xl px-4 py-2 transition-all md:rounded-full md:px-6 ${
+                      className={`h-auto rounded-2xl px-4 py-2 transition-all md:rounded-full md:px-6 ${
                         active
                           ? reduceMotion
                             ? "font-bold"

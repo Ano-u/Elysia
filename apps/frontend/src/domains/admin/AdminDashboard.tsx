@@ -1,7 +1,12 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchApi } from "../../lib/api";
 import { LiquidCard } from "../../components/ui/LiquidCard";
+import {
+  readAdminInspirations,
+  writeAdminInspirations,
+  type AdminInspirationItem,
+} from "../../lib/inspirationStore";
 
 type RiskEventStatus = "active" | "released" | "warned" | "banned";
 type BanEventStatus = "active" | "lifted";
@@ -131,7 +136,7 @@ const APPEAL_NOTE_TEMPLATES = [
 
 export const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<
-    "moderation" | "access" | "risk" | "bans" | "appeals" | "audit" | "ai"
+    "moderation" | "access" | "risk" | "bans" | "appeals" | "audit" | "inspirations" | "ai"
   >("moderation");
 
   return (
@@ -159,6 +164,9 @@ export const AdminDashboard: React.FC = () => {
             <NavButton active={activeTab === "audit"} onClick={() => setActiveTab("audit")}>
               审计日志
             </NavButton>
+            <NavButton active={activeTab === "inspirations"} onClick={() => setActiveTab("inspirations")}>
+              灵感管理
+            </NavButton>
             <NavButton active={activeTab === "ai"} onClick={() => setActiveTab("ai")}>
               AI 审核设置
             </NavButton>
@@ -172,6 +180,7 @@ export const AdminDashboard: React.FC = () => {
           {activeTab === "bans" && <BanCenter />}
           {activeTab === "appeals" && <AppealsCenter />}
           {activeTab === "audit" && <AuditLogs />}
+          {activeTab === "inspirations" && <InspirationsManager />}
           {activeTab === "ai" && <AiConfig />}
         </main>
       </div>
@@ -1098,6 +1107,110 @@ const AuditLogs = () => {
             </details>
           </LiquidCard>
         ))}
+      </div>
+    </div>
+  );
+};
+
+const InspirationsManager = () => {
+  const [items, setItems] = useState<AdminInspirationItem[]>(() => readAdminInspirations());
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const sync = () => setItems(readAdminInspirations());
+    const onStorage = () => sync();
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const addInspiration = () => {
+    const text = draft.trim();
+    if (text.length < 6) {
+      setError("灵感文案至少 6 个字。");
+      return;
+    }
+    if (text.length > 120) {
+      setError("灵感文案请控制在 120 字以内。");
+      return;
+    }
+    if (items.some((item) => item.text === text)) {
+      setError("这条灵感已经存在。");
+      return;
+    }
+    const next = writeAdminInspirations([
+      { id: `insp-${Date.now()}`, text, createdAt: new Date().toISOString() },
+      ...items,
+    ]);
+    setItems(next);
+    setDraft("");
+    setError(null);
+  };
+
+  const removeInspiration = (id: string) => {
+    const next = writeAdminInspirations(items.filter((item) => item.id !== id));
+    setItems(next);
+    setError(null);
+  };
+
+  return (
+    <div className="max-w-3xl space-y-4">
+      <h3 className="font-elysia-display text-3xl text-slate-700 dark:text-slate-100">灵感管理</h3>
+      <p className="text-sm text-slate-500 dark:text-slate-300/80">
+        这里添加的文案会在用户进入 Home 后、7 秒无编辑时自动出现在输入区下方。用户开始编辑后提示会淡出。
+      </p>
+
+      <LiquidCard className="p-4 bg-white/45 dark:bg-black/22">
+        <textarea
+          value={draft}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            setError(null);
+          }}
+          placeholder="写一条温柔的灵感提示..."
+          className="min-h-[96px] w-full rounded-[1.35rem] border border-white/45 bg-white/60 px-3 py-2 text-sm outline-none dark:border-white/12 dark:bg-black/22"
+        />
+        <div className="mt-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-300/70">
+          <span>建议 6-120 字</span>
+          <span>{draft.trim().length} 字</span>
+        </div>
+        {error && (
+          <p className="mt-2 rounded-xl border border-rose-200/70 bg-rose-50/70 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/25 dark:text-rose-200">
+            {error}
+          </p>
+        )}
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            onClick={addInspiration}
+            className="rounded-full bg-slate-900 px-4 py-2 text-xs text-white hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+          >
+            添加灵感
+          </button>
+        </div>
+      </LiquidCard>
+
+      <div className="grid gap-3">
+        {items.map((item) => (
+          <LiquidCard key={item.id} className="p-4 bg-white/45 dark:bg-black/22">
+            <p className="text-sm text-slate-600 dark:text-slate-200/90">{item.text}</p>
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-xs text-slate-400 dark:text-slate-300/70">
+                添加于 {formatDateTime(item.createdAt)}
+              </span>
+              <button
+                type="button"
+                onClick={() => removeInspiration(item.id)}
+                className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs text-rose-700 hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-900/25 dark:text-rose-200 dark:hover:bg-rose-900/35"
+              >
+                删除
+              </button>
+            </div>
+          </LiquidCard>
+        ))}
+        {items.length === 0 && (
+          <LiquidCard className="p-6 text-sm text-slate-500 dark:text-slate-300/80">还没有灵感文案，先添加一条吧。</LiquidCard>
+        )}
       </div>
     </div>
   );

@@ -130,7 +130,7 @@ export const UniverseView: React.FC = () => {
       {!isLoading && cards.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
           <div className="rounded-full border border-white/40 bg-white/40 px-5 py-2 text-sm text-slate-600 backdrop-blur-md dark:border-white/15 dark:bg-white/8 dark:text-slate-200/85">
-            还没有公开回响，先在礼堂写下一句吧。
+            还没有公开回响，先在 Elysia 写下一句吧。
           </div>
         </div>
       )}

@@ -1,5 +1,5 @@
-import React, { useState, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LiquidCard } from "../../components/ui/LiquidCard";
 import { ProgressiveInput } from "../../components/ui/ProgressiveInput";
@@ -13,7 +13,10 @@ import {
 } from "../../lib/apiClient";
 import type { PublicationStatus, RecordSummary } from "../../types/api";
 
-const ONBOARDING_STORAGE_KEY = "elysia-warm-guide-v1";
+const ONBOARDING_STORAGE_KEY = "elysia-warm-guide-v2";
+const GUIDE_STEPS_TOTAL = 3;
+
+type IntroStage = "opening" | "guided" | "ready";
 
 const STATUS_LABEL: Record<PublicationStatus, string> = {
   private: "仅自己可见",
@@ -119,7 +122,7 @@ const OnboardingTaskCard: React.FC = () => {
           ? "正在准备今日任务..."
           : todayTask
           ? `Day ${todayTask.day}: ${todayTask.title}`
-          : "今天先写一句，礼堂会记住你正在努力的这一刻。"}
+          : "今天先写一句，Elysia 会永远记得你正在努力的这一刻。"}
       </p>
 
       <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/70 dark:bg-white/10">
@@ -132,9 +135,7 @@ const OnboardingTaskCard: React.FC = () => {
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="text-xs text-slate-400 dark:text-slate-300/65">
-          已完成 {completedDays.length}/7 天
-        </span>
+        <span className="text-xs text-slate-400 dark:text-slate-300/65">已完成 {completedDays.length}/7 天</span>
         <button
           type="button"
           disabled={!todayTask || todayCompleted || completeMutation.isPending}
@@ -161,8 +162,7 @@ const HomeTimeline: React.FC = () => {
   });
 
   const visibilityMutation = useMutation({
-    mutationFn: ({ id, isPublic }: { id: string; isPublic: boolean }) =>
-      updateRecordVisibility(id, isPublic),
+    mutationFn: ({ id, isPublic }: { id: string; isPublic: boolean }) => updateRecordVisibility(id, isPublic),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["home-feed"] });
       queryClient.invalidateQueries({ queryKey: ["universe"] });
@@ -176,7 +176,7 @@ const HomeTimeline: React.FC = () => {
     return (
       <div
         key={item.id}
-        className="rounded-2xl border border-white/45 bg-white/50 p-4 backdrop-blur-xl dark:border-white/10 dark:bg-black/20"
+        className="rounded-[1.55rem] border border-white/45 bg-white/50 p-4 backdrop-blur-xl dark:border-white/10 dark:bg-black/20"
       >
         <p className="font-elysia-display text-base text-slate-700 dark:text-slate-100">{item.moodPhrase}</p>
         {item.description && (
@@ -213,7 +213,7 @@ const HomeTimeline: React.FC = () => {
   return (
     <LiquidCard className="h-full min-h-[44vh] p-5 sm:p-6 bg-white/38 dark:bg-black/18">
       <div className="mb-4 flex items-end justify-between">
-        <h3 className="font-elysia-display text-2xl text-slate-700 dark:text-slate-100">无瑕石庭·最近记录</h3>
+        <h3 className="font-elysia-display text-2xl text-slate-700 dark:text-slate-100">往世乐土·最近记录</h3>
         <span className="text-xs text-slate-500 dark:text-slate-300/75">私密内容也会在这里出现</span>
       </div>
       <div className="hide-scrollbar max-h-[38vh] space-y-3 overflow-y-auto pr-1 sm:max-h-[46vh]">
@@ -227,87 +227,38 @@ const HomeTimeline: React.FC = () => {
   );
 };
 
-const WarmGuideOverlay: React.FC<{
+const OpeningScreen: React.FC<{
   open: boolean;
-  onClose: () => void;
-}> = ({ open, onClose }) => {
-  const [step, setStep] = useState(0);
-
-  const steps = [
-    {
-      title: "像花朵一样开始",
-      description: "你不必一次写完。先写一句，就已经是对今天最温柔也最勇敢的拥抱。",
-    },
-    {
-      title: "粉色天空下的礼堂",
-      description: "空间站负责记录，星海漫游负责共鸣，记忆之网会帮你看见情绪与命运之间的连结。",
-    },
-    {
-      title: "誓言与希望会被看见",
-      description: "公开内容会先审核，私密内容只你可见。遇到误判时，我们也会坚定地为你保留申诉入口。",
-    },
-  ];
-
-  const isLast = step === steps.length - 1;
-
-  return (
-    <AnimatePresence>
-      {open && (
+  onEnter: () => void;
+}> = ({ open, onEnter }) => (
+  <AnimatePresence>
+    {open && (
+      <motion.button
+        type="button"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.35 }}
+        onClick={onEnter}
+        className="fixed inset-0 z-[90] flex w-full items-center justify-center bg-white/35 px-6 text-center backdrop-blur-md dark:bg-black/45"
+      >
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[95] flex items-center justify-center bg-white/45 p-4 backdrop-blur-xl dark:bg-black/55"
+          initial={{ opacity: 0, y: 18, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          className="max-w-3xl"
         >
-          <motion.div
-            initial={{ opacity: 0, y: 16, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.97 }}
-            className="w-full max-w-xl rounded-3xl border border-white/50 bg-white/70 p-6 shadow-[var(--shadow-crystal)] dark:border-white/10 dark:bg-slate-900/70"
-          >
-            <p className="text-xs tracking-[0.16em] text-slate-400">Warm Guide {step + 1}/3</p>
-            <h3 className="font-elysia-display mt-2 text-3xl text-slate-700 dark:text-slate-100">
-              {steps[step].title}
-            </h3>
-            <p className="font-elysia-poem mt-3 text-2xl leading-relaxed text-slate-500 dark:text-slate-300/85 sm:text-[2rem]">
-              {steps[step].description}
-            </p>
-
-            <div className="mt-6 flex items-center justify-between">
-              <button
-                type="button"
-                className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-300/80 dark:hover:text-slate-100"
-                onClick={onClose}
-              >
-                稍后再看
-              </button>
-              <div className="flex gap-2">
-                {!isLast && (
-                  <button
-                    type="button"
-                    className="rounded-full border border-white/60 bg-white/75 px-4 py-2 text-sm text-slate-600 hover:bg-white dark:border-white/20 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/20"
-                    onClick={() => setStep((value) => Math.min(value + 1, steps.length - 1))}
-                  >
-                    下一步
-                  </button>
-                )}
-                {isLast && (
-                  <button
-                    type="button"
-                    className="rounded-full bg-slate-900 px-5 py-2 text-sm text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-                    onClick={onClose}
-                  >
-                    我想开始
-                  </button>
-                )}
-              </div>
-            </div>
-          </motion.div>
+          <p className="font-elysia-poem text-[2.15rem] leading-[1.55] text-slate-600/95 dark:text-slate-100/92 sm:text-[2.7rem]">
+            真诚地爱着世界，也真诚地爱着你自己。
+          </p>
+          <p className="mt-5 font-elysia-display text-sm tracking-[0.2em] text-slate-500/85 dark:text-slate-300/80">
+            点击任意地方继续
+          </p>
         </motion.div>
-      )}
-    </AnimatePresence>
-  );
-};
+      </motion.button>
+    )}
+  </AnimatePresence>
+);
 
 const BACKGROUND_VIDEO_URL = "/Timeless-Grand-Hall.webm"; // TODO: Swap with CDN URL later
 const BACKGROUND_PHOTO_URL = "/Timeless-Grand-Hall.png";
@@ -322,29 +273,49 @@ export const HomeView: React.FC = () => {
     }
   };
 
-  const [showGuide, setShowGuide] = useState<boolean>(() => {
+  const [introStage, setIntroStage] = useState<IntroStage>(() => {
     if (typeof window === "undefined") {
-      return false;
+      return "ready";
     }
-    return !window.localStorage.getItem(ONBOARDING_STORAGE_KEY);
+    return window.localStorage.getItem(ONBOARDING_STORAGE_KEY) ? "ready" : "opening";
   });
+  const [guideStep, setGuideStep] = useState(0);
 
-  const closeGuide = () => {
-    setShowGuide(false);
+  const showOpening = introStage === "opening";
+  const showGuide = introStage === "guided";
+
+  const markGuideFinished = () => {
+    setIntroStage("ready");
     localStorage.setItem(ONBOARDING_STORAGE_KEY, "seen");
   };
 
+  const enterGuidedFlow = () => {
+    setGuideStep(0);
+    setIntroStage("guided");
+  };
+
+  const handleGuideNext = () => {
+    setGuideStep((current) => {
+      const next = current + 1;
+      if (next >= GUIDE_STEPS_TOTAL) {
+        markGuideFinished();
+        return current;
+      }
+      return next;
+    });
+  };
+
   const replayGuide = () => {
-    setShowGuide(true);
+    setGuideStep(0);
+    setIntroStage("guided");
   };
 
   return (
     <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-20 sm:px-8">
-      {/* Background Video Layer — pure CSS animation for GPU compositing */}
       <div
         aria-hidden
-        className={`absolute inset-0 z-0 overflow-hidden pointer-events-none ${reduceMotion ? '' : 'animate-bg-drift'}`}
-        style={{ filter: "saturate(0.95) brightness(1.08)" }}
+        className={`absolute inset-0 z-0 overflow-hidden pointer-events-none ${reduceMotion ? "" : "animate-bg-drift"}`}
+        style={{ filter: "saturate(0.92) brightness(1.02)" }}
       >
         <video
           ref={videoRef}
@@ -356,11 +327,10 @@ export const HomeView: React.FC = () => {
           playsInline
           disablePictureInPicture
           onLoadedMetadata={handleLoadedMetadata}
-          className="w-full h-full object-cover opacity-72 dark:opacity-10 mix-blend-screen dark:mix-blend-lighten pointer-events-none"
+          className="w-full h-full object-cover opacity-68 dark:opacity-12 mix-blend-screen dark:mix-blend-lighten pointer-events-none"
         />
       </div>
 
-      {/* <div className="absolute inset-0 z-[1] bg-gradient-to-b from-white/45 via-white/72 to-white/86 dark:from-slate-900/35 dark:via-slate-900/68 dark:to-slate-900/84" /> */}
       <div className="absolute inset-0 z-[2] pointer-events-none bg-[radial-gradient(circle_at_20%_14%,rgba(255,255,255,0.7),transparent_45%),radial-gradient(circle_at_82%_12%,rgba(255,231,242,0.52),transparent_38%),radial-gradient(circle_at_50%_90%,rgba(214,236,255,0.34),transparent_52%)]" />
       <div className="pointer-events-none absolute inset-x-[9%] top-[7%] z-[3] h-[53%] rounded-[44%_44%_8%_8%/58%_58%_8%_8%] border border-white/45 bg-gradient-to-b from-white/26 to-transparent dark:border-white/10 dark:from-white/5" />
       <div className="pointer-events-none absolute inset-x-[16%] top-[12%] z-[3] h-[43%] rounded-[42%_42%_8%_8%/56%_56%_8%_8%] border border-white/35 dark:border-white/8" />
@@ -368,30 +338,53 @@ export const HomeView: React.FC = () => {
 
       <FloatingPetals reduceMotion={reduceMotion} />
 
+      <AnimatePresence>
+        {showGuide && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="pointer-events-none absolute inset-0 z-[58] bg-white/26 backdrop-blur-[3px] dark:bg-black/42"
+          />
+        )}
+      </AnimatePresence>
+
       <motion.div
-        initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 32 }}
-        animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
-        transition={{
-          ...getTransition(reduceMotion),
-          duration: reduceMotion ? 0.3 : 0.92,
-          delay: 0.08,
-        }}
+        initial={false}
+        animate={
+          showOpening
+            ? { opacity: 0, y: 120, scale: 0.96 }
+            : { opacity: 1, y: 0, scale: 1 }
+        }
+        transition={
+          showOpening
+            ? { duration: 0.24 }
+            : {
+                ...getTransition(reduceMotion),
+                type: "spring",
+                duration: reduceMotion ? 0.32 : 0.96,
+                damping: 17,
+                stiffness: 140,
+                mass: 0.92,
+              }
+        }
         className="relative z-20 w-full max-w-6xl"
       >
         <motion.div
-          initial={reduceMotion ? { opacity: 0 } : { scale: 0.96, opacity: 0 }}
-          animate={reduceMotion ? { opacity: 1 } : { scale: 1, opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.22 }}
+          initial={false}
+          animate={
+            showOpening
+              ? { opacity: 0, y: 24 }
+              : { opacity: 1, y: 0 }
+          }
+          transition={{ duration: 0.72, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
           className="mb-7 text-center sm:mb-10"
         >
           <h1 className="font-elysia-logo text-[4.6rem] font-medium tracking-[0.03em] text-transparent bg-gradient-to-b from-[#fffefd] via-[#fff4fb] to-[#eaf0ff] bg-clip-text drop-shadow-[0_6px_18px_rgba(245,236,250,0.92)] sm:text-[5.4rem] pb-2">
             Elysia
           </h1>
           <p className="mt-3 font-elysia-display text-lg text-slate-600/88 dark:text-slate-200/90">
-            粉色天空坠入无瑕石庭，愿你在誓言与希望里安心书写。
-          </p>
-          <p className="font-elysia-poem mt-2 text-[1.6rem] leading-none text-slate-500/85 dark:text-slate-200/82 sm:text-[1.9rem]">
-            真诚地爱着世界，也真诚地爱着你自己。
+            粉色天空坠入往世乐土，愿你在誓言与希望里安心书写。
           </p>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-300/75">
             慢慢来，先写一句就很好。你不是独自一人，我们会一直温柔又热情地接住你。
@@ -399,23 +392,34 @@ export const HomeView: React.FC = () => {
           <button
             type="button"
             onClick={replayGuide}
-            className="mt-2 rounded-full border border-white/60 bg-white/65 px-3 py-1 text-xs text-slate-500 transition-colors hover:bg-white dark:border-white/15 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
+            className="mt-3 rounded-full border border-white/60 bg-white/65 px-3 py-1 text-xs text-slate-500 transition-colors hover:bg-white dark:border-white/15 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
           >
             回看引导
           </button>
         </motion.div>
 
-        <div className="grid gap-4 lg:grid-cols-[1.25fr_0.95fr] lg:gap-6">
+        <motion.div
+          initial={false}
+          animate={showOpening ? { opacity: 0, y: 48 } : { opacity: 1, y: 0 }}
+          transition={{ duration: 0.82, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+          className="grid gap-4 lg:grid-cols-[1.25fr_0.95fr] lg:gap-6"
+        >
           <LiquidCard className="min-h-[46vh] p-6 sm:p-10 bg-white/45 dark:bg-black/23">
-            <ProgressiveInput />
+            <ProgressiveInput
+              guideStep={showGuide ? guideStep : null}
+              isGuideActive={showGuide}
+              onGuideNext={handleGuideNext}
+              onGuideSkip={markGuideFinished}
+            />
           </LiquidCard>
           <div className="space-y-4">
             <OnboardingTaskCard />
             <HomeTimeline />
           </div>
-        </div>
+        </motion.div>
       </motion.div>
-      <WarmGuideOverlay open={showGuide} onClose={closeGuide} />
+
+      <OpeningScreen open={showOpening} onEnter={enterGuidedFlow} />
     </div>
   );
 };
