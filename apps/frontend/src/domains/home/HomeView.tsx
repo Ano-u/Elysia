@@ -55,32 +55,11 @@ function formatRelativeTime(isoTime: string): string {
   return rtf.format(Math.round(diffMs / dayMs), "day");
 }
 
-const FloatingPetals: React.FC<{ reduceMotion: boolean }> = ({ reduceMotion }) => (
+const FloatingPetals: React.FC = () => (
   <div className="pointer-events-none absolute inset-0 z-[4] overflow-hidden">
     {PETAL_POSITIONS.map((petal, index) => (
-      <motion.span
+      <span
         key={index}
-        initial={{ opacity: 0, y: 12 }}
-        animate={
-          reduceMotion
-            ? { opacity: 0.45, y: 0 }
-            : {
-                opacity: [0.28, 0.56, 0.3],
-                y: [0, 24, 0],
-                x: [0, index % 2 === 0 ? 14 : -12, 0],
-                rotate: [0, index % 2 === 0 ? 11 : -13, 0],
-              }
-        }
-        transition={
-          reduceMotion
-            ? { duration: 0.3, delay: petal.delay }
-            : {
-                duration: 11 + (index % 3) * 2,
-                delay: petal.delay,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }
-        }
         className="absolute h-3.5 w-3.5 rounded-[60%_40%_65%_35%] bg-gradient-to-br from-[#fff8fb] via-[#ffd9ea] to-[#ffc7e0] blur-[0.3px]"
         style={{
           left: petal.left,
@@ -88,7 +67,8 @@ const FloatingPetals: React.FC<{ reduceMotion: boolean }> = ({ reduceMotion }) =
           scale: petal.scale,
           boxShadow: "0 0 12px rgba(255, 208, 228, 0.46)",
         }}
-      />
+      >
+      </span>
     ))}
   </div>
 );
@@ -114,7 +94,7 @@ const OnboardingTaskCard: React.FC = () => {
   const todayCompleted = todayTask ? completedDays.includes(todayTask.day) : false;
 
   return (
-    <LiquidCard className="p-5 sm:p-6 bg-white/40 dark:bg-black/18">
+    <LiquidCard className="hide-scrollbar h-full min-h-0 overflow-y-auto overscroll-contain p-5 sm:p-6 bg-white/40 dark:bg-black/18">
       <p className="text-xs tracking-[0.16em] text-slate-400 dark:text-slate-300/60">Warm Path · 7 Days</p>
       <h3 className="mt-2 font-elysia-display text-2xl text-slate-700 dark:text-slate-100">今日 1 分钟任务</h3>
       <p className="mt-2 text-sm text-slate-500 dark:text-slate-300/82">
@@ -211,12 +191,12 @@ const HomeTimeline: React.FC = () => {
   };
 
   return (
-    <LiquidCard className="h-full min-h-[44vh] p-5 sm:p-6 bg-white/38 dark:bg-black/18">
+    <LiquidCard className="flex h-full min-h-[18rem] flex-col overflow-hidden p-5 sm:p-6 bg-white/38 dark:bg-black/18">
       <div className="mb-4 flex items-end justify-between">
         <h3 className="font-elysia-display text-2xl text-slate-700 dark:text-slate-100">往世乐土·最近记录</h3>
         <span className="text-xs text-slate-500 dark:text-slate-300/75">私密内容也会在这里出现</span>
       </div>
-      <div className="hide-scrollbar max-h-[38vh] space-y-3 overflow-y-auto pr-1 sm:max-h-[46vh]">
+      <div className="hide-scrollbar min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-1">
         {isLoading && <p className="text-sm text-slate-400">正在捧起你最近的心情片段...</p>}
         {!isLoading && (data?.items.length ?? 0) === 0 && (
           <p className="text-sm text-slate-500 dark:text-slate-300/80">还没有记录，先写一句就能点亮这片星海。</p>
@@ -283,6 +263,9 @@ export const HomeView: React.FC = () => {
 
   const showOpening = introStage === "opening";
   const showGuide = introStage === "guided";
+  const blurNonGuideClass = showGuide
+    ? "pointer-events-none opacity-34 blur-[2.5px] saturate-[0.8] contrast-[0.9] transition-all duration-300"
+    : "transition-all duration-300";
 
   const markGuideFinished = () => {
     setIntroStage("ready");
@@ -311,10 +294,10 @@ export const HomeView: React.FC = () => {
   };
 
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-20 sm:px-8">
+    <div className="relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-20 sm:px-8">
       <div
         aria-hidden
-        className={`absolute inset-0 z-0 overflow-hidden pointer-events-none ${reduceMotion ? "" : "animate-bg-drift"}`}
+        className="absolute inset-0 z-0 overflow-hidden pointer-events-none"
         style={{ filter: "saturate(0.92) brightness(1.02)" }}
       >
         <video
@@ -336,18 +319,7 @@ export const HomeView: React.FC = () => {
       <div className="pointer-events-none absolute inset-x-[16%] top-[12%] z-[3] h-[43%] rounded-[42%_42%_8%_8%/56%_56%_8%_8%] border border-white/35 dark:border-white/8" />
       <div className="pointer-events-none absolute inset-x-0 top-[52%] z-[3] h-[1px] bg-gradient-to-r from-transparent via-white/65 to-transparent dark:via-white/18" />
 
-      <FloatingPetals reduceMotion={reduceMotion} />
-
-      <AnimatePresence>
-        {showGuide && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="pointer-events-none absolute inset-0 z-[58] bg-white/26 backdrop-blur-[3px] dark:bg-black/42"
-          />
-        )}
-      </AnimatePresence>
+      <FloatingPetals />
 
       <motion.div
         initial={false}
@@ -368,7 +340,7 @@ export const HomeView: React.FC = () => {
                 mass: 0.92,
               }
         }
-        className="relative z-20 w-full max-w-6xl"
+        className="relative z-20 flex h-full min-h-0 w-full max-w-6xl flex-col"
       >
         <motion.div
           initial={false}
@@ -378,7 +350,7 @@ export const HomeView: React.FC = () => {
               : { opacity: 1, y: 0 }
           }
           transition={{ duration: 0.72, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-          className="mb-7 text-center sm:mb-10"
+          className={`mb-5 shrink-0 text-center sm:mb-6 ${blurNonGuideClass}`}
         >
           <h1 className="font-elysia-logo text-[4.6rem] font-medium tracking-[0.03em] text-transparent bg-gradient-to-b from-[#fffefd] via-[#fff4fb] to-[#eaf0ff] bg-clip-text drop-shadow-[0_6px_18px_rgba(245,236,250,0.92)] sm:text-[5.4rem] pb-2">
             Elysia
@@ -402,9 +374,9 @@ export const HomeView: React.FC = () => {
           initial={false}
           animate={showOpening ? { opacity: 0, y: 48 } : { opacity: 1, y: 0 }}
           transition={{ duration: 0.82, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-          className="grid gap-4 lg:grid-cols-[1.25fr_0.95fr] lg:gap-6"
+          className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1.25fr)_minmax(0,1fr)] gap-4 overflow-hidden lg:grid-cols-[1.25fr_0.95fr] lg:grid-rows-[minmax(0,1fr)] lg:gap-6"
         >
-          <LiquidCard className="min-h-[46vh] p-6 sm:p-10 bg-white/45 dark:bg-black/23">
+          <LiquidCard className="relative flex h-full min-h-0 flex-col overflow-hidden p-6 sm:p-8 bg-white/45 dark:bg-black/23">
             <ProgressiveInput
               guideStep={showGuide ? guideStep : null}
               isGuideActive={showGuide}
@@ -412,9 +384,13 @@ export const HomeView: React.FC = () => {
               onGuideSkip={markGuideFinished}
             />
           </LiquidCard>
-          <div className="space-y-4">
-            <OnboardingTaskCard />
-            <HomeTimeline />
+          <div className={`flex h-full min-h-0 flex-col gap-4 ${blurNonGuideClass}`}>
+            <div className="min-h-0 flex-[0.82] lg:h-[16.5rem] lg:flex-none">
+              <OnboardingTaskCard />
+            </div>
+            <div className="min-h-0 flex-[1.18]">
+              <HomeTimeline />
+            </div>
           </div>
         </motion.div>
       </motion.div>

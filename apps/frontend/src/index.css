@@ -138,12 +138,20 @@
 }
 
 @layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
   * {
     @apply border-border;
   }
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-body);
+    overflow: hidden;
+    overscroll-behavior: none;
   }
 }
 

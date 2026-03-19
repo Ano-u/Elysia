@@ -140,9 +140,9 @@ export const AdminDashboard: React.FC = () => {
   >("moderation");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 p-6 text-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:text-slate-200">
-      <div className="mx-auto grid max-w-[1360px] gap-6 lg:grid-cols-[260px_1fr]">
-        <aside className="rounded-3xl border border-white/45 bg-white/45 p-4 shadow-[var(--shadow-crystal)] backdrop-blur-xl dark:border-white/12 dark:bg-black/20">
+    <div className="h-full min-h-0 overflow-hidden bg-gradient-to-br from-slate-50 via-white to-slate-100 p-6 text-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:text-slate-200">
+      <div className="mx-auto grid h-full min-h-0 max-w-[1360px] gap-6 lg:grid-cols-[260px_1fr]">
+        <aside className="min-h-0 overflow-y-auto rounded-3xl border border-white/45 bg-white/45 p-4 shadow-[var(--shadow-crystal)] backdrop-blur-xl dark:border-white/12 dark:bg-black/20">
           <h2 className="font-elysia-display px-2 text-2xl text-slate-700 dark:text-slate-100">治理控制台</h2>
           <p className="px-2 pt-1 text-xs text-slate-500 dark:text-slate-300/80">温柔治理，清晰裁决。</p>
           <div className="mt-4 flex flex-col gap-1.5">
@@ -173,7 +173,7 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </aside>
 
-        <main className="rounded-3xl border border-white/45 bg-white/42 p-5 shadow-[var(--shadow-crystal)] backdrop-blur-xl dark:border-white/12 dark:bg-black/18">
+        <main className="min-h-0 overflow-y-auto rounded-3xl border border-white/45 bg-white/42 p-5 shadow-[var(--shadow-crystal)] backdrop-blur-xl dark:border-white/12 dark:bg-black/18">
           {activeTab === "moderation" && <ModerationQueue />}
           {activeTab === "access" && <AccessApplications />}
           {activeTab === "risk" && <RiskQueue />}

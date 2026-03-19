@@ -174,6 +174,7 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
   const [hintMsg, setHintMsg] = useState<string | null>(null);
   const [showIdleHint, setShowIdleHint] = useState(false);
   const [isDescriptionFocused, setIsDescriptionFocused] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const moodSectionRef = useRef<HTMLDivElement>(null);
   const advancedSectionRef = useRef<HTMLDivElement>(null);
   const submitSectionRef = useRef<HTMLDivElement>(null);
@@ -218,18 +219,28 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
       return;
     }
 
-    const target = isMoodGuideActive
-      ? moodSectionRef.current
-      : isDescriptionGuideActive
-      ? advancedSectionRef.current
-      : isSubmitGuideActive
-      ? submitSectionRef.current
-      : null;
+    const container = scrollContainerRef.current;
+    if (!container) {
+      return;
+    }
 
-    target?.scrollIntoView({
+    if (isSubmitGuideActive) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "smooth",
+      });
+      return;
+    }
+
+    const target = isMoodGuideActive ? moodSectionRef.current : isDescriptionGuideActive ? advancedSectionRef.current : null;
+    if (!target) {
+      return;
+    }
+
+    const nextTop = Math.max(0, target.offsetTop - container.clientHeight / 2 + target.clientHeight / 2);
+    container.scrollTo({
+      top: nextTop,
       behavior: "smooth",
-      block: "center",
-      inline: "nearest",
     });
   }, [isGuideActive, isMoodGuideActive, isDescriptionGuideActive, isSubmitGuideActive]);
 
@@ -381,7 +392,8 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col">
       <div
-        className={`hide-scrollbar flex-1 min-h-0 space-y-3 overflow-y-auto pr-1 pb-2 transition-transform duration-300 ${
+        ref={scrollContainerRef}
+        className={`hide-scrollbar flex-1 min-h-0 space-y-3 overflow-y-auto overscroll-contain pr-1 pb-2 transition-transform duration-300 ${
           isDescriptionFocused ? "-translate-y-8 sm:-translate-y-11" : "translate-y-0"
         }`}
       >
