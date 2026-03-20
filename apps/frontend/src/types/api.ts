@@ -155,6 +155,16 @@ export interface CreateRecordRequest {
   tags?: string[];
 }
 
+export interface UpdateRecordRequest {
+  moodPhrase?: string;
+  quote?: string | null;
+  extraEmotions?: string[];
+  description?: string;
+  occurredAt?: string | null;
+  locationId?: string | null;
+  tags?: string[];
+}
+
 export interface RecordSummary {
   id: string;
   moodPhrase: string;
@@ -177,6 +187,10 @@ export interface CreateRecordResponse {
     status: PublicationStatus;
     label: string;
   };
+}
+
+export interface UpdateRecordResponse extends CreateRecordResponse {
+  ok: boolean;
 }
 
 export interface HomeFeedResponse {

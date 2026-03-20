@@ -9,12 +9,14 @@ import {
   createRecord,
   getHomeFeed,
   getOnboardingProgress,
+  updateRecord,
   updateRecordVisibility,
 } from "../../lib/apiClient";
-import type { RecordSummary, VisibilityIntent, CreateRecordRequest, HomeFeedResponse } from "../../types/api";
-import { Globe, Lock, Clock } from "lucide-react";
+import type { RecordSummary, VisibilityIntent, CreateRecordRequest } from "../../types/api";
+import { Globe, Lock, Clock, PenLine, Check, X } from "lucide-react";
 import { pickRandomCopy, useRotatingCopy } from "../../lib/rotatingCopy";
 import { getCreateSuccessMessage, getPublicationStatusMeta, type PublicationTone } from "../../lib/publicationCopy";
+import { validateMoodPhraseLength } from "../../lib/moodPhraseValidation";
 
 const DRAFT_KEY = "elysia-home-draft-v3";
 const GUIDE_COMPLETED_STORAGE_PREFIX = "elysia-home-guide-completed-v1";
@@ -61,6 +63,14 @@ const CREATE_RECORD_ERROR_MESSAGES = {
     "哎呀，网络刚刚晃了一下，不过这份心情没有丢，爱莉陪你再试一次吧♪",
     "刚才那阵风太急了，爱莉没能听清，我们再慢一点说一次好吗？",
   ],
+  moodLimit: [
+    "标题最多 20 个字，英文最多 20 个词，精简一下我们再出发吧♪",
+    "这一句标题有点长啦，最多 20 字或 20 个英文词，我们一起收束一下吧♪",
+  ],
+  contentTooLong: [
+    "这次写得太满啦，描述部分最多 1000 字，稍微精简一下就能顺利送出♪",
+    "爱莉已经收到你的心意啦，不过内容有点长，描述最多 1000 字，整理一下我们再发射吧♪",
+  ],
   generic: [
     "哎呀，爱莉刚刚没有听清，再让我认真听一次，好不好？♪",
     "这一句刚刚没能稳稳落下来，不过别担心，爱莉还在这里。",
@@ -84,6 +94,17 @@ function resolveCreateErrorMessage(error: unknown): string {
   }
   if (maybeErr.code === "RISK_CONTROL_ACTIVE") {
     return pickRandomCopy(CREATE_RECORD_ERROR_MESSAGES.riskControl);
+  }
+  if (
+    fallbackMessage.includes("标题最多 20 字")
+    || fallbackMessage.includes("标题英文最多 20 个词")
+    || fallbackMessage.includes("at most 20")
+    || fallbackMessage.includes("at most 140")
+  ) {
+    return pickRandomCopy(CREATE_RECORD_ERROR_MESSAGES.moodLimit);
+  }
+  if (fallbackMessage.includes("at most 1000") || fallbackMessage.includes("too_big")) {
+    return pickRandomCopy(CREATE_RECORD_ERROR_MESSAGES.contentTooLong);
   }
   if (fallbackMessage.includes("failed to fetch")) {
     return pickRandomCopy(CREATE_RECORD_ERROR_MESSAGES.network);
@@ -184,6 +205,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const [showOnlyPublic, setShowOnlyPublic] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [feedbackTone, setFeedbackTone] = useState<"error" | "success">("success");
+  const saveEventTokenRef = useRef(0);
+  const [saveAnimationEvent, setSaveAnimationEvent] = useState<{ token: number; status: "success" | "error" } | null>(null);
   const [guideMode, setGuideMode] = useState<"hidden" | "welcome" | "spotlight">("hidden");
   const [guideStep, setGuideStep] = useState(0);
   const [guideTargetRect, setGuideTargetRect] = useState<DOMRect | null>(null);
@@ -244,9 +267,15 @@ export const HomeView: React.FC<HomeViewProps> = ({
     closeGuide();
   };
 
+  const emitSaveAnimationEvent = (status: "success" | "error") => {
+    saveEventTokenRef.current += 1;
+    setSaveAnimationEvent({ token: saveEventTokenRef.current, status });
+  };
+
   const createMutation = useMutation({
     mutationFn: (payload: CreateRecordRequest) => createRecord(payload),
     onSuccess: (response) => {
+      emitSaveAnimationEvent("success");
       setDraft({ ...draft, moodPhrase: "", quote: "", description: "", extraEmotions: [] });
       localStorage.removeItem(DRAFT_KEY);
       setFeedbackTone("success");
@@ -255,15 +284,24 @@ export const HomeView: React.FC<HomeViewProps> = ({
       queryClient.invalidateQueries({ queryKey: ["universe"] });
     },
     onError: (error) => {
+      emitSaveAnimationEvent("error");
       setFeedbackTone("error");
       setFeedbackMessage(resolveCreateErrorMessage(error));
     },
   });
 
   const handleSave = () => {
-    if (!draft.moodPhrase.trim()) return;
+    const moodPhrase = draft.moodPhrase.trim();
+    const moodCheck = validateMoodPhraseLength(moodPhrase);
+    if (!moodCheck.ok) {
+      emitSaveAnimationEvent("error");
+      setFeedbackTone("error");
+      setFeedbackMessage(moodCheck.reason);
+      return;
+    }
+
     createMutation.mutate({
-      moodPhrase: draft.moodPhrase.trim(),
+      moodPhrase,
       quote: draft.quote.trim() || undefined,
       description: draft.description.trim() || undefined,
       extraEmotions: draft.extraEmotions.length ? draft.extraEmotions : undefined,
@@ -480,6 +518,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               onSave={handleSave}
               onJumpUniverse={() => onNavigate("universe")}
               isPending={createMutation.isPending}
+              saveAnimationEvent={saveAnimationEvent}
               feedbackMessage={feedbackMessage}
               feedbackTone={feedbackTone}
             />
@@ -576,9 +615,19 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
 const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
   const queryClient = useQueryClient();
-  const isPublic = item.visibilityIntent === "public";
-  const publicationMeta = getPublicationStatusMeta(item.publicationStatus);
-  const emotionTags = item.extraEmotions && item.extraEmotions.length > 0 ? item.extraEmotions : item.tags ?? [];
+  const [mockSnapshot, setMockSnapshot] = useState<Partial<RecordSummary> | null>(null);
+  const currentItem = mockSnapshot ? { ...item, ...mockSnapshot } : item;
+  const isPublic = currentItem.visibilityIntent === "public";
+  const publicationMeta = getPublicationStatusMeta(currentItem.publicationStatus);
+  const emotionTags = currentItem.extraEmotions && currentItem.extraEmotions.length > 0 ? currentItem.extraEmotions : currentItem.tags ?? [];
+  const [isEditing, setIsEditing] = useState(false);
+  const [isActionHovered, setIsActionHovered] = useState(false);
+  const [editMoodPhrase, setEditMoodPhrase] = useState(currentItem.moodPhrase);
+  const [editQuote, setEditQuote] = useState(currentItem.quote ?? "");
+  const [editDescription, setEditDescription] = useState(currentItem.description ?? "");
+  const [editFeedback, setEditFeedback] = useState<string | null>(null);
+  const isMockItem = currentItem.id.startsWith("test-");
+  const canEditByStatus = ["private", "pending_auto", "pending_manual", "published"].includes(currentItem.publicationStatus);
 
   const visibilityMutation = useMutation({
     mutationFn: ({ id, isPublic }: { id: string; isPublic: boolean }) => updateRecordVisibility(id, isPublic),
@@ -587,20 +636,87 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
     },
   });
 
+  const editMutation = useMutation({
+    mutationFn: (payload: { moodPhrase: string; quote: string | null; description: string }) =>
+      updateRecord(currentItem.id, payload),
+    onSuccess: () => {
+      setIsEditing(false);
+      setEditFeedback("修改已提交，正在进行二次审核呀♪");
+      queryClient.invalidateQueries({ queryKey: ["home-feed"] });
+      queryClient.invalidateQueries({ queryKey: ["universe"] });
+    },
+    onError: (error) => {
+      setEditFeedback(resolveCreateErrorMessage(error));
+    },
+  });
+
+  useEffect(() => {
+    if (isEditing) return;
+    setEditMoodPhrase(currentItem.moodPhrase);
+    setEditQuote(currentItem.quote ?? "");
+    setEditDescription(currentItem.description ?? "");
+  }, [isEditing, currentItem.moodPhrase, currentItem.quote, currentItem.description, currentItem.updatedAt]);
+
   const toggleVisibility = () => {
-    if (item.id.startsWith("test-")) {
-       // Mock for test data
-       queryClient.setQueryData(["home-feed"], (old: HomeFeedResponse | undefined) => {
-         if (!old) return old;
-         return {
-           ...old,
-           items: old.items.map((i: RecordSummary) => i.id === item.id ? { ...i, visibilityIntent: isPublic ? "private" : "public" } : i)
-         };
-       });
-       return;
-    };
-    visibilityMutation.mutate({ id: item.id, isPublic: !isPublic });
+    if (isMockItem) {
+      setMockSnapshot((prev) => ({
+        ...(prev ?? {}),
+        visibilityIntent: isPublic ? "private" : "public",
+        updatedAt: new Date().toISOString(),
+      }));
+      return;
+    }
+    visibilityMutation.mutate({ id: currentItem.id, isPublic: !isPublic });
   };
+
+  const openEditMode = () => {
+    if (!canEditByStatus) {
+      toggleVisibility();
+      return;
+    }
+    setEditFeedback(null);
+    setIsEditing(true);
+  };
+
+  const handleEditCancel = () => {
+    setEditMoodPhrase(currentItem.moodPhrase);
+    setEditQuote(currentItem.quote ?? "");
+    setEditDescription(currentItem.description ?? "");
+    setEditFeedback(null);
+    setIsEditing(false);
+  };
+
+  const handleEditSave = () => {
+    const moodPhrase = editMoodPhrase.trim();
+    const moodCheck = validateMoodPhraseLength(moodPhrase);
+    if (!moodCheck.ok) {
+      setEditFeedback(moodCheck.reason);
+      return;
+    }
+
+    if (isMockItem) {
+      setMockSnapshot((prev) => ({
+        ...(prev ?? {}),
+        moodPhrase,
+        quote: editQuote.trim().length > 0 ? editQuote.trim() : null,
+        description: editDescription.trim().length > 0 ? editDescription.trim() : null,
+        publicationStatus: "pending_second_review",
+        updatedAt: new Date().toISOString(),
+      }));
+      setIsEditing(false);
+      setEditFeedback("修改已提交，正在进行二次审核呀♪");
+      return;
+    }
+
+    editMutation.mutate({
+      moodPhrase,
+      quote: editQuote.trim().length > 0 ? editQuote.trim() : null,
+      description: editDescription.trim(),
+    });
+  };
+
+  const showEditHint = canEditByStatus && isActionHovered && !isEditing;
+  const actionBusy = visibilityMutation.isPending || editMutation.isPending;
 
   return (
     <div className="flex flex-col gap-4 group relative">
@@ -608,7 +724,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
       <div className="flex items-center justify-between px-10 text-xs text-slate-400 font-bold tracking-widest uppercase">
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4 text-pink-300" />
-          {new Date(item.createdAt).toLocaleString("zh-CN", {
+          {new Date(currentItem.createdAt).toLocaleString("zh-CN", {
             hour12: false,
             month: "short",
             day: "numeric",
@@ -618,11 +734,20 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
         </div>
 
         <button
-          onClick={toggleVisibility}
-          disabled={visibilityMutation.isPending}
-          className={`flex items-center gap-2 transition-all hover:scale-105 ${isPublic ? "text-blue-400" : "text-slate-400"}`}
+          onMouseEnter={() => setIsActionHovered(true)}
+          onMouseLeave={() => setIsActionHovered(false)}
+          onClick={openEditMode}
+          disabled={actionBusy}
+          className={`flex items-center gap-2 transition-all hover:scale-105 ${
+            showEditHint ? "text-violet-500 dark:text-violet-300" : isPublic ? "text-blue-400" : "text-slate-400"
+          }`}
         >
-          {isPublic ? (
+          {showEditHint ? (
+            <>
+              <PenLine className="w-4 h-4" />
+              <span className="drop-shadow-sm">修改</span>
+            </>
+          ) : isPublic ? (
             <>
               <Globe className="w-4 h-4" />
               <span className="drop-shadow-sm">公开共鸣</span>
@@ -648,40 +773,110 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
           </p>
         </div>
 
-        <div className="flex items-start justify-between gap-6">
-          <h3 className="font-elysia-display text-2xl text-slate-700 dark:text-white font-bold leading-tight flex-1">
-            {item.moodPhrase}
-          </h3>
-
-          {/* Emotions on the right of title */}
-          {emotionTags.length > 0 && (
-            <div className="flex flex-wrap gap-2 justify-end pt-1 shrink-0 max-w-[200px]">
-              {emotionTags.map(e => (
-                <span key={e} className="px-3 py-1 rounded-full bg-pink-100/40 dark:bg-pink-900/10 border-2 border-pink-200/30 dark:border-pink-800/20 text-[10px] font-bold text-pink-600 dark:text-pink-300 shadow-sm">
-                  {e}
-                </span>
-              ))}
+        {isEditing ? (
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col gap-2">
+              <span className="text-[10px] tracking-widest uppercase font-bold text-slate-400">标题</span>
+              <input
+                type="text"
+                maxLength={200}
+                value={editMoodPhrase}
+                onChange={(e) => setEditMoodPhrase(e.target.value)}
+                placeholder="把这一刻轻轻写成标题吧♪"
+                className="w-full bg-white/60 dark:bg-black/30 border-none rounded-2xl px-4 py-3 text-base text-slate-700 dark:text-slate-100 outline-none focus:ring-2 focus:ring-violet-200/60"
+              />
             </div>
-          )}
-        </div>
 
-        {item.quote && (
-          <div className="relative pl-4 py-1 my-6">
-            <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-pink-300/60 rounded-full shadow-glow" />
-            <p className="italic text-slate-600 dark:text-slate-300 text-base leading-relaxed font-medium">
-              {item.quote}
-            </p>
+            <div className="flex flex-col gap-2">
+              <span className="text-[10px] tracking-widest uppercase font-bold text-slate-400">今日誓言</span>
+              <input
+                type="text"
+                maxLength={200}
+                value={editQuote}
+                onChange={(e) => setEditQuote(e.target.value)}
+                placeholder="要不要把这一句也轻轻补上？"
+                className="w-full bg-white/50 dark:bg-black/25 border-none rounded-2xl px-4 py-3 text-sm italic text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/60"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-[10px] tracking-widest uppercase font-bold text-slate-400">描述</span>
+              <textarea
+                value={editDescription}
+                maxLength={1000}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="补一两句细节，让这份心意更完整♪"
+                className="w-full min-h-[140px] resize-none bg-white/50 dark:bg-black/25 border-none rounded-2xl px-4 py-3 text-sm leading-relaxed text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/60"
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-xs text-violet-500 dark:text-violet-300">修改完成后会进入二次审核</p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleEditCancel}
+                  className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/85 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-white dark:border-white/20 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleEditSave}
+                  disabled={editMutation.isPending}
+                  className="inline-flex items-center gap-1 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-300/20 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/30"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  {editMutation.isPending ? "提交中..." : "提交修改"}
+                </button>
+              </div>
+            </div>
           </div>
+        ) : (
+          <>
+            <div className="flex items-start justify-between gap-6">
+              <h3 className="font-elysia-display text-2xl text-slate-700 dark:text-white font-bold leading-tight flex-1 break-words [overflow-wrap:anywhere]">
+                {currentItem.moodPhrase}
+              </h3>
+
+              {/* Emotions on the right of title */}
+              {emotionTags.length > 0 && (
+                <div className="flex flex-wrap gap-2 justify-end pt-1 shrink-0 max-w-[200px]">
+                  {emotionTags.map(e => (
+                    <span key={e} className="px-3 py-1 rounded-full bg-pink-100/40 dark:bg-pink-900/10 border-2 border-pink-200/30 dark:border-pink-800/20 text-[10px] font-bold text-pink-600 dark:text-pink-300 shadow-sm">
+                      {e}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {currentItem.quote && (
+              <div className="relative pl-4 py-1 my-6">
+                <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-pink-300/60 rounded-full shadow-glow" />
+                <p className="italic text-slate-600 dark:text-slate-300 text-base leading-relaxed font-medium break-words [overflow-wrap:anywhere]">
+                  {currentItem.quote}
+                </p>
+              </div>
+            )}
+
+            {currentItem.description && (
+              <div className="flex flex-col gap-2 pl-4">
+                {currentItem.description.split("\n").filter(p => p.trim()).map((p, i) => (
+                  <div key={i} className="relative text-slate-500 dark:text-slate-400 text-sm/1 leading-loose whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                    <div className="absolute -left-4 top-3 w-2 h-2 bg-slate-200 dark:bg-slate-800 rounded-full" />
+                    {p}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
 
-        {item.description && (
-          <div className="flex flex-col gap-2 pl-4">
-            {item.description.split("\n").filter(p => p.trim()).map((p, i) => (
-              <div key={i} className="relative text-slate-500 dark:text-slate-400 text-sm/1 leading-loose">
-                <div className="absolute -left-4 top-3 w-2 h-2 bg-slate-200 dark:bg-slate-800 rounded-full" />
-                {p}
-              </div>
-            ))}
+        {editFeedback && (
+          <div className="rounded-[1.2rem] border border-violet-200/70 bg-violet-50/70 px-4 py-2 text-sm text-violet-700 dark:border-violet-300/20 dark:bg-violet-500/15 dark:text-violet-200">
+            {editFeedback}
           </div>
         )}
       </LiquidCard>

@@ -15,13 +15,13 @@ const PUBLICATION_STATUS_META: Record<PublicationStatus, PublicationStatusMeta> 
     tone: "private",
   },
   pending_auto: {
-    label: "正在等候温柔确认",
-    detail: "爱莉已经替你收好啦，接下来会认真看看它该去往哪里。",
+    label: "正在等待Elysia确认呀♪",
+    detail: "爱莉已经替你收好啦，正在等待Elysia确认这份心意的下一站。",
     tone: "pending",
   },
   pending_manual: {
-    label: "正在等候温柔确认",
-    detail: "这份心情已经被好好接住啦，稍等一下下，就会知道它的下一站。",
+    label: "正在等待Elysia确认呀♪",
+    detail: "这份心情已经被好好接住啦，正在等待Elysia确认它的下一站。",
     tone: "pending",
   },
   pending_second_review: {
@@ -53,8 +53,8 @@ const PUBLICATION_STATUS_META: Record<PublicationStatus, PublicationStatusMeta> 
 
 const CREATE_SUCCESS_MESSAGES: Record<PublicationStatus, string> = {
   private: "爱莉已经把这一刻好好珍藏起来啦，等你想回头看时，它会一直在♪",
-  pending_auto: "爱莉已经把这份心情收好了，接下来会替你送去温柔确认，请稍等一下下♪",
-  pending_manual: "这份心情已经稳稳交到爱莉手里啦，很快就会知道它下一步要去哪里♪",
+  pending_auto: "爱莉已经把这份心情收好了，正在等待Elysia确认呀♪",
+  pending_manual: "这份心情已经稳稳交到爱莉手里啦，正在等待Elysia确认呀♪",
   pending_second_review: "爱莉已经替你把它送去再认真看一眼啦，别担心，很快就会有回音♪",
   risk_control_24h: "这份心情要先在风里停一停，不过爱莉会陪着它，等能继续时再一起出发♪",
   published: "爱莉已经把这份心情送进星海啦，去听听它会唤来怎样的回响吧♪",

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireAccessApproved, requireNotInRiskControl, requireUser } from "../lib/auth.js";
 import { query, withTransaction } from "../lib/db.js";
 import { broadcast } from "../lib/realtime.js";
-import { validateQuoteLength, hashIp } from "../lib/utils.js";
+import { validateMoodPhraseLength, validateQuoteLength, hashIp } from "../lib/utils.js";
 import { writeAuditLog } from "../lib/audit.js";
 import { assessModeration, type ModerationAssessment, type RiskLevel } from "../lib/moderation.js";
 import {
@@ -389,6 +389,11 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const body = recordCreateSchema.parse(req.body);
+    const moodPhraseCheck = validateMoodPhraseLength(body.moodPhrase);
+    if (!moodPhraseCheck.ok) {
+      reply.code(400).send({ message: moodPhraseCheck.reason });
+      return;
+    }
 
     if (body.quote) {
       const quoteCheck = validateQuoteLength(body.quote);
@@ -643,6 +648,13 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
 
     const params = z.object({ id: z.string().uuid() }).parse(req.params);
     const body = recordPatchSchema.parse(req.body);
+    if (body.moodPhrase) {
+      const moodPhraseCheck = validateMoodPhraseLength(body.moodPhrase);
+      if (!moodPhraseCheck.ok) {
+        reply.code(400).send({ message: moodPhraseCheck.reason });
+        return;
+      }
+    }
 
     const current = await query<RecordRow>(
       `
@@ -763,6 +775,17 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
         hasImages: moderationInput.has_images,
         textAssessment: assessment,
       });
+      const finalDecision: PublicationDecision =
+        publicationDecision.publicationStatus === "risk_control_24h"
+          ? publicationDecision
+          : {
+              ...publicationDecision,
+              publicationStatus: "pending_second_review",
+              isPublic: false,
+              queueType: "second_review",
+              queuePriority: publicationDecision.queuePriority ?? 4,
+              reason: "内容修改后进入二次审查",
+            };
 
       const revisionNo = await createRecordRevision({
         client,
@@ -786,7 +809,7 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
         triggerIpHash,
         visibilityIntent: moderationInput.visibility_intent,
         assessment,
-        decision: publicationDecision,
+        decision: finalDecision,
         revisionNo,
         reviewStage: "auto",
         modelMeta: {

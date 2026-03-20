@@ -19,6 +19,8 @@ import type {
   PublicationStatus,
   PublishStatusResponse,
   RecordSummary,
+  UpdateRecordRequest,
+  UpdateRecordResponse,
   UniverseResponse
 } from '../types/api';
 
@@ -44,6 +46,10 @@ type RawCreateRecordResponse = {
     status: PublicationStatus;
     label: string;
   };
+};
+
+type RawUpdateRecordResponse = RawCreateRecordResponse & {
+  ok: boolean;
 };
 
 type RawHomeFeedResponse = {
@@ -161,6 +167,16 @@ export const updateRecordVisibility = (id: string, isPublic: boolean) =>
     method: 'PATCH',
     body: JSON.stringify({ isPublic }),
   }).then((raw): CreateRecordResponse => ({
+    record: mapRecordSummary(raw.record),
+    publishStatus: raw.publishStatus,
+  }));
+
+export const updateRecord = (id: string, data: UpdateRecordRequest) =>
+  fetchApi<RawUpdateRecordResponse>(`/api/records/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }).then((raw): UpdateRecordResponse => ({
+    ok: raw.ok,
     record: mapRecordSummary(raw.record),
     publishStatus: raw.publishStatus,
   }));

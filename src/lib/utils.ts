@@ -28,6 +28,24 @@ export function validateQuoteLength(quote: string): { ok: boolean; reason?: stri
   return { ok: true };
 }
 
+export function validateMoodPhraseLength(moodPhrase: string): { ok: boolean; reason?: string } {
+  if (moodPhrase.trim().length === 0) {
+    return { ok: false, reason: "标题不能为空" };
+  }
+
+  if (isLikelyEnglish(moodPhrase)) {
+    if (countEnglishWords(moodPhrase) > 20) {
+      return { ok: false, reason: "标题英文最多 20 个词" };
+    }
+    return { ok: true };
+  }
+
+  if (moodPhrase.length > 20) {
+    return { ok: false, reason: "标题最多 20 字" };
+  }
+  return { ok: true };
+}
+
 export function hashIp(ip: string): string {
   // 轻量哈希，仅用于示例。生产环境建议使用加盐安全哈希。
   let hash = 0;

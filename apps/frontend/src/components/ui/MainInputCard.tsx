@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LiquidCard } from "./LiquidCard";
 import { ActionPairRow } from "./ActionPairRow";
@@ -19,6 +19,7 @@ interface MainInputCardProps {
   onSave: () => void;
   onJumpUniverse: () => void;
   isPending?: boolean;
+  saveAnimationEvent?: { token: number; status: "success" | "error" } | null;
   feedbackMessage?: string | null;
   feedbackTone?: "error" | "success";
 }
@@ -71,19 +72,81 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
   onSave,
   onJumpUniverse,
   isPending,
+  saveAnimationEvent,
   feedbackMessage,
   feedbackTone = "success",
 }) => {
+  const editorAreaRef = useRef<HTMLDivElement>(null);
+  const quoteInputRef = useRef<HTMLInputElement>(null);
+  const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [isQuoteFocused, setIsQuoteFocused] = useState(false);
   const [isDescFocused, setIsDescFocused] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
   const hasValue = moodPhrase.trim().length > 0;
-  const isLanding = !hasValue && !isFocused;
-  const isCompact = hasValue && !isFocused;
+  const hasQuote = quote.trim().length > 0;
+  const hasDescription = description.trim().length > 0;
+  const isComposerExpanded = isFocused || isQuoteFocused || isDescFocused;
+  const isLanding = !hasValue && !isComposerExpanded;
+  const isCompact = hasValue && !isComposerExpanded;
+  const showQuoteInput = isQuoteFocused || (!hasQuote && isComposerExpanded);
   const ambientMessages = isPending ? WAITING_MESSAGES : hasValue ? GUIDANCE_MESSAGES : COMPANION_MESSAGES;
   const ambientMessage = useRotatingCopy(ambientMessages, 10000, ambientMessages.length > 1);
+
+  const isTargetInsideEditor = (target: EventTarget | null): boolean => {
+    if (!(target instanceof Node)) return false;
+    return editorAreaRef.current?.contains(target) ?? false;
+  };
+
+  const collapseEditor = () => {
+    setIsFocused(false);
+    setIsQuoteFocused(false);
+    setIsDescFocused(false);
+    setShowDetails((current) => (hasDescription ? current : false));
+  };
+
+  const focusFieldAtEnd = (field: HTMLInputElement | HTMLTextAreaElement | null) => {
+    if (!field) return;
+    field.focus({ preventScroll: true });
+    const valueLength = field.value.length;
+    field.setSelectionRange(valueLength, valueLength);
+  };
+
+  const activateQuoteEditor = () => {
+    setIsQuoteFocused(true);
+  };
+
+  const activateDescriptionEditor = () => {
+    setShowDetails(true);
+    setIsDescFocused(true);
+  };
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (isTargetInsideEditor(event.target)) return;
+      collapseEditor();
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    return () => window.removeEventListener("pointerdown", handlePointerDown);
+  }, []);
+
+  useEffect(() => {
+    if (!isQuoteFocused) return;
+    const frameId = window.requestAnimationFrame(() => {
+      focusFieldAtEnd(quoteInputRef.current);
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [isQuoteFocused]);
+
+  useEffect(() => {
+    if (!showDetails || !isDescFocused) return;
+    const frameId = window.requestAnimationFrame(() => {
+      focusFieldAtEnd(descriptionTextareaRef.current);
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [showDetails, isDescFocused]);
 
   const toggleTag = (tag: string) => {
     if (extraEmotions.includes(tag)) {
@@ -96,12 +159,16 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
   return (
     <div className="w-full max-w-4xl mx-auto flex flex-col gap-10">
       {/* Card: Mood + Quote + Details */}
-      <LiquidCard className="bg-white/45 dark:bg-black/23 overflow-hidden p-10 transition-all duration-700 shadow-2xl">
+      <LiquidCard
+        ref={editorAreaRef}
+        className="bg-white/45 dark:bg-black/23 overflow-hidden p-10 transition-all duration-700 shadow-2xl"
+      >
         <div className="flex flex-col gap-8">
           {/* Main Input Section */}
           <div className="relative">
             <textarea
               autoFocus={hasValue}
+              maxLength={200}
               className={`font-elysia-display w-full resize-none border-none bg-transparent p-0 outline-none placeholder:text-slate-400/40 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-300/20 transition-all duration-700 ease-in-out ${
                 isLanding ? "text-[2.2rem] min-h-[120px]" : isCompact ? "text-2xl min-h-[40px] font-bold" : "text-[2.4rem] min-h-[140px]"
               }`}
@@ -109,7 +176,11 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
               value={moodPhrase}
               onChange={(e) => setMoodPhrase(e.target.value)}
               onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
+              onBlur={(e) => {
+                if (!isTargetInsideEditor(e.relatedTarget)) {
+                  setIsFocused(false);
+                }
+              }}
               disabled={isPending}
             />
 
@@ -138,8 +209,8 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
               >
                 {/* Row 1: Quote */}
                 <div className="flex flex-col gap-3">
-                  <AnimatePresence mode="wait">
-                    {isQuoteFocused || !quote ? (
+                  <AnimatePresence>
+                    {showQuoteInput ? (
                       <motion.div
                         key="quote-input"
                         initial={{ opacity: 0 }}
@@ -153,21 +224,27 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                           /> 今日誓言
                         </span>
                         <input
+                          ref={quoteInputRef}
                           type="text"
+                          maxLength={200}
                           value={quote}
                           onChange={(e) => setQuote(e.target.value)}
                           onFocus={() => setIsQuoteFocused(true)}
-                          onBlur={() => setIsQuoteFocused(false)}
+                          onBlur={(e) => {
+                            if (!isTargetInsideEditor(e.relatedTarget)) {
+                              setIsQuoteFocused(false);
+                            }
+                          }}
                           placeholder="今天想把哪一句，留成只属于你的誓言呢？♪"
                           className="w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-3 text-base italic text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 transition-all shadow-inner"
                         />
                       </motion.div>
-                    ) : (
+                    ) : hasQuote ? (
                       <motion.div
                         key="quote-display"
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
-                        onClick={() => setIsQuoteFocused(true)}
+                        onClick={activateQuoteEditor}
                         className="relative pl-6 py-1 cursor-pointer group"
                       >
                         <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-pink-300/60 rounded-full group-hover:bg-pink-400 transition-colors" />
@@ -175,14 +252,21 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                           {quote}
                         </p>
                       </motion.div>
-                    )}
+                    ) : null}
                   </AnimatePresence>
                 </div>
 
                 {/* Row 2: Details (Unfold with bullet transformation) */}
                 <div className="flex flex-col gap-4">
                   <button
-                    onClick={() => setShowDetails(!showDetails)}
+                    onClick={() => {
+                      if (showDetails) {
+                        setShowDetails(false);
+                        setIsDescFocused(false);
+                        return;
+                      }
+                      activateDescriptionEditor();
+                    }}
                     className="flex items-center gap-2 text-[10px] tracking-widest text-slate-400 uppercase font-bold hover:text-pink-400 transition-colors w-fit"
                   >
                     {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -195,30 +279,26 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
                         className="overflow-hidden"
                       >
-                        {isDescFocused || !description ? (
-                          <textarea
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            onFocus={() => setIsDescFocused(true)}
-                            onBlur={() => setIsDescFocused(false)}
-                            placeholder="补一两句细节吧，好让未来的你认出今天的心跳♪"
-                            className="w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-4 text-sm text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 min-h-[140px] resize-none shadow-inner"
-                          />
-                        ) : (
-                          <div
-                            onClick={() => setIsDescFocused(true)}
-                            className="flex flex-col gap-4 pl-6 cursor-pointer"
-                          >
-                            {description.split("\n").filter(p => p.trim()).map((p, i) => (
-                              <div key={i} className="relative text-slate-500 dark:text-slate-400 text-sm leading-relaxed">
-                                <div className="absolute -left-6 top-2.5 w-1.5 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full" />
-                                {p}
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        <textarea
+                          ref={descriptionTextareaRef}
+                          value={description}
+                          maxLength={1000}
+                          onChange={(e) => setDescription(e.target.value)}
+                          onFocus={() => setIsDescFocused(true)}
+                          onBlur={(e) => {
+                            if (!isTargetInsideEditor(e.relatedTarget)) {
+                              setIsDescFocused(false);
+                            }
+                          }}
+                          onClick={activateDescriptionEditor}
+                          placeholder="补一两句细节吧，好让未来的你认出今天的心跳♪"
+                          className={`w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-4 text-sm text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 resize-none shadow-inner transition-[min-height] duration-300 ${
+                            isDescFocused ? "min-h-[140px]" : "min-h-[82px]"
+                          }`}
+                        />
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -261,6 +341,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
           onLeftClick={onSave}
           onRightClick={onJumpUniverse}
           isRightActive={isPublic}
+          leftActionEvent={saveAnimationEvent}
           rightActiveLabel={isPublic ? "星海已连接" : "私密存储中"}
           isSwitched={isPublic}
           onSwitchToggle={onPublicToggle}
