@@ -154,7 +154,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
             animate={{ opacity: 1, y: 0 }}
             className="text-center"
           >
-            <h1 className="font-elysia-logo text-[4rem] sm:text-[5.4rem] font-medium tracking-tight text-transparent bg-gradient-to-b from-slate-800 via-slate-700 to-slate-900 bg-clip-text dark:from-white dark:to-slate-400">
+            <h1 className="font-elysia-title elysia-dream-title text-[4rem] sm:text-[5.4rem] font-medium tracking-tight">
               Elysia
             </h1>
             <p className="mt-2 font-elysia-display text-base sm:text-lg text-slate-500 dark:text-slate-300">
@@ -185,7 +185,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
           <div className="absolute left-[-2.5rem] top-0 bottom-0 w-[2px] bg-gradient-to-b from-slate-200 via-slate-300 to-transparent dark:from-white/5 dark:via-white/10 hidden lg:block" />
 
           <div className="flex items-center justify-between px-6">
-            <h2 className="font-elysia-display text-[2.5rem] text-slate-700 dark:text-white font-black tracking-tight">往世乐土</h2>
+            <h2 className="font-elysia-title elysia-dream-title text-[2.9rem] sm:text-[3.4rem] font-medium tracking-tight">往世乐土</h2>
 
             <ActionPairRow
               type="timeline-mindmap"
