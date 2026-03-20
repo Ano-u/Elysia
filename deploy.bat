@@ -76,6 +76,7 @@ echo [Elysia] Running database migration...
 call :run_pnpm migrate
 if errorlevel 1 (
   echo [Elysia] WARNING: migration failed. Backend and worker will be skipped.
+  echo [Elysia] WARNING: frontend will still start, but API requests may fail.
   set "CAN_START_BACKEND=0"
   set "CAN_START_WORKER=0"
 )
@@ -96,14 +97,36 @@ set "FRONTEND_URL=http://127.0.0.1:!FRONTEND_PORT!"
 echo [Elysia] Launching backend, frontend, and worker...
 if /I "!PM_MODE!"=="powershell" (
   if "!CAN_START_BACKEND!"=="1" start "Elysia Backend" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -Command "Set-Location -LiteralPath '%ROOT%'; pnpm dev"
+) else if /I "!PM_MODE!"=="corepack" (
+  if "!CAN_START_BACKEND!"=="1" start "Elysia Backend" cmd /k "cd /d ""%ROOT%"" && corepack.cmd pnpm dev"
+) else (
+  if "!CAN_START_BACKEND!"=="1" start "Elysia Backend" cmd /k "cd /d ""%ROOT%"" && pnpm.cmd dev"
+)
+
+if "!CAN_START_BACKEND!"=="1" (
+  echo [Elysia] Checking backend readiness on http://127.0.0.1:3000/api/healthz ...
+  powershell -NoProfile -Command "$ok=$false; for($i=0;$i -lt 30;$i++){ try { $r=Invoke-WebRequest -Uri 'http://127.0.0.1:3000/api/healthz' -UseBasicParsing -TimeoutSec 2; if($r.StatusCode -ge 200 -and $r.StatusCode -lt 500){ $ok=$true; break } } catch {}; Start-Sleep -Milliseconds 700 }; if($ok){ exit 0 } else { exit 1 }"
+  if errorlevel 1 (
+    echo [Elysia] WARNING: Backend failed to become ready on 127.0.0.1:3000.
+    echo [Elysia] WARNING: frontend will still start, but API proxy may report ECONNREFUSED.
+    echo [Elysia] HINT: check the "Elysia Backend" window for the first crash stack.
+    for /f "tokens=1 delims=." %%V in ('node -p "process.versions.node" 2^>nul') do set "NODE_MAJOR=%%V"
+    if defined NODE_MAJOR (
+      if !NODE_MAJOR! GEQ 24 (
+        echo [Elysia] HINT: current Node major version is !NODE_MAJOR!; recommend Node 22 LTS for local dev.
+      )
+    )
+    echo [Elysia] HINT: ensure PostgreSQL/Redis are healthy, then rerun deploy.bat.
+  )
+)
+
+if /I "!PM_MODE!"=="powershell" (
   start "Elysia Frontend" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -Command "Set-Location -LiteralPath '%ROOT%'; pnpm --filter frontend dev --host 127.0.0.1 --port !FRONTEND_PORT! --strictPort"
   if "!CAN_START_WORKER!"=="1" start "Elysia Worker" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -Command "Set-Location -LiteralPath '%ROOT%'; pnpm worker"
 ) else if /I "!PM_MODE!"=="corepack" (
-  if "!CAN_START_BACKEND!"=="1" start "Elysia Backend" cmd /k "cd /d ""%ROOT%"" && corepack.cmd pnpm dev"
   start "Elysia Frontend" cmd /k "cd /d ""%ROOT%"" && corepack.cmd pnpm --filter frontend dev --host 127.0.0.1 --port !FRONTEND_PORT! --strictPort"
   if "!CAN_START_WORKER!"=="1" start "Elysia Worker" cmd /k "cd /d ""%ROOT%"" && corepack.cmd pnpm worker"
 ) else (
-  if "!CAN_START_BACKEND!"=="1" start "Elysia Backend" cmd /k "cd /d ""%ROOT%"" && pnpm.cmd dev"
   start "Elysia Frontend" cmd /k "cd /d ""%ROOT%"" && pnpm.cmd --filter frontend dev --host 127.0.0.1 --port !FRONTEND_PORT! --strictPort"
   if "!CAN_START_WORKER!"=="1" start "Elysia Worker" cmd /k "cd /d ""%ROOT%"" && pnpm.cmd worker"
 )

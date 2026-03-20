@@ -13,7 +13,9 @@ echo [Elysia] Releasing common dev ports if still occupied...
 call :kill_port 3000 backend
 call :kill_port 5173 frontend
 call :kill_port 5174 frontend-fallback
+call :kill_port 5175 frontend-fallback-2
 call :kill_port 24678 vite-hmr
+call :kill_port 24679 vite-hmr-alt
 
 echo [Elysia] Stopping PostgreSQL and Redis containers...
 where docker >nul 2>nul
