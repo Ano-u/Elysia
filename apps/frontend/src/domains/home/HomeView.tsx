@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LiquidCard } from "../../components/ui/LiquidCard";
 import { MainInputCard } from "../../components/ui/MainInputCard";
@@ -12,8 +12,85 @@ import {
 } from "../../lib/apiClient";
 import type { RecordSummary, VisibilityIntent, CreateRecordRequest, HomeFeedResponse } from "../../types/api";
 import { Globe, Lock, Clock } from "lucide-react";
+import { pickRandomCopy, useRotatingCopy } from "../../lib/rotatingCopy";
+import { getCreateSuccessMessage, getPublicationStatusMeta, type PublicationTone } from "../../lib/publicationCopy";
 
 const DRAFT_KEY = "elysia-home-draft-v3";
+const FEED_LOADING_MESSAGES = [
+  "爱莉正在把你最近的心情，轻轻捧起来呢♪",
+  "请稍等一下下，爱莉在替你整理刚刚落下的星光。",
+  "这些心情片段马上就来，爱莉没有忘记它们哦♪",
+];
+const FEED_EMPTY_MESSAGES = [
+  "爱莉希雅听得懂，这里很安静，正适合让心情轻轻开口。",
+  "往世乐土还安静着呢，写下一句，就会有光落进来♪",
+  "今天想先说哪一句呢？爱莉会认真把它珍藏起来。",
+];
+const CREATE_RECORD_ERROR_MESSAGES = {
+  unauthorized: [
+    "哎呀，爱莉刚刚没有听清你的心意，等登录稳稳回来，我们再试一次吧♪",
+    "哎呀，这一声心跳刚刚没能顺利落下来，等会儿再让爱莉认真听一遍，好吗？",
+  ],
+  accessBlocked: [
+    "哎呀，你的名字还在往世乐土门前等候呢，等审核通过后，爱莉再认真听你说♪",
+    "现在还在准入审核里呢，爱莉已经记下你的心意了，再等等好吗？",
+  ],
+  riskControl: [
+    "哎呀，这一步先被轻轻拦住啦，等风声安静一点，爱莉再陪你继续。",
+    "现在还在冷却里呢，爱莉不想你被急急地推着走，我们稍后再来♪",
+  ],
+  network: [
+    "哎呀，网络刚刚晃了一下，不过这份心情没有丢，爱莉陪你再试一次吧♪",
+    "刚才那阵风太急了，爱莉没能听清，我们再慢一点说一次好吗？",
+  ],
+  generic: [
+    "哎呀，爱莉刚刚没有听清，再让我认真听一次，好不好？♪",
+    "这一句刚刚没能稳稳落下来，不过别担心，爱莉还在这里。",
+  ],
+};
+
+function resolveCreateErrorMessage(error: unknown): string {
+  const maybeErr = error as {
+    status?: number;
+    code?: string;
+    message?: string;
+    data?: { message?: string };
+  };
+  const fallbackMessage = maybeErr.message?.trim().toLowerCase() ?? "";
+
+  if (maybeErr.status === 401) {
+    return pickRandomCopy(CREATE_RECORD_ERROR_MESSAGES.unauthorized);
+  }
+  if (maybeErr.code === "ACCESS_GATE_BLOCKED") {
+    return pickRandomCopy(CREATE_RECORD_ERROR_MESSAGES.accessBlocked);
+  }
+  if (maybeErr.code === "RISK_CONTROL_ACTIVE") {
+    return pickRandomCopy(CREATE_RECORD_ERROR_MESSAGES.riskControl);
+  }
+  if (fallbackMessage.includes("failed to fetch")) {
+    return pickRandomCopy(CREATE_RECORD_ERROR_MESSAGES.network);
+  }
+  return pickRandomCopy(CREATE_RECORD_ERROR_MESSAGES.generic);
+}
+
+function getStatusBadgeClasses(tone: PublicationTone): string {
+  switch (tone) {
+    case "private":
+      return "border-pink-200/70 bg-pink-50/80 text-pink-600 dark:border-pink-400/20 dark:bg-pink-400/10 dark:text-pink-200";
+    case "pending":
+      return "border-sky-200/80 bg-sky-50/80 text-sky-600 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-200";
+    case "review":
+      return "border-violet-200/80 bg-violet-50/80 text-violet-600 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-200";
+    case "caution":
+      return "border-amber-200/80 bg-amber-50/85 text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200";
+    case "published":
+      return "border-emerald-200/80 bg-emerald-50/85 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200";
+    case "revise":
+      return "border-rose-200/80 bg-rose-50/85 text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200";
+    default:
+      return "border-slate-200/80 bg-white/80 text-slate-600 dark:border-white/15 dark:bg-white/10 dark:text-slate-200";
+  }
+}
 
 interface HomeViewProps {
   onNavigate: (view: "home" | "universe" | "mindmap" | "admin") => void;
@@ -79,6 +156,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<DraftPayload>(readInitialDraft);
   const [showOnlyPublic, setShowOnlyPublic] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [feedbackTone, setFeedbackTone] = useState<"error" | "success">("success");
 
   const { data: feedData, isLoading: isFeedLoading } = useQuery({
     queryKey: ["home-feed"],
@@ -92,10 +171,17 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateRecordRequest) => createRecord(payload),
-    onSuccess: () => {
+    onSuccess: (response) => {
       setDraft({ ...draft, moodPhrase: "", quote: "", description: "", extraEmotions: [] });
       localStorage.removeItem(DRAFT_KEY);
+      setFeedbackTone("success");
+      setFeedbackMessage(getCreateSuccessMessage(response.publishStatus.status));
       queryClient.invalidateQueries({ queryKey: ["home-feed"] });
+      queryClient.invalidateQueries({ queryKey: ["universe"] });
+    },
+    onError: (error) => {
+      setFeedbackTone("error");
+      setFeedbackMessage(resolveCreateErrorMessage(error));
     },
   });
 
@@ -119,6 +205,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
 
   const mindMapProgress = onboardingData ? onboardingData.progress.completed_days.length : 0;
   const isMindMapActive = mindMapProgress >= 7;
+  const loadingMessage = useRotatingCopy(FEED_LOADING_MESSAGES, 10000, isFeedLoading);
 
   const allItems = [...TEST_DATA, ...(feedData?.items ?? [])].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -126,6 +213,11 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
 
   const filteredItems = allItems.filter(item =>
     !showOnlyPublic || item.visibilityIntent === "public"
+  );
+  const emptyMessage = useRotatingCopy(
+    FEED_EMPTY_MESSAGES,
+    10000,
+    !isFeedLoading && filteredItems.length === 0,
   );
 
   return (
@@ -154,28 +246,45 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
             animate={{ opacity: 1, y: 0 }}
             className="text-center"
           >
-            <h1 className="font-elysia-title elysia-dream-title text-[4rem] sm:text-[5.4rem] font-medium tracking-tight">
+            <h1 className="font-elysia-title elysia-dream-title text-[4rem] sm:text-[5.4rem] tracking-tight">
               Elysia
             </h1>
             <p className="mt-2 font-elysia-display text-base sm:text-lg text-slate-500 dark:text-slate-300">
-              粉色天空坠入往世乐土，愿你在誓言与希望里安心书写。
+              粉色天光落进往世乐土，Elysia会永远回应你的期待♪
             </p>
           </motion.div>
 
           <MainInputCard
             moodPhrase={draft.moodPhrase}
-            setMoodPhrase={(v) => setDraft({ ...draft, moodPhrase: v })}
+            setMoodPhrase={(v) => {
+              setDraft({ ...draft, moodPhrase: v });
+              setFeedbackMessage(null);
+            }}
             quote={draft.quote}
-            setQuote={(v) => setDraft({ ...draft, quote: v })}
+            setQuote={(v) => {
+              setDraft({ ...draft, quote: v });
+              setFeedbackMessage(null);
+            }}
             description={draft.description}
-            setDescription={(v) => setDraft({ ...draft, description: v })}
+            setDescription={(v) => {
+              setDraft({ ...draft, description: v });
+              setFeedbackMessage(null);
+            }}
             extraEmotions={draft.extraEmotions}
-            setExtraEmotions={(v) => setDraft({ ...draft, extraEmotions: v })}
+            setExtraEmotions={(v) => {
+              setDraft({ ...draft, extraEmotions: v });
+              setFeedbackMessage(null);
+            }}
             isPublic={draft.visibilityIntent === "public"}
-            onPublicToggle={(isP) => setDraft({ ...draft, visibilityIntent: isP ? "public" : "private" })}
+            onPublicToggle={(isP) => {
+              setDraft({ ...draft, visibilityIntent: isP ? "public" : "private" });
+              setFeedbackMessage(null);
+            }}
             onSave={handleSave}
             onJumpUniverse={() => onNavigate("universe")}
             isPending={createMutation.isPending}
+            feedbackMessage={feedbackMessage}
+            feedbackTone={feedbackTone}
           />
         </section>
 
@@ -185,7 +294,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
           <div className="absolute left-[-2.5rem] top-0 bottom-0 w-[2px] bg-gradient-to-b from-slate-200 via-slate-300 to-transparent dark:from-white/5 dark:via-white/10 hidden lg:block" />
 
           <div className="flex items-center justify-between px-6">
-            <h2 className="font-elysia-title elysia-dream-title text-[2.9rem] sm:text-[3.4rem] font-medium tracking-tight">往世乐土</h2>
+            <h2 className="font-elysia-title elysia-dream-title text-[2.9rem] sm:text-[3.4rem] tracking-tight">往世乐土</h2>
 
             <ActionPairRow
               type="timeline-mindmap"
@@ -201,9 +310,31 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
 
           <div className="grid grid-cols-1 gap-10 px-6">
             {isFeedLoading ? (
-              <p className="text-center text-slate-400 py-20 font-elysia-display text-xl">正在捧起你最近的心情片段...</p>
+              <AnimatePresence mode="wait">
+                <motion.p
+                  key={loadingMessage}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+                  className="text-center text-slate-400 py-20 font-elysia-display text-xl"
+                >
+                  {loadingMessage}
+                </motion.p>
+              </AnimatePresence>
             ) : filteredItems.length === 0 ? (
-              <p className="text-center text-slate-400 py-20 font-elysia-display text-xl">这里还是安静的，写下一句来点亮它吧。</p>
+              <AnimatePresence mode="wait">
+                <motion.p
+                  key={emptyMessage}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+                  className="text-center text-slate-400 py-20 font-elysia-display text-xl"
+                >
+                  {emptyMessage}
+                </motion.p>
+              </AnimatePresence>
             ) : (
               filteredItems.map((item) => (
                 <TimelineCard key={item.id} item={item} />
@@ -219,6 +350,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
 const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
   const queryClient = useQueryClient();
   const isPublic = item.visibilityIntent === "public";
+  const publicationMeta = getPublicationStatusMeta(item.publicationStatus);
 
   const visibilityMutation = useMutation({
     mutationFn: ({ id, isPublic }: { id: string; isPublic: boolean }) => updateRecordVisibility(id, isPublic),
@@ -277,6 +409,17 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
       </div>
 
       <LiquidCard className="bg-white/50 dark:bg-black/20 backdrop-blur-xl border-white/60 dark:border-white/10 p-10 flex flex-col gap-8 shadow-xl hover:shadow-2xl transition-all duration-500">
+        <div className="flex flex-wrap items-center gap-3">
+          <span
+            className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-bold tracking-[0.12em] uppercase ${getStatusBadgeClasses(publicationMeta.tone)}`}
+          >
+            {publicationMeta.label}
+          </span>
+          <p className="max-w-2xl text-sm leading-relaxed text-slate-500 dark:text-slate-300/80">
+            {publicationMeta.detail}
+          </p>
+        </div>
+
         <div className="flex items-start justify-between gap-6">
           <h3 className="font-elysia-display text-2xl text-slate-700 dark:text-white font-bold leading-tight flex-1">
             {item.moodPhrase}

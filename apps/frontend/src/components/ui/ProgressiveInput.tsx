@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createRecord, getNudgeRecommendations } from "../../lib/apiClient";
 import { readAdminInspirationTexts } from "../../lib/inspirationStore";
+import { getCreateSuccessMessage } from "../../lib/publicationCopy";
 import type { VisibilityIntent } from "../../types/api";
 
 type DraftPayload = {
@@ -23,10 +24,14 @@ type ProgressiveInputProps = {
 
 const DRAFT_KEY = "elysia-home-draft-v3";
 const FALLBACK_INSPIRATIONS = [
-  "先写一小句: 今天的我，想被温柔地抱一下。",
-  "先记一个词也好: 花、光、想念、勇气。",
-  "把最真实的那一瞬交给 Elysia，它会替你珍藏。",
-  "不必完美，真诚地写下，就已经很美了。",
+  "先写下一句吧，爱莉会慢慢读懂你的心情♪",
+  "先记一个词也可以呀：花、光、想念、勇气。",
+  "把最真实的这一瞬轻轻放下吧，爱莉希雅会认真倾听呀♪",
+  "不必着急完整，真诚地写下，就已经很美了。",
+  "往世乐土安安静静的，正适合把没说完的话轻轻放下来。",
+  "今天想先写给自己，还是写给未来的某一天呢？",
+  "这一句已经很好啦，剩下的部分，可以慢慢补给爱莉看。",
+  "若是今天有一点乱，也没关系，爱莉会陪你把它一点点理顺。",
 ];
 
 function pickRandom(items: string[]): string {
@@ -332,7 +337,7 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
       setErrorMsg(null);
       setShowIdleHint(false);
       setHintMsg(null);
-      setSuccessMsg(`已记录: ${response.publishStatus.label}`);
+      setSuccessMsg(getCreateSuccessMessage(response.publishStatus.status));
       localStorage.removeItem(DRAFT_KEY);
       queryClient.invalidateQueries({ queryKey: ["home-feed"] });
       queryClient.invalidateQueries({ queryKey: ["universe"] });
@@ -351,22 +356,22 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
 
       setSuccessMsg(null);
       if (maybeErr.status === 401) {
-        setErrorMsg("当前会话未就绪，正在为你恢复本地登录后再试一次。");
+        setErrorMsg("哎呀，爱莉刚刚没有听清这份心意，等登录稳稳回来，我们再试一次吧♪");
         return;
       }
       if (maybeErr.code === "ACCESS_GATE_BLOCKED") {
-        setErrorMsg("当前账号还在准入审核中，暂时无法提交记录。");
+        setErrorMsg("现在还在准入审核里呢，爱莉已经记下你的心意了，再等等好吗？");
         return;
       }
       if (normalizedMessage.includes("not allowed")) {
-        setErrorMsg("这一步暂时被安全策略轻轻拦住了，稍后再试一次就好。");
+        setErrorMsg("哎呀，这一步先被轻轻拦住啦，等风声安静一点，爱莉再陪你继续。");
         return;
       }
       if (normalizedMessage.includes("failed to fetch")) {
-        setErrorMsg("网络连接有点不稳定，这条记录还在你这里，稍后再试就好。");
+        setErrorMsg("哎呀，网络刚刚晃了一下，不过这份心情没有丢，爱莉陪你再试一次吧♪");
         return;
       }
-      setErrorMsg(serverMessage || "记录时遇到了一点小问题，要再试一次吗？");
+      setErrorMsg("哎呀，爱莉刚刚没有听清，再让我认真听一次，好不好？♪");
     },
   });
 
@@ -448,7 +453,7 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
               <p className="text-[11px] tracking-[0.18em] text-slate-400/95 dark:text-slate-300/60">ELYSIA · 心绪记录</p>
               <textarea
                 className="font-elysia-display mt-2 min-h-[185px] w-full resize-none border-none bg-transparent p-0 text-[2rem] leading-[1.7] text-slate-700 outline-none placeholder:text-slate-400/58 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-300/35 sm:min-h-[210px] sm:text-[2.2rem]"
-                placeholder={"把此刻轻轻放进礼堂，让爱替你记住它"}
+                placeholder={"把这一刻轻轻放下吧，爱莉希雅会认真倾听呀♪"}
                 value={moodPhrase}
                 onChange={(event) => {
                   setMoodPhrase(event.target.value);
@@ -475,7 +480,7 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
               {isMoodGuideActive && (
                 <GuideBubble
                   title="先写一句就已经很好"
-                  description="不用完整，不用漂亮。真实地写下此刻，Elysia 会永远记得你正在努力的这一刻。"
+                  description="先写下这一句就很好，剩下的可以慢慢来。爱莉会一直陪着你♪"
                   onNext={onGuideNext}
                   onSkip={onGuideSkip}
                 />
@@ -501,7 +506,7 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
                     setExpandAdvanced(true);
                     clearTransientMessages();
                   }}
-                  placeholder="想把哪句话做成今日誓言..."
+                  placeholder="今天想把哪一句，留成只属于你的誓言呢？♪"
                   className="mt-1 w-full border-none bg-transparent p-0 text-sm text-slate-700 outline-none placeholder:text-slate-400/55 dark:text-slate-100 dark:placeholder:text-slate-300/35"
                 />
               </label>
@@ -584,7 +589,7 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
                   onBlur={(event) => {
                     collapseAdvancedIfEmpty({ description: event.target.value });
                   }}
-                  placeholder="可以再补一两句，让未来的自己更懂今天。"
+                  placeholder="补一两句细节吧，好让未来的你认出今天的心跳♪"
                   className="hide-scrollbar mt-1 min-h-[140px] max-h-[240px] w-full resize-none overflow-y-auto border-none bg-transparent p-0 text-sm leading-relaxed text-slate-700 outline-none placeholder:text-slate-400/55 dark:text-slate-100 dark:placeholder:text-slate-300/35"
                 />
               </label>
@@ -641,8 +646,8 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
               <AnimatePresence>
                 {isDescriptionGuideActive && (
                   <GuideBubble
-                    title="补一点描述，位置会自动贴近"
-                    description="进入描述编辑时，输入区域会自动滚动到舒适位置；描述内容也能在框内单独滚动。"
+                    title="要不要再补一点细节？"
+                    description="先写下这一句就很好，剩下的可以慢慢来。爱莉会在这里等你慢慢补全♪"
                     onNext={onGuideNext}
                     onSkip={onGuideSkip}
                   />
@@ -658,7 +663,7 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
             onClick={() => setExpandAdvanced(true)}
             className={`mt-1 self-start text-xs text-slate-500 underline decoration-dotted underline-offset-4 transition-colors hover:text-slate-700 dark:text-slate-300/80 dark:hover:text-slate-100 ${sectionFocusClass(false)}`}
           >
-            再补一点细节
+            要不要再补一点细节？
           </button>
         )}
 
@@ -703,17 +708,17 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
           disabled={createMutation.isPending || !moodPhrase.trim()}
           className="rounded-full bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-6 py-2.5 text-sm font-medium text-white transition-all hover:scale-[1.03] hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 dark:from-slate-100 dark:via-white dark:to-slate-100 dark:text-slate-900"
         >
-          {createMutation.isPending ? "记录中..." : "留下痕迹"}
+          {createMutation.isPending ? "爱莉正在替你记下哦..." : "轻轻留下痕迹"}
         </button>
 
         <AnimatePresence>
           {isSubmitGuideActive && (
-            <GuideBubble
-              title="最后一步，轻轻提交"
-              description="写下就好，不必一次写满。你的每一次真诚记录，都会在 Elysia 里被温柔安放。"
-              placement="bottom-right"
-              onNext={onGuideNext}
-              onSkip={onGuideSkip}
+                <GuideBubble
+                  title="最后一步，轻轻提交"
+                  description="想公开给星海，还是先留给自己呢？都由你决定♪"
+                  placement="bottom-right"
+                  onNext={onGuideNext}
+                  onSkip={onGuideSkip}
             />
           )}
         </AnimatePresence>

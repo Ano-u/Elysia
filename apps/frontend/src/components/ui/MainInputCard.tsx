@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { LiquidCard } from "./LiquidCard";
 import { ActionPairRow } from "./ActionPairRow";
 import { ChevronDown, ChevronUp, Tag as TagIcon, Quote } from "lucide-react";
+import { useRotatingCopy } from "../../lib/rotatingCopy";
 
 interface MainInputCardProps {
   moodPhrase: string;
@@ -18,9 +19,43 @@ interface MainInputCardProps {
   onSave: () => void;
   onJumpUniverse: () => void;
   isPending?: boolean;
+  feedbackMessage?: string | null;
+  feedbackTone?: "error" | "success";
 }
 
 const PREDEFINED_TAGS = ["温柔", "热烈", "想念", "孤独", "平静", "欢欣", "迷茫", "希望"];
+const COMPANION_MESSAGES = [
+  "爱莉希雅听得懂，这里很安静，正适合让心情轻轻开口。",
+  "把这一刻轻轻放下吧，爱莉希雅会认真倾听呀♪",
+  "先写下一句吧，爱莉会慢慢读懂你的心情♪",
+  "今天的心情，也想被温柔记住，对吗？♪",
+  "要是还没想好从哪里开始，就先把第一句交给爱莉吧。",
+  "往世乐土安安静静的，正适合把那些没说完的话轻轻放下。",
+  "不着急呀，想到哪里就写到哪里，真心本来就比完整更动人♪",
+  "今天想先写给自己，还是写给未来的某一天呢？",
+  "若是有一点委屈，或者一点点想念，也都可以交给这里。",
+  "爱莉会替你把这一刻放在最柔软的位置，所以慢慢来就好♪",
+];
+const GUIDANCE_MESSAGES = [
+  "要不要再补一点细节？",
+  "先写下这一句就很好，剩下的可以慢慢来。",
+  "想公开给星海，还是先留给自己呢？都由你决定♪",
+  "爱莉会把你写下的每个字，都好好收起来呀♪",
+  "这句话已经很动人啦，要不要再让爱莉多了解你一点点？",
+  "补上两句细节吧，这样未来的你，一眼就能认出今天的心跳。",
+  "若是还说不清楚，也可以先记一个情绪词，爱莉会懂的。",
+  "想让它去星海里回响，还是只留在往世乐土里呢？这个选择一直都属于你♪",
+  "这一句已经很好啦，剩下的部分，我们可以慢慢把它补完整。",
+  "若你愿意，连今天的时间也写下来吧，爱莉想把这一刻记得更清楚些。",
+];
+const WAITING_MESSAGES = [
+  "爱莉正在替你把这份心情轻轻安放，请稍等一下下♪",
+  "别着急呀，爱莉会先把这一句好好听清。",
+  "这份心意已经在路上啦，爱莉正在认真接住它♪",
+  "爱莉正在替你把它安安稳稳收好，很快就回来回应你♪",
+  "这一句已经送出去了，爱莉会先认真听清，再带它往前走。",
+  "请再等一小会儿呀，爱莉不想错过你写下的任何一个字。",
+];
 
 export const MainInputCard: React.FC<MainInputCardProps> = ({
   moodPhrase,
@@ -36,6 +71,8 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
   onSave,
   onJumpUniverse,
   isPending,
+  feedbackMessage,
+  feedbackTone = "success",
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [isQuoteFocused, setIsQuoteFocused] = useState(false);
@@ -45,6 +82,8 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
   const hasValue = moodPhrase.trim().length > 0;
   const isLanding = !hasValue && !isFocused;
   const isCompact = hasValue && !isFocused;
+  const ambientMessages = isPending ? WAITING_MESSAGES : hasValue ? GUIDANCE_MESSAGES : COMPANION_MESSAGES;
+  const ambientMessage = useRotatingCopy(ambientMessages, 10000, ambientMessages.length > 1);
 
   const toggleTag = (tag: string) => {
     if (extraEmotions.includes(tag)) {
@@ -66,13 +105,26 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
               className={`font-elysia-display w-full resize-none border-none bg-transparent p-0 outline-none placeholder:text-slate-400/40 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-300/20 transition-all duration-700 ease-in-out ${
                 isLanding ? "text-[2.2rem] min-h-[120px]" : isCompact ? "text-2xl min-h-[40px] font-bold" : "text-[2.4rem] min-h-[140px]"
               }`}
-              placeholder="把此刻轻轻放进礼堂，让爱替你记住它"
+              placeholder="把这一刻轻轻放下吧，爱莉希雅会认真倾听呀♪"
               value={moodPhrase}
               onChange={(e) => setMoodPhrase(e.target.value)}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
               disabled={isPending}
             />
+
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={ambientMessage}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+                className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-500 dark:text-slate-300/80"
+              >
+                {ambientMessage}
+              </motion.p>
+            </AnimatePresence>
           </div>
 
           {/* Quote & Details Transformation */}
@@ -106,7 +158,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                           onChange={(e) => setQuote(e.target.value)}
                           onFocus={() => setIsQuoteFocused(true)}
                           onBlur={() => setIsQuoteFocused(false)}
-                          placeholder="想把哪句话做成今日誓言..."
+                          placeholder="今天想把哪一句，留成只属于你的誓言呢？♪"
                           className="w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-3 text-base italic text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 transition-all shadow-inner"
                         />
                       </motion.div>
@@ -134,7 +186,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                     className="flex items-center gap-2 text-[10px] tracking-widest text-slate-400 uppercase font-bold hover:text-pink-400 transition-colors w-fit"
                   >
                     {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                    详细描述
+                    再多告诉爱莉一点吧
                   </button>
 
                   <AnimatePresence>
@@ -151,7 +203,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                             onChange={(e) => setDescription(e.target.value)}
                             onFocus={() => setIsDescFocused(true)}
                             onBlur={() => setIsDescFocused(false)}
-                            placeholder="补一两句细节，让未来的自己更懂今天..."
+                            placeholder="补一两句细节吧，好让未来的你认出今天的心跳♪"
                             className="w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-4 text-sm text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 min-h-[140px] resize-none shadow-inner"
                           />
                         ) : (
@@ -215,6 +267,23 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
           isPending={isPending}
         />
       </div>
+
+      <AnimatePresence>
+        {feedbackMessage ? (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className={`mx-6 rounded-[1.4rem] border px-4 py-3 text-sm leading-relaxed ${
+              feedbackTone === "error"
+                ? "border-amber-200/70 bg-amber-50/75 text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-200"
+                : "border-emerald-200/70 bg-emerald-50/70 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-900/20 dark:text-emerald-200"
+            }`}
+          >
+            {feedbackMessage}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 };
