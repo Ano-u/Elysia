@@ -122,7 +122,7 @@ type RoundedBlurLayerProps = {
   viewportWidth: number;
   viewportHeight: number;
   blurPx: number;
-  tintClassName: string;
+  tintOpacity: number;
   zIndex: number;
 };
 
@@ -131,58 +131,56 @@ const RoundedBlurLayer: React.FC<RoundedBlurLayerProps> = ({
   viewportWidth,
   viewportHeight,
   blurPx,
-  tintClassName,
+  tintOpacity,
   zIndex,
 }) => {
   const seamFix = 1;
   const cornerSize = Math.max(2, cutout.radius + seamFix);
-  const blurStyle: React.CSSProperties = {
+  const layerStyle: React.CSSProperties = {
     backdropFilter: `blur(${blurPx}px)`,
     WebkitBackdropFilter: `blur(${blurPx}px)`,
+    opacity: tintOpacity,
+    zIndex,
   };
 
   return (
     <>
       <div
-        className={`fixed left-0 top-0 w-full ${tintClassName}`}
-        style={{ ...blurStyle, zIndex, height: cutout.top + seamFix }}
+        className="fixed left-0 top-0 w-full bg-white dark:bg-slate-950"
+        style={{ ...layerStyle, height: cutout.top + seamFix }}
       />
       <div
-        className={`fixed left-0 ${tintClassName}`}
+        className="fixed left-0 bg-white dark:bg-slate-950"
         style={{
-          ...blurStyle,
-          zIndex,
+          ...layerStyle,
           top: cutout.top - seamFix,
           width: cutout.left + seamFix,
           height: cutout.height + seamFix * 2,
         }}
       />
       <div
-        className={`fixed right-0 ${tintClassName}`}
+        className="fixed right-0 bg-white dark:bg-slate-950"
         style={{
-          ...blurStyle,
-          zIndex,
+          ...layerStyle,
           top: cutout.top - seamFix,
           width: Math.max(0, viewportWidth - cutout.right + seamFix),
           height: cutout.height + seamFix * 2,
         }}
       />
       <div
-        className={`fixed left-0 bottom-0 w-full ${tintClassName}`}
+        className="fixed left-0 bottom-0 w-full bg-white dark:bg-slate-950"
         style={{
-          ...blurStyle,
-          zIndex,
+          ...layerStyle,
           top: cutout.bottom - seamFix,
           height: Math.max(0, viewportHeight - cutout.bottom + seamFix),
         }}
       />
 
       <div
-        className={`fixed ${tintClassName}`}
+        className="fixed bg-white dark:bg-slate-950"
         style={{
-          ...blurStyle,
+          ...layerStyle,
           ...cornerMaskStyle("tl", cutout.radius),
-          zIndex,
           left: cutout.left - seamFix,
           top: cutout.top - seamFix,
           width: cornerSize,
@@ -190,11 +188,10 @@ const RoundedBlurLayer: React.FC<RoundedBlurLayerProps> = ({
         }}
       />
       <div
-        className={`fixed ${tintClassName}`}
+        className="fixed bg-white dark:bg-slate-950"
         style={{
-          ...blurStyle,
+          ...layerStyle,
           ...cornerMaskStyle("tr", cutout.radius),
-          zIndex,
           left: cutout.right - cornerSize + seamFix,
           top: cutout.top - seamFix,
           width: cornerSize,
@@ -202,11 +199,10 @@ const RoundedBlurLayer: React.FC<RoundedBlurLayerProps> = ({
         }}
       />
       <div
-        className={`fixed ${tintClassName}`}
+        className="fixed bg-white dark:bg-slate-950"
         style={{
-          ...blurStyle,
+          ...layerStyle,
           ...cornerMaskStyle("bl", cutout.radius),
-          zIndex,
           left: cutout.left - seamFix,
           top: cutout.bottom - cornerSize + seamFix,
           width: cornerSize,
@@ -214,11 +210,10 @@ const RoundedBlurLayer: React.FC<RoundedBlurLayerProps> = ({
         }}
       />
       <div
-        className={`fixed ${tintClassName}`}
+        className="fixed bg-white dark:bg-slate-950"
         style={{
-          ...blurStyle,
+          ...layerStyle,
           ...cornerMaskStyle("br", cutout.radius),
-          zIndex,
           left: cutout.right - cornerSize + seamFix,
           top: cutout.bottom - cornerSize + seamFix,
           width: cornerSize,
@@ -246,9 +241,35 @@ export const HomeGuideOverlay: React.FC<HomeGuideOverlayProps> = ({
   const focusRect = hasTarget && targetRect ? toFocusRect(targetRect, targetRadius ?? null) : null;
   const viewportWidth = typeof window === "undefined" ? 1280 : window.innerWidth;
   const viewportHeight = typeof window === "undefined" ? 720 : window.innerHeight;
-  const ringNear = focusRect ? expandFocusRect(focusRect, 26, viewportWidth, viewportHeight) : null;
-  const ringMid = focusRect ? expandFocusRect(focusRect, 86, viewportWidth, viewportHeight) : null;
-  const ringFar = focusRect ? expandFocusRect(focusRect, 196, viewportWidth, viewportHeight) : null;
+  const continuousLayers = (() => {
+    if (!focusRect) {
+      return [] as Array<{ cutout: FocusRect; blurPx: number; tintOpacity: number }>;
+    }
+
+    const steps = 32;
+    const maxDistance = Math.min(360, Math.max(180, Math.min(viewportWidth, viewportHeight) * 0.52));
+    let prevTargetOpacity = 0;
+    const output: Array<{ cutout: FocusRect; blurPx: number; tintOpacity: number }> = [];
+
+    for (let index = 0; index < steps; index += 1) {
+      const t = (index + 1) / steps;
+      const easedDistance = Math.pow(t, 2.15);
+      const easedBlur = Math.pow(t, 1.82);
+      const easedOpacity = Math.pow(t, 1.64);
+      const distance = Math.round(maxDistance * easedDistance);
+      const blurPx = 1 + 26 * easedBlur;
+      const targetOpacity = 0.06 + 0.34 * easedOpacity;
+      const tintOpacity = Math.max(0.006, targetOpacity - prevTargetOpacity);
+      prevTargetOpacity = targetOpacity;
+      output.push({
+        cutout: expandFocusRect(focusRect, distance, viewportWidth, viewportHeight),
+        blurPx,
+        tintOpacity,
+      });
+    }
+
+    return output;
+  })();
 
   const bubbleWidth = Math.max(120, Math.min(clamp(viewportWidth - 24, 160, 360), viewportWidth - 12));
   const bubbleHeight = 210;
@@ -287,7 +308,7 @@ export const HomeGuideOverlay: React.FC<HomeGuideOverlayProps> = ({
                   className="w-full max-w-xl rounded-[2rem] border border-white/80 bg-[linear-gradient(145deg,rgba(255,248,255,0.94),rgba(246,238,255,0.9),rgba(239,247,255,0.92))] p-6 shadow-[0_24px_56px_rgba(160,142,211,0.32),inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-3xl dark:border-white/20 dark:bg-[linear-gradient(145deg,rgba(36,26,56,0.88),rgba(42,32,66,0.86),rgba(22,35,60,0.88))]"
                 >
                   <p className="text-[11px] tracking-[0.22em] text-slate-400/90 dark:text-slate-300/65">ELYSIA · 新人引导</p>
-                  <h3 className="mt-2 font-elysia-title text-[2.2rem] leading-tight text-slate-700 dark:text-white">爱莉希雅来接住你啦</h3>
+                  <h3 className="mt-2 font-elysia-title text-[2.2rem] leading-tight text-slate-700 dark:text-white">让爱莉希雅来接住你吧♪</h3>
                   <p className="mt-3 font-elysia-display text-base leading-relaxed text-slate-600 dark:text-slate-200/88">
                     第一次来到往世乐土时，爱莉会用 3 步轻轻带你熟悉这里。先写一句就很好，剩下的我们慢慢来，好吗？♪
                   </p>
@@ -321,44 +342,17 @@ export const HomeGuideOverlay: React.FC<HomeGuideOverlayProps> = ({
               transition={{ duration: 0.22 }}
               className="fixed inset-0 z-[118]"
             >
-              <RoundedBlurLayer
-                cutout={focusRect}
-                viewportWidth={viewportWidth}
-                viewportHeight={viewportHeight}
-                blurPx={3}
-                tintClassName="bg-white/[0.11] dark:bg-slate-950/[0.2]"
-                zIndex={118}
-              />
-              {ringNear && (
+              {continuousLayers.map((layer, index) => (
                 <RoundedBlurLayer
-                  cutout={ringNear}
+                  key={`guide-layer-${index}-${layer.cutout.left}-${layer.cutout.top}-${layer.cutout.width}-${layer.cutout.height}`}
+                  cutout={layer.cutout}
                   viewportWidth={viewportWidth}
                   viewportHeight={viewportHeight}
-                  blurPx={8}
-                  tintClassName="bg-white/[0.16] dark:bg-slate-950/[0.27]"
+                  blurPx={layer.blurPx}
+                  tintOpacity={layer.tintOpacity}
                   zIndex={119}
                 />
-              )}
-              {ringMid && (
-                <RoundedBlurLayer
-                  cutout={ringMid}
-                  viewportWidth={viewportWidth}
-                  viewportHeight={viewportHeight}
-                  blurPx={15}
-                  tintClassName="bg-white/[0.2] dark:bg-slate-950/[0.34]"
-                  zIndex={120}
-                />
-              )}
-              {ringFar && (
-                <RoundedBlurLayer
-                  cutout={ringFar}
-                  viewportWidth={viewportWidth}
-                  viewportHeight={viewportHeight}
-                  blurPx={24}
-                  tintClassName="bg-white/[0.24] dark:bg-slate-950/[0.42]"
-                  zIndex={120}
-                />
-              )}
+              ))}
 
               <div
                 className="pointer-events-none fixed z-[121] border border-white/85 shadow-[0_20px_52px_rgba(142,133,196,0.28),inset_0_0_0_1px_rgba(255,255,255,0.58)] dark:border-white/30"
