@@ -211,7 +211,12 @@ function App() {
               transition={{ duration: reduceMotion ? 0.28 : 0.5, ease: [0.22, 1, 0.36, 1] }}
               className="absolute inset-0 h-full w-full"
             >
-              <HomeView onNavigate={setCurrentView} />
+              <HomeView
+                onNavigate={setCurrentView}
+                viewerUserId={authQuery.data?.user?.id ?? null}
+                authReady={!authQuery.isLoading && !authQuery.isFetching}
+                isLocalDev={isLocalDev}
+              />
             </motion.div>
           )}
           {activeView === "universe" && (

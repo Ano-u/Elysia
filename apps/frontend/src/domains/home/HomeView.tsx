@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LiquidCard } from "../../components/ui/LiquidCard";
 import { MainInputCard } from "../../components/ui/MainInputCard";
 import { ActionPairRow } from "../../components/ui/ActionPairRow";
+import { HomeGuideOverlay, type HomeGuideStepContent } from "../../components/ui/HomeGuideOverlay";
 import {
   createRecord,
   getHomeFeed,
@@ -16,6 +17,9 @@ import { pickRandomCopy, useRotatingCopy } from "../../lib/rotatingCopy";
 import { getCreateSuccessMessage, getPublicationStatusMeta, type PublicationTone } from "../../lib/publicationCopy";
 
 const DRAFT_KEY = "elysia-home-draft-v3";
+const GUIDE_COMPLETED_STORAGE_PREFIX = "elysia-home-guide-completed-v1";
+const GUIDE_FORCE_STORAGE_KEY = "elysia-home-guide-force";
+const GUIDE_FORCE_QUERY_KEY = "guide";
 const FEED_LOADING_MESSAGES = [
   "爱莉正在把你最近的心情，轻轻捧起来呢♪",
   "请稍等一下下，爱莉在替你整理刚刚落下的星光。",
@@ -25,6 +29,20 @@ const FEED_EMPTY_MESSAGES = [
   "爱莉希雅听得懂，这里很安静，正适合让心情轻轻开口。",
   "往世乐土还安静着呢，写下一句，就会有光落进来♪",
   "今天想先说哪一句呢？爱莉会认真把它珍藏起来。",
+];
+const GUIDE_STEPS: HomeGuideStepContent[] = [
+  {
+    title: "先把这一刻轻轻交给爱莉",
+    description: "从这里开始就好。哪怕只写一句，也已经很了不起，爱莉会认真听完它♪",
+  },
+  {
+    title: "想去哪里，都由你决定",
+    description: "这里可以切到记忆织网，也可以先留在时间流里慢慢回看。你不用着急做选择。",
+  },
+  {
+    title: "每份心情都会有清楚去向",
+    description: "爱莉会把状态告诉你：私密珍藏、温柔确认、送进星海，让你每一步都心里有底。",
+  },
 ];
 const CREATE_RECORD_ERROR_MESSAGES = {
   unauthorized: [
@@ -94,6 +112,9 @@ function getStatusBadgeClasses(tone: PublicationTone): string {
 
 interface HomeViewProps {
   onNavigate: (view: "home" | "universe" | "mindmap" | "admin") => void;
+  viewerUserId?: string | null;
+  authReady?: boolean;
+  isLocalDev?: boolean;
 }
 
 type DraftPayload = {
@@ -152,12 +173,24 @@ const TEST_DATA: RecordSummary[] = [
   }
 ];
 
-export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
+export const HomeView: React.FC<HomeViewProps> = ({
+  onNavigate,
+  viewerUserId = null,
+  authReady = true,
+  isLocalDev = false,
+}) => {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<DraftPayload>(readInitialDraft);
   const [showOnlyPublic, setShowOnlyPublic] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [feedbackTone, setFeedbackTone] = useState<"error" | "success">("success");
+  const [guideMode, setGuideMode] = useState<"hidden" | "welcome" | "spotlight">("hidden");
+  const [guideStep, setGuideStep] = useState(0);
+  const [guideTargetRect, setGuideTargetRect] = useState<DOMRect | null>(null);
+  const [guideTargetRadius, setGuideTargetRadius] = useState<number>(26);
+  const composerGuideRef = useRef<HTMLDivElement>(null);
+  const timelineSwitchGuideRef = useRef<HTMLDivElement>(null);
+  const timelineListGuideRef = useRef<HTMLDivElement>(null);
 
   const { data: feedData, isLoading: isFeedLoading } = useQuery({
     queryKey: ["home-feed"],
@@ -168,6 +201,42 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
     queryKey: ["onboarding-progress"],
     queryFn: getOnboardingProgress,
   });
+
+  const guideStorageKey = `${GUIDE_COMPLETED_STORAGE_PREFIX}:${viewerUserId ?? "anonymous"}`;
+  const isGuideVisible = guideMode !== "hidden";
+  const isGuideSpotlight = guideMode === "spotlight";
+  const activeGuideRef =
+    guideStep === 0 ? composerGuideRef : guideStep === 1 ? timelineSwitchGuideRef : timelineListGuideRef;
+
+  const closeGuide = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(guideStorageKey, String(Date.now()));
+    }
+    setGuideMode("hidden");
+    setGuideTargetRect(null);
+    setGuideTargetRadius(26);
+  };
+
+  const handleGuideStart = () => {
+    setGuideStep(0);
+    setGuideMode("spotlight");
+  };
+
+  const handleGuideBack = () => {
+    setGuideStep((current) => Math.max(0, current - 1));
+  };
+
+  const handleGuideNext = () => {
+    if (guideStep >= GUIDE_STEPS.length - 1) {
+      closeGuide();
+      return;
+    }
+    setGuideStep((current) => current + 1);
+  };
+
+  const handleGuideSkip = () => {
+    closeGuide();
+  };
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateRecordRequest) => createRecord(payload),
@@ -203,6 +272,123 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
     return () => clearTimeout(timer);
   }, [draft]);
 
+  useEffect(() => {
+    if (!authReady || typeof window === "undefined") {
+      return;
+    }
+
+    const queryGuideValue = new URLSearchParams(window.location.search).get(GUIDE_FORCE_QUERY_KEY);
+    const forceByQuery = queryGuideValue === "1";
+    const disableGuideByQuery = queryGuideValue === "0";
+    const forceByStorage = window.localStorage.getItem(GUIDE_FORCE_STORAGE_KEY) === "1";
+    const shouldForceGuide = isLocalDev && (forceByQuery || forceByStorage);
+
+    if (isLocalDev) {
+      if (disableGuideByQuery) {
+        return;
+      }
+      setGuideStep(0);
+      setGuideMode("welcome");
+      return;
+    }
+
+    if (shouldForceGuide) {
+      setGuideStep(0);
+      setGuideMode("welcome");
+      return;
+    }
+
+    const completedAt = window.localStorage.getItem(guideStorageKey);
+    if (!completedAt) {
+      setGuideStep(0);
+      setGuideMode("welcome");
+    }
+  }, [authReady, guideStorageKey, isLocalDev]);
+
+  useEffect(() => {
+    if (!isGuideSpotlight || typeof window === "undefined") {
+      return;
+    }
+
+    const node = activeGuideRef.current;
+    if (!node) {
+      return;
+    }
+
+    node.scrollIntoView({
+      block: "center",
+      inline: "nearest",
+      behavior: "smooth",
+    });
+
+    const parseRadiusValue = (value: string): number => {
+      const parsed = Number.parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    const resolveRadius = (element: HTMLElement): number => {
+      const directRadius = parseRadiusValue(window.getComputedStyle(element).borderTopLeftRadius);
+      if (directRadius > 0) {
+        return directRadius;
+      }
+      const firstChild = element.firstElementChild as HTMLElement | null;
+      if (!firstChild) {
+        return 26;
+      }
+      const childRadius = parseRadiusValue(window.getComputedStyle(firstChild).borderTopLeftRadius);
+      return childRadius > 0 ? childRadius : 26;
+    };
+
+    let frameId = 0;
+    const syncRect = () => {
+      frameId = 0;
+      const currentNode = activeGuideRef.current;
+      if (!currentNode) {
+        return;
+      }
+      setGuideTargetRect(currentNode.getBoundingClientRect());
+      setGuideTargetRadius(resolveRadius(currentNode));
+    };
+    const scheduleSync = () => {
+      if (frameId) {
+        return;
+      }
+      frameId = window.requestAnimationFrame(syncRect);
+    };
+
+    scheduleSync();
+    const settleTimer = window.setTimeout(scheduleSync, 240);
+
+    window.addEventListener("resize", scheduleSync);
+    window.addEventListener("scroll", scheduleSync, true);
+
+    return () => {
+      window.clearTimeout(settleTimer);
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+      window.removeEventListener("resize", scheduleSync);
+      window.removeEventListener("scroll", scheduleSync, true);
+    };
+  }, [activeGuideRef, isGuideSpotlight, guideStep]);
+
+  useEffect(() => {
+    if (!isGuideVisible || typeof window === "undefined") {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        window.localStorage.setItem(guideStorageKey, String(Date.now()));
+        setGuideMode("hidden");
+        setGuideTargetRect(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isGuideVisible, guideStorageKey]);
+
   const mindMapProgress = onboardingData ? onboardingData.progress.completed_days.length : 0;
   const isMindMapActive = mindMapProgress >= 7;
   const loadingMessage = useRotatingCopy(FEED_LOADING_MESSAGES, 10000, isFeedLoading);
@@ -219,6 +405,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
     10000,
     !isFeedLoading && filteredItems.length === 0,
   );
+  const guideStepContent = GUIDE_STEPS[guideStep] ?? GUIDE_STEPS[0];
+  const guideTargetClass = (index: number): string =>
+    isGuideSpotlight && guideStep === index ? "relative z-[122]" : "relative z-10";
 
   return (
     <div className="relative h-full w-full overflow-y-auto hide-scrollbar bg-[#f8fbff] dark:bg-[#0d1422] transition-all duration-700">
@@ -254,38 +443,40 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
             </p>
           </motion.div>
 
-          <MainInputCard
-            moodPhrase={draft.moodPhrase}
-            setMoodPhrase={(v) => {
-              setDraft({ ...draft, moodPhrase: v });
-              setFeedbackMessage(null);
-            }}
-            quote={draft.quote}
-            setQuote={(v) => {
-              setDraft({ ...draft, quote: v });
-              setFeedbackMessage(null);
-            }}
-            description={draft.description}
-            setDescription={(v) => {
-              setDraft({ ...draft, description: v });
-              setFeedbackMessage(null);
-            }}
-            extraEmotions={draft.extraEmotions}
-            setExtraEmotions={(v) => {
-              setDraft({ ...draft, extraEmotions: v });
-              setFeedbackMessage(null);
-            }}
-            isPublic={draft.visibilityIntent === "public"}
-            onPublicToggle={(isP) => {
-              setDraft({ ...draft, visibilityIntent: isP ? "public" : "private" });
-              setFeedbackMessage(null);
-            }}
-            onSave={handleSave}
-            onJumpUniverse={() => onNavigate("universe")}
-            isPending={createMutation.isPending}
-            feedbackMessage={feedbackMessage}
-            feedbackTone={feedbackTone}
-          />
+          <div ref={composerGuideRef} className={`${guideTargetClass(0)} rounded-[2.25rem]`}>
+            <MainInputCard
+              moodPhrase={draft.moodPhrase}
+              setMoodPhrase={(v) => {
+                setDraft({ ...draft, moodPhrase: v });
+                setFeedbackMessage(null);
+              }}
+              quote={draft.quote}
+              setQuote={(v) => {
+                setDraft({ ...draft, quote: v });
+                setFeedbackMessage(null);
+              }}
+              description={draft.description}
+              setDescription={(v) => {
+                setDraft({ ...draft, description: v });
+                setFeedbackMessage(null);
+              }}
+              extraEmotions={draft.extraEmotions}
+              setExtraEmotions={(v) => {
+                setDraft({ ...draft, extraEmotions: v });
+                setFeedbackMessage(null);
+              }}
+              isPublic={draft.visibilityIntent === "public"}
+              onPublicToggle={(isP) => {
+                setDraft({ ...draft, visibilityIntent: isP ? "public" : "private" });
+                setFeedbackMessage(null);
+              }}
+              onSave={handleSave}
+              onJumpUniverse={() => onNavigate("universe")}
+              isPending={createMutation.isPending}
+              feedbackMessage={feedbackMessage}
+              feedbackTone={feedbackTone}
+            />
+          </div>
         </section>
 
         {/* Section 2: HomeTimeline */}
@@ -293,7 +484,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
           {/* Vertical Guide Line */}
           <div className="absolute left-[-2.5rem] top-0 bottom-0 w-[2px] bg-gradient-to-b from-slate-200 via-slate-300 to-transparent dark:from-white/5 dark:via-white/10 hidden lg:block" />
 
-          <div className="flex items-center justify-between px-6">
+          <div ref={timelineSwitchGuideRef} className={`${guideTargetClass(1)} rounded-[1.35rem] flex items-center justify-between px-6`}>
             <h2 className="font-elysia-title elysia-dream-title text-[2.9rem] sm:text-[3.4rem] tracking-tight">往世乐土</h2>
 
             <ActionPairRow
@@ -308,7 +499,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-10 px-6">
+          <div ref={timelineListGuideRef} className={`${guideTargetClass(2)} rounded-[1.75rem] grid grid-cols-1 gap-10 px-6`}>
             {isFeedLoading ? (
               <AnimatePresence mode="wait">
                 <motion.p
@@ -343,6 +534,19 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
           </div>
         </section>
       </div>
+      <HomeGuideOverlay
+        open={isGuideVisible}
+        mode={guideMode === "welcome" ? "welcome" : "spotlight"}
+        stepIndex={guideStep}
+        stepCount={GUIDE_STEPS.length}
+        step={guideStepContent}
+        targetRect={guideTargetRect}
+        targetRadius={guideTargetRadius}
+        onStart={handleGuideStart}
+        onBack={handleGuideBack}
+        onNext={handleGuideNext}
+        onSkip={handleGuideSkip}
+      />
     </div>
   );
 };
