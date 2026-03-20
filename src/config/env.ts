@@ -11,7 +11,11 @@ const envSchema = z.object({
   REDIS_URL: z.string().min(1),
   COOKIE_SECRET: z.string().min(8),
   JWT_SECRET: z.string().min(8),
-  CORS_ORIGINS: z.string().default("http://localhost:5173,http://localhost:3000"),
+  CORS_ORIGINS: z
+    .string()
+    .default(
+      "http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175,http://localhost:5173,http://localhost:5174,http://localhost:5175,http://127.0.0.1:3000,http://localhost:3000",
+    ),
   R2_ENDPOINT: z.string().min(1),
   R2_BUCKET: z.string().min(1),
   R2_ACCESS_KEY_ID: z.string().min(1),

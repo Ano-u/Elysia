@@ -160,6 +160,7 @@ export interface RecordSummary {
   moodPhrase: string;
   quote?: string | null;
   extraEmotions?: string[] | null;
+  tags?: string[] | null;
   description: string | null;
   imageIds?: string[] | null;
   drawingId?: string | null;

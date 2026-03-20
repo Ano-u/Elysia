@@ -4,10 +4,26 @@ setlocal EnableExtensions EnableDelayedExpansion
 for %%I in ("%~dp0.") do set "ROOT=%%~fI"
 cd /d "%ROOT%"
 
+set "LOCAL_NODE_DIR="
+for /d %%D in ("%ROOT%\.tools\node-v22*-win-x64") do (
+  if exist "%%~fD\node.exe" (
+    set "LOCAL_NODE_DIR=%%~fD"
+    goto :node_runtime_found
+  )
+)
+:node_runtime_found
+if defined LOCAL_NODE_DIR (
+  set "PATH=!LOCAL_NODE_DIR!;!PATH!"
+  echo [Elysia] Runtime Node: !LOCAL_NODE_DIR!\node.exe
+)
+for /f "delims=" %%V in ('node -v 2^>nul') do set "NODE_VERSION=%%V"
+if defined NODE_VERSION echo [Elysia] Node version: !NODE_VERSION!
+
 echo [Elysia] Starting one-click deployment...
 
 set "CAN_START_BACKEND=1"
 set "CAN_START_WORKER=1"
+set "RUNTIME_MODE=tsx"
 
 set "PM_MODE="
 where pnpm.cmd >nul 2>nul
@@ -72,12 +88,33 @@ if not exist "node_modules" (
   echo [Elysia] Dependencies already present, skip install.
 )
 
-echo [Elysia] Running database migration...
-call :run_pnpm migrate
+echo [Elysia] Preparing runtime artifacts...
+call :run_pnpm exec tsc -p tsconfig.json --noCheck
 if errorlevel 1 (
-  echo [Elysia] WARNING: migration failed. Backend and worker will be skipped.
-  echo [Elysia] WARNING: frontend will still start, but API requests may fail.
-  set "CAN_START_BACKEND=0"
+  echo [Elysia] WARNING: runtime transpile failed, fallback to tsx mode.
+) else (
+  set "RUNTIME_MODE=dist"
+  echo [Elysia] Runtime mode: dist ^(noCheck^)
+)
+
+call :port_in_use 5432
+if errorlevel 1 (
+  echo [Elysia] WARNING: PostgreSQL is not listening on 127.0.0.1:5432.
+)
+call :port_in_use 6379
+if errorlevel 1 (
+  echo [Elysia] WARNING: Redis is not listening on 127.0.0.1:6379.
+)
+
+echo [Elysia] Running database migration...
+if /I "!RUNTIME_MODE!"=="dist" (
+  call :run_node dist\scripts\migrate.js
+) else (
+  call :run_pnpm migrate
+)
+if errorlevel 1 (
+  echo [Elysia] WARNING: migration failed. Backend will still start for diagnostics.
+  echo [Elysia] WARNING: worker startup skipped because schema may be outdated.
   set "CAN_START_WORKER=0"
 )
 
@@ -96,11 +133,29 @@ set "FRONTEND_URL=http://127.0.0.1:!FRONTEND_PORT!"
 
 echo [Elysia] Launching backend, frontend, and worker...
 if /I "!PM_MODE!"=="powershell" (
-  if "!CAN_START_BACKEND!"=="1" start "Elysia Backend" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -Command "Set-Location -LiteralPath '%ROOT%'; pnpm dev"
+  if "!CAN_START_BACKEND!"=="1" (
+    if /I "!RUNTIME_MODE!"=="dist" (
+      start "Elysia Backend" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -Command "Set-Location -LiteralPath '%ROOT%'; node dist/src/index.js"
+    ) else (
+      start "Elysia Backend" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -Command "Set-Location -LiteralPath '%ROOT%'; pnpm dev"
+    )
+  )
 ) else if /I "!PM_MODE!"=="corepack" (
-  if "!CAN_START_BACKEND!"=="1" start "Elysia Backend" cmd /k "cd /d ""%ROOT%"" && corepack.cmd pnpm dev"
+  if "!CAN_START_BACKEND!"=="1" (
+    if /I "!RUNTIME_MODE!"=="dist" (
+      start "Elysia Backend" cmd /k "cd /d ""%ROOT%"" && node dist/src/index.js"
+    ) else (
+      start "Elysia Backend" cmd /k "cd /d ""%ROOT%"" && corepack.cmd pnpm dev"
+    )
+  )
 ) else (
-  if "!CAN_START_BACKEND!"=="1" start "Elysia Backend" cmd /k "cd /d ""%ROOT%"" && pnpm.cmd dev"
+  if "!CAN_START_BACKEND!"=="1" (
+    if /I "!RUNTIME_MODE!"=="dist" (
+      start "Elysia Backend" cmd /k "cd /d ""%ROOT%"" && node dist/src/index.js"
+    ) else (
+      start "Elysia Backend" cmd /k "cd /d ""%ROOT%"" && pnpm.cmd dev"
+    )
+  )
 )
 
 if "!CAN_START_BACKEND!"=="1" (
@@ -122,13 +177,31 @@ if "!CAN_START_BACKEND!"=="1" (
 
 if /I "!PM_MODE!"=="powershell" (
   start "Elysia Frontend" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -Command "Set-Location -LiteralPath '%ROOT%'; pnpm --filter frontend dev --host 127.0.0.1 --port !FRONTEND_PORT! --strictPort"
-  if "!CAN_START_WORKER!"=="1" start "Elysia Worker" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -Command "Set-Location -LiteralPath '%ROOT%'; pnpm worker"
+  if "!CAN_START_WORKER!"=="1" (
+    if /I "!RUNTIME_MODE!"=="dist" (
+      start "Elysia Worker" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -Command "Set-Location -LiteralPath '%ROOT%'; node dist/src/workers/index.js"
+    ) else (
+      start "Elysia Worker" powershell -NoExit -NoProfile -ExecutionPolicy Bypass -Command "Set-Location -LiteralPath '%ROOT%'; pnpm worker"
+    )
+  )
 ) else if /I "!PM_MODE!"=="corepack" (
   start "Elysia Frontend" cmd /k "cd /d ""%ROOT%"" && corepack.cmd pnpm --filter frontend dev --host 127.0.0.1 --port !FRONTEND_PORT! --strictPort"
-  if "!CAN_START_WORKER!"=="1" start "Elysia Worker" cmd /k "cd /d ""%ROOT%"" && corepack.cmd pnpm worker"
+  if "!CAN_START_WORKER!"=="1" (
+    if /I "!RUNTIME_MODE!"=="dist" (
+      start "Elysia Worker" cmd /k "cd /d ""%ROOT%"" && node dist/src/workers/index.js"
+    ) else (
+      start "Elysia Worker" cmd /k "cd /d ""%ROOT%"" && corepack.cmd pnpm worker"
+    )
+  )
 ) else (
   start "Elysia Frontend" cmd /k "cd /d ""%ROOT%"" && pnpm.cmd --filter frontend dev --host 127.0.0.1 --port !FRONTEND_PORT! --strictPort"
-  if "!CAN_START_WORKER!"=="1" start "Elysia Worker" cmd /k "cd /d ""%ROOT%"" && pnpm.cmd worker"
+  if "!CAN_START_WORKER!"=="1" (
+    if /I "!RUNTIME_MODE!"=="dist" (
+      start "Elysia Worker" cmd /k "cd /d ""%ROOT%"" && node dist/src/workers/index.js"
+    ) else (
+      start "Elysia Worker" cmd /k "cd /d ""%ROOT%"" && pnpm.cmd worker"
+    )
+  )
 )
 
 echo [Elysia] Done.
@@ -166,6 +239,10 @@ if /I "!PM_MODE!"=="corepack" (
   exit /b !errorlevel!
 )
 exit /b 1
+
+:run_node
+node %*
+exit /b !errorlevel!
 
 :port_in_use
 set "CHECK_PORT=%~1"

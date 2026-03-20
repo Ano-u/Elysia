@@ -26,6 +26,8 @@ Desktop.ini
 .vscode/
 .idea/
 *.swp
+.claude/
+.tools/
 
 # Cloudflare Tunnel 凭据
 cloudflared/credentials.json

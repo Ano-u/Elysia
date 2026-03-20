@@ -27,6 +27,7 @@ type RawRecordSummary = {
   mood_phrase: string;
   quote?: string | null;
   extra_emotions?: string[] | null;
+  tags?: string[] | null;
   description: string | null;
   image_ids?: string[] | null;
   drawing_id?: string | null;
@@ -115,6 +116,7 @@ function mapRecordSummary(raw: RawRecordSummary): RecordSummary {
     moodPhrase: raw.mood_phrase,
     quote: raw.quote,
     extraEmotions: raw.extra_emotions,
+    tags: raw.tags,
     description: raw.description,
     imageIds: raw.image_ids,
     drawingId: raw.drawing_id,

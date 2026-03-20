@@ -58,6 +58,12 @@ type RecordRow = {
   updated_at: string;
 };
 
+type RecordFeedRow = RecordRow & {
+  quote: string | null;
+  extra_emotions: string[];
+  tags: string[];
+};
+
 type RecordModerationInput = {
   id: string;
   user_id: string;
@@ -1025,13 +1031,26 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
     });
     const q = querySchema.parse(req.query);
 
-    const rows = await query<RecordRow>(
+    const rows = await query<RecordFeedRow>(
       `
-        SELECT *
-        FROM records
-        WHERE user_id = $1
-          AND ($2::timestamptz IS NULL OR created_at < $2::timestamptz)
-        ORDER BY created_at DESC
+        SELECT
+          r.*,
+          rq.quote,
+          COALESCE((
+            SELECT ARRAY_AGG(re.emotion ORDER BY re.created_at ASC)
+            FROM record_emotions re
+            WHERE re.record_id = r.id
+          ), ARRAY[]::text[]) AS extra_emotions,
+          COALESCE((
+            SELECT ARRAY_AGG(rt.tag ORDER BY rt.created_at ASC)
+            FROM record_tags rt
+            WHERE rt.record_id = r.id
+          ), ARRAY[]::text[]) AS tags
+        FROM records r
+        LEFT JOIN record_quotes rq ON rq.record_id = r.id
+        WHERE r.user_id = $1
+          AND ($2::timestamptz IS NULL OR r.created_at < $2::timestamptz)
+        ORDER BY r.created_at DESC
         LIMIT $3
       `,
       [user.id, q.cursor ?? null, q.limit],

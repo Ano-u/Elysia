@@ -192,7 +192,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const timelineSwitchGuideRef = useRef<HTMLDivElement>(null);
   const timelineListGuideRef = useRef<HTMLDivElement>(null);
 
-  const { data: feedData, isLoading: isFeedLoading } = useQuery({
+  const {
+    data: feedData,
+    isLoading: isFeedLoading,
+    isError: isFeedError,
+    error: feedError,
+    refetch: refetchFeed,
+  } = useQuery({
     queryKey: ["home-feed"],
     queryFn: () => getHomeFeed(20),
   });
@@ -392,6 +398,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const mindMapProgress = onboardingData ? onboardingData.progress.completed_days.length : 0;
   const isMindMapActive = mindMapProgress >= 7;
   const loadingMessage = useRotatingCopy(FEED_LOADING_MESSAGES, 10000, isFeedLoading);
+  const feedErrorMessage = isFeedError ? resolveCreateErrorMessage(feedError) : null;
 
   const allItems = [...TEST_DATA, ...(feedData?.items ?? [])].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -513,6 +520,22 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   {loadingMessage}
                 </motion.p>
               </AnimatePresence>
+            ) : isFeedError ? (
+              <div className="flex flex-col items-center gap-4 rounded-[1.25rem] border border-rose-200/70 bg-white/70 px-6 py-10 text-center shadow-sm dark:border-rose-400/20 dark:bg-black/25">
+                <p className="font-elysia-display text-lg text-rose-500 dark:text-rose-200">往世乐土刚刚起雾啦</p>
+                <p className="max-w-xl text-sm leading-relaxed text-slate-500 dark:text-slate-300/85">
+                  {feedErrorMessage ?? "爱莉刚刚没能把时间流稳稳展开，我们再试一次就好♪"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void refetchFeed();
+                  }}
+                  className="rounded-full border border-white/70 bg-white/85 px-4 py-1.5 text-sm font-semibold text-slate-600 transition hover:bg-white dark:border-white/25 dark:bg-white/15 dark:text-slate-100 dark:hover:bg-white/25"
+                >
+                  再试一次
+                </button>
+              </div>
             ) : filteredItems.length === 0 ? (
               <AnimatePresence mode="wait">
                 <motion.p
@@ -555,6 +578,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
   const queryClient = useQueryClient();
   const isPublic = item.visibilityIntent === "public";
   const publicationMeta = getPublicationStatusMeta(item.publicationStatus);
+  const emotionTags = item.extraEmotions && item.extraEmotions.length > 0 ? item.extraEmotions : item.tags ?? [];
 
   const visibilityMutation = useMutation({
     mutationFn: ({ id, isPublic }: { id: string; isPublic: boolean }) => updateRecordVisibility(id, isPublic),
@@ -630,9 +654,9 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
           </h3>
 
           {/* Emotions on the right of title */}
-          {item.extraEmotions && item.extraEmotions.length > 0 && (
+          {emotionTags.length > 0 && (
             <div className="flex flex-wrap gap-2 justify-end pt-1 shrink-0 max-w-[200px]">
-              {item.extraEmotions.map(e => (
+              {emotionTags.map(e => (
                 <span key={e} className="px-3 py-1 rounded-full bg-pink-100/40 dark:bg-pink-900/10 border-2 border-pink-200/30 dark:border-pink-800/20 text-[10px] font-bold text-pink-600 dark:text-pink-300 shadow-sm">
                   {e}
                 </span>
