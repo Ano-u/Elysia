@@ -13,7 +13,8 @@ import {
   updateRecordVisibility,
 } from "../../lib/apiClient";
 import type { RecordSummary, VisibilityIntent, CreateRecordRequest } from "../../types/api";
-import { Globe, Lock, Clock, PenLine, Check, X } from "lucide-react";
+import { Clock, PenLine, Loader, Check, X, Lock, Compass, Eye, AlertTriangle } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { pickRandomCopy, useRotatingCopy } from "../../lib/rotatingCopy";
 import { getCreateSuccessMessage, getPublicationStatusMeta, type PublicationTone } from "../../lib/publicationCopy";
 import { validateMoodPhraseLength } from "../../lib/moodPhraseValidation";
@@ -112,22 +113,24 @@ function resolveCreateErrorMessage(error: unknown): string {
   return pickRandomCopy(CREATE_RECORD_ERROR_MESSAGES.generic);
 }
 
-function getStatusBadgeClasses(tone: PublicationTone): string {
+type StatusBadgeInfo = { Icon: LucideIcon; classes: string };
+
+function getStatusBadgeInfo(tone: PublicationTone): StatusBadgeInfo {
   switch (tone) {
     case "private":
-      return "border-pink-200/70 bg-pink-50/80 text-pink-600 dark:border-pink-400/20 dark:bg-pink-400/10 dark:text-pink-200";
+      return { Icon: Lock, classes: "text-pink-600 dark:text-pink-200" };
     case "pending":
-      return "border-sky-200/80 bg-sky-50/80 text-sky-600 dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-200";
+      return { Icon: Loader, classes: "text-sky-600 dark:text-sky-200" };
     case "review":
-      return "border-violet-200/80 bg-violet-50/80 text-violet-600 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-200";
+      return { Icon: Eye, classes: "text-violet-600 dark:text-violet-200" };
     case "caution":
-      return "border-amber-200/80 bg-amber-50/85 text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200";
+      return { Icon: AlertTriangle, classes: "text-amber-700 dark:text-amber-200" };
     case "published":
-      return "border-emerald-200/80 bg-emerald-50/85 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200";
+      return { Icon: Compass, classes: "text-emerald-700 dark:text-emerald-200" };
     case "revise":
-      return "border-rose-200/80 bg-rose-50/85 text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200";
+      return { Icon: PenLine, classes: "text-rose-700 dark:text-rose-200" };
     default:
-      return "border-slate-200/80 bg-white/80 text-slate-600 dark:border-white/15 dark:bg-white/10 dark:text-slate-200";
+      return { Icon: Loader, classes: "text-slate-600 dark:text-slate-200" };
   }
 }
 
@@ -205,6 +208,15 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const [showOnlyPublic, setShowOnlyPublic] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [feedbackTone, setFeedbackTone] = useState<"error" | "success">("success");
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  useEffect(() => {
+    if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
+    if (!feedbackMessage) return;
+    feedbackTimerRef.current = setTimeout(() => setFeedbackMessage(null), 3000);
+    return () => { if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current); };
+  }, [feedbackMessage]);
+
   const saveEventTokenRef = useRef(0);
   const [saveAnimationEvent, setSaveAnimationEvent] = useState<{ token: number; status: "success" | "error" } | null>(null);
   const [guideMode, setGuideMode] = useState<"hidden" | "welcome" | "spotlight">("hidden");
@@ -563,7 +575,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               <div className="flex flex-col items-center gap-4 rounded-[1.25rem] border border-rose-200/70 bg-white/70 px-6 py-10 text-center shadow-sm dark:border-rose-400/20 dark:bg-black/25">
                 <p className="font-elysia-display text-lg text-rose-500 dark:text-rose-200">往世乐土刚刚起雾啦</p>
                 <p className="max-w-xl text-sm leading-relaxed text-slate-500 dark:text-slate-300/85">
-                  {feedErrorMessage ?? "爱莉刚刚没能把时间流稳稳展开，我们再试一次就好♪"}
+                  {feedErrorMessage ?? "爱莉刚刚没能把时间流展开，我们再试一次就好♪"}
                 </p>
                 <button
                   type="button"
@@ -621,11 +633,19 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
   const publicationMeta = getPublicationStatusMeta(currentItem.publicationStatus);
   const emotionTags = currentItem.extraEmotions && currentItem.extraEmotions.length > 0 ? currentItem.extraEmotions : currentItem.tags ?? [];
   const [isEditing, setIsEditing] = useState(false);
-  const [isActionHovered, setIsActionHovered] = useState(false);
   const [editMoodPhrase, setEditMoodPhrase] = useState(currentItem.moodPhrase);
   const [editQuote, setEditQuote] = useState(currentItem.quote ?? "");
   const [editDescription, setEditDescription] = useState(currentItem.description ?? "");
   const [editFeedback, setEditFeedback] = useState<string | null>(null);
+  const editFeedbackTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  useEffect(() => {
+    if (editFeedbackTimerRef.current) clearTimeout(editFeedbackTimerRef.current);
+    if (!editFeedback) return;
+    editFeedbackTimerRef.current = setTimeout(() => setEditFeedback(null), 3000);
+    return () => { if (editFeedbackTimerRef.current) clearTimeout(editFeedbackTimerRef.current); };
+  }, [editFeedback]);
+
   const isMockItem = currentItem.id.startsWith("test-");
   const canEditByStatus = ["private", "pending_auto", "pending_manual", "published"].includes(currentItem.publicationStatus);
 
@@ -715,8 +735,8 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
     });
   };
 
-  const showEditHint = canEditByStatus && isActionHovered && !isEditing;
   const actionBusy = visibilityMutation.isPending || editMutation.isPending;
+  const badgeInfo = getStatusBadgeInfo(publicationMeta.tone);
 
   return (
     <div className="flex flex-col gap-4 group relative">
@@ -733,46 +753,16 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
           })}
         </div>
 
-        <button
-          onMouseEnter={() => setIsActionHovered(true)}
-          onMouseLeave={() => setIsActionHovered(false)}
-          onClick={openEditMode}
-          disabled={actionBusy}
-          className={`flex items-center gap-2 transition-all hover:scale-105 ${
-            showEditHint ? "text-violet-500 dark:text-violet-300" : isPublic ? "text-blue-400" : "text-slate-400"
-          }`}
+        <span
+          title={isEditing ? "修改完成后会进入二次审核♪" : publicationMeta.detail}
+          className={`inline-flex items-center gap-2 cursor-default`}
         >
-          {showEditHint ? (
-            <>
-              <PenLine className="w-4 h-4" />
-              <span className="drop-shadow-sm">修改</span>
-            </>
-          ) : isPublic ? (
-            <>
-              <Globe className="w-4 h-4" />
-              <span className="drop-shadow-sm">公开共鸣</span>
-            </>
-          ) : (
-            <>
-              <Lock className="w-4 h-4" />
-              <span>私密记忆</span>
-            </>
-          )}
-        </button>
+          {isEditing ? <PenLine className="w-4 h-4 text-violet-500 dark:text-violet-300" /> : <badgeInfo.Icon className={`w-4 h-4 ${badgeInfo.classes}`} />}
+          {isEditing ? "修改完成后会进入二次审核" : publicationMeta.label}
+        </span>
       </div>
 
       <LiquidCard className="bg-white/50 dark:bg-black/20 backdrop-blur-xl border-white/60 dark:border-white/10 p-10 flex flex-col gap-8 shadow-xl hover:shadow-2xl transition-all duration-500">
-        <div className="flex flex-wrap items-center gap-3">
-          <span
-            className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-bold tracking-[0.12em] uppercase ${getStatusBadgeClasses(publicationMeta.tone)}`}
-          >
-            {publicationMeta.label}
-          </span>
-          <p className="max-w-2xl text-sm leading-relaxed text-slate-500 dark:text-slate-300/80">
-            {publicationMeta.detail}
-          </p>
-        </div>
-
         {isEditing ? (
           <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-2">
@@ -810,35 +800,45 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
               />
             </div>
 
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-xs text-violet-500 dark:text-violet-300">修改完成后会进入二次审核</p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleEditCancel}
-                  className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/85 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-white dark:border-white/20 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  取消
-                </button>
-                <button
-                  type="button"
-                  onClick={handleEditSave}
-                  disabled={editMutation.isPending}
-                  className="inline-flex items-center gap-1 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-300/20 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/30"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  {editMutation.isPending ? "提交中..." : "提交修改"}
-                </button>
-              </div>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleEditCancel}
+                className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/85 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-white dark:border-white/20 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
+              >
+                <X className="w-3.5 h-3.5" />
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleEditSave}
+                disabled={editMutation.isPending}
+                className="inline-flex items-center gap-1 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-300/20 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/30"
+              >
+                <Check className="w-3.5 h-3.5" />
+                {editMutation.isPending ? "提交中..." : "提交修改"}
+              </button>
             </div>
           </div>
         ) : (
           <>
-            <div className="flex items-start justify-between gap-6">
-              <h3 className="font-elysia-display text-2xl text-slate-700 dark:text-white font-bold leading-tight flex-1 break-words [overflow-wrap:anywhere]">
-                {currentItem.moodPhrase}
-              </h3>
+            <div className="flex items-start justify-between gap-6 my-2">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <h3 className="font-elysia-display text-2xl text-slate-700 dark:text-white font-bold leading-tight break-words [overflow-wrap:anywhere]">
+                  {currentItem.moodPhrase}
+                </h3>
+                {canEditByStatus && (
+                  <button
+                    type="button"
+                    onClick={openEditMode}
+                    disabled={actionBusy}
+                    title="修改"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 shrink-0 p-1 rounded-full text-violet-400 hover:text-violet-600 dark:text-violet-300 dark:hover:text-violet-100"
+                  >
+                    <PenLine className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
 
               {/* Emotions on the right of title */}
               {emotionTags.length > 0 && (
@@ -853,7 +853,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
             </div>
 
             {currentItem.quote && (
-              <div className="relative pl-4 py-1 my-6">
+              <div className="relative pl-4 py-1 my-4">
                 <div className="absolute left-0 top-0 bottom-0 w-[4px] bg-pink-300/60 rounded-full shadow-glow" />
                 <p className="italic text-slate-600 dark:text-slate-300 text-base leading-relaxed font-medium break-words [overflow-wrap:anywhere]">
                   {currentItem.quote}
@@ -862,7 +862,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
             )}
 
             {currentItem.description && (
-              <div className="flex flex-col gap-2 pl-4">
+              <div className="flex flex-col gap-2 pl-4 my-4">
                 {currentItem.description.split("\n").filter(p => p.trim()).map((p, i) => (
                   <div key={i} className="relative text-slate-500 dark:text-slate-400 text-sm/1 leading-loose whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                     <div className="absolute -left-4 top-3 w-2 h-2 bg-slate-200 dark:bg-slate-800 rounded-full" />

@@ -92,7 +92,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
   const isCompact = hasValue && !isComposerExpanded;
   const showQuoteInput = isQuoteFocused || (!hasQuote && isComposerExpanded);
   const ambientMessages = isPending ? WAITING_MESSAGES : hasValue ? GUIDANCE_MESSAGES : COMPANION_MESSAGES;
-  const ambientMessage = useRotatingCopy(ambientMessages, 10000, ambientMessages.length > 1);
+  const ambientMessage = useRotatingCopy(ambientMessages, 15000, ambientMessages.length > 1);
 
   const isTargetInsideEditor = (target: EventTarget | null): boolean => {
     if (!(target instanceof Node)) return false;
@@ -166,6 +166,19 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
         <div className="flex flex-col gap-8">
           {/* Main Input Section */}
           <div className="relative">
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={ambientMessage}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+                className="mb-6 max-w-3xl text-sm italic leading-relaxed text-slate-500/60 dark:text-slate-300/80"
+              >
+                {ambientMessage}
+              </motion.p>
+            </AnimatePresence>
+
             <textarea
               autoFocus={hasValue}
               maxLength={200}
@@ -183,19 +196,6 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
               }}
               disabled={isPending}
             />
-
-            <AnimatePresence mode="wait">
-              <motion.p
-                key={ambientMessage}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-                className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-500 dark:text-slate-300/80"
-              >
-                {ambientMessage}
-              </motion.p>
-            </AnimatePresence>
           </div>
 
           {/* Quote & Details Transformation */}

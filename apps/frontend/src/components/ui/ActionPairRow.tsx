@@ -246,7 +246,7 @@ export const ActionPairRow: React.FC<ActionPairRowProps> = ({
 
           {/* Progress Gadget / Switch Thumb */}
           <motion.div
-            className="absolute w-6 h-6 bg-white shadow-md rounded-full border border-pink-100 flex items-center justify-center z-20 pointer-events-none group-hover/track:scale-110 transition-transform"
+            className={`absolute w-6 h-6 bg-white shadow-md rounded-full border border-pink-100 flex items-center justify-center z-20 pointer-events-none ${isToggleMode ? "group-hover/track:scale-110" : ""} transition-transform`}
             animate={{
                left: `calc(${fillPercentage}% - 12px)`, // Center the thumb on the edge
             }}
