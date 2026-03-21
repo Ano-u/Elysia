@@ -37,6 +37,10 @@
   --color-elysia-mist: var(--elysia-mist);
   --color-elysia-coral: var(--elysia-coral);
   --color-elysia-gold: var(--elysia-gold);
+  --color-elysia-lavender: var(--elysia-lavender);
+  --color-elysia-crystal: var(--elysia-crystal);
+  --color-elysia-butterfly: var(--elysia-butterfly);
+  --color-elysia-bowstring: var(--elysia-bowstring);
 }
 
 @layer base {
@@ -80,6 +84,11 @@
     --elysia-mist: #e6f1ff;
     --elysia-coral: #ffeef4;
     --elysia-gold: #fff4d8;
+    --elysia-lavender: #c8a2e8;
+    --elysia-crystal: #e8d5f5;
+    --elysia-butterfly: #f0b6d6;
+    --elysia-bowstring: #a8d8ea;
+    --elysia-petal: rgba(240, 182, 214, 0.15);
 
     /* Crystal & Liquid Textures */
     --shadow-crystal: 0 10px 35px rgba(135, 171, 214, 0.17);
@@ -126,6 +135,11 @@
     --elysia-mist: #152238;
     --elysia-coral: #251926;
     --elysia-gold: #322a1d;
+    --elysia-lavender: #9b6fc0;
+    --elysia-crystal: #6b4d8a;
+    --elysia-butterfly: #c07a9e;
+    --elysia-bowstring: #5a9ab5;
+    --elysia-petal: rgba(192, 122, 158, 0.12);
 
     /* Crystal & Liquid Textures - Dark Mode */
     --shadow-crystal: 0 10px 35px rgba(0, 0, 0, 0.42);
@@ -238,6 +252,61 @@
 
   @media (prefers-reduced-motion: reduce) {
     .animate-bg-drift {
+      animation: none;
+    }
+  }
+
+  /* === 爱莉希雅主题动画 === */
+
+  @keyframes butterfly-drift {
+    0%   { transform: translate(0, 0) rotate(0deg) scale(1); }
+    25%  { transform: translate(40px, -30px) rotate(8deg) scale(1.05); }
+    50%  { transform: translate(-20px, -60px) rotate(-5deg) scale(0.95); }
+    75%  { transform: translate(-50px, -20px) rotate(6deg) scale(1.02); }
+    100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  }
+
+  @keyframes crystal-pulse {
+    0%, 100% { opacity: 0.08; transform: scale(1); }
+    50%      { opacity: 0.2; transform: scale(1.08); }
+  }
+
+  @keyframes silk-flow {
+    0%   { stroke-dashoffset: 0; }
+    100% { stroke-dashoffset: -40; }
+  }
+
+  @keyframes petal-float {
+    0%   { transform: translate(0, -20px) rotate(0deg); opacity: 0; }
+    10%  { opacity: 0.12; }
+    90%  { opacity: 0.08; }
+    100% { transform: translate(-30px, 100vh) rotate(180deg); opacity: 0; }
+  }
+
+  .animate-butterfly-drift {
+    animation: butterfly-drift 24s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  .animate-crystal-pulse {
+    animation: crystal-pulse 8s ease-in-out infinite;
+    will-change: opacity, transform;
+  }
+
+  .animate-silk-flow {
+    animation: silk-flow 4s linear infinite;
+  }
+
+  .animate-petal-float {
+    animation: petal-float 20s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-butterfly-drift,
+    .animate-crystal-pulse,
+    .animate-silk-flow,
+    .animate-petal-float {
       animation: none;
     }
   }

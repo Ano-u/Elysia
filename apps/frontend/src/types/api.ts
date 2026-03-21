@@ -103,6 +103,7 @@ export interface UniverseItem {
   moodPhrase: string;
   quote?: string | null;
   description?: string | null;
+  tags?: string[] | null;
   createdAt: string;
   authorId: string;
   authorName: string;

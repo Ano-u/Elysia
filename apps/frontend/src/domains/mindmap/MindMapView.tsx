@@ -90,25 +90,28 @@ export const MindMapView: React.FC = () => {
 
   if (isLoading) {
      return (
-        <div className="flex flex-col items-center justify-center min-h-screen">
-          <div className="font-elysia-poem text-[1.5rem] leading-none text-slate-500 animate-pulse">正在织起你的记忆星线...</div>
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/20 dark:bg-slate-950/45">
+          <div className="font-elysia-poem text-[1.5rem] leading-none text-slate-600 dark:text-slate-200/90 animate-pulse">正在织起你的记忆星线...</div>
         </div>
      );
   }
 
   if (isError) {
     return (
-       <div className="flex flex-col items-center justify-center min-h-screen">
-         <div className="text-red-400 font-light text-sm">记忆织网暂时失去连接，请稍后再试。</div>
+       <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/20 dark:bg-slate-950/45">
+         <div className="rounded-full border border-rose-200/70 bg-white/75 px-5 py-2 text-sm text-rose-500 backdrop-blur-md dark:border-rose-400/35 dark:bg-black/40 dark:text-rose-200">
+           记忆织网暂时失去连接，请稍后再试。
+         </div>
        </div>
     );
   }
 
   return (
-    <div className="absolute inset-0 overflow-hidden bg-transparent z-10 select-none">
+    <div className="absolute inset-0 overflow-hidden bg-slate-950/20 dark:bg-slate-950/45 z-10 select-none">
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_14%_12%,rgba(255,255,255,0.34),transparent_38%),radial-gradient(circle_at_86%_8%,rgba(251,191,36,0.16),transparent_34%),radial-gradient(circle_at_50%_100%,rgba(244,114,182,0.14),transparent_45%)]" />
       {/* Background Grid */}
       <div
-        className="absolute inset-0 pointer-events-none opacity-20 dark:opacity-30 mix-blend-overlay"
+        className="absolute inset-0 pointer-events-none opacity-28 dark:opacity-30 mix-blend-overlay"
         style={{
           backgroundImage: "linear-gradient(to right, rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.1) 1px, transparent 1px)",
           backgroundSize: "60px 60px"
@@ -116,11 +119,11 @@ export const MindMapView: React.FC = () => {
       />
 
       {/* Mode Switcher */}
-      <div className="absolute left-1/2 top-20 z-50 -translate-x-1/2 rounded-full border border-white/20 bg-white/10 px-4 py-1 text-[11px] tracking-[0.14em] text-slate-500 backdrop-blur-md dark:border-white/10 dark:bg-black/20 dark:text-slate-300/70">
+      <div className="absolute left-1/2 top-20 z-50 -translate-x-1/2 rounded-full border border-white/50 bg-white/72 px-4 py-1 text-[11px] tracking-[0.14em] text-slate-600 backdrop-blur-md dark:border-white/15 dark:bg-black/35 dark:text-slate-200/80">
         轻触节点可高亮关系 · 拖动节点可重排结构
       </div>
 
-      <div className="absolute top-28 left-1/2 -translate-x-1/2 z-50 flex gap-2 p-1 bg-white/10 dark:bg-black/20 backdrop-blur-md rounded-full border border-white/20">
+      <div className="absolute top-28 left-1/2 -translate-x-1/2 z-50 flex gap-2 p-1 bg-white/72 dark:bg-black/35 backdrop-blur-md rounded-full border border-white/50 dark:border-white/15">
          <button
            onClick={() => setMode('simple')}
            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${mode === 'simple' ? 'bg-white/90 text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}
@@ -135,34 +138,113 @@ export const MindMapView: React.FC = () => {
          </button>
       </div>
 
-      {/* SVG for Edges */}
+      {/* SVG for Edges — 光丝流动线 */}
       <svg ref={svgRef} className="absolute inset-0 w-full h-full pointer-events-none z-10">
-        <g strokeOpacity={0.6}>
+        <defs>
+          {/* 径向渐变 — 水晶气泡节点 */}
+          <radialGradient id="crystal-pink" cx="40%" cy="35%">
+            <stop offset="0%" stopColor="var(--elysia-butterfly)" stopOpacity="0.5" />
+            <stop offset="100%" stopColor="var(--elysia-coral)" stopOpacity="0.2" />
+          </radialGradient>
+          <radialGradient id="crystal-gold" cx="40%" cy="35%">
+            <stop offset="0%" stopColor="var(--elysia-gold)" stopOpacity="0.5" />
+            <stop offset="100%" stopColor="#fff8e7" stopOpacity="0.2" />
+          </radialGradient>
+          <radialGradient id="crystal-lavender" cx="40%" cy="35%">
+            <stop offset="0%" stopColor="var(--elysia-lavender)" stopOpacity="0.5" />
+            <stop offset="100%" stopColor="var(--elysia-crystal)" stopOpacity="0.2" />
+          </radialGradient>
+          <radialGradient id="crystal-blue" cx="40%" cy="35%">
+            <stop offset="0%" stopColor="var(--elysia-bowstring)" stopOpacity="0.5" />
+            <stop offset="100%" stopColor="var(--elysia-mist)" stopOpacity="0.2" />
+          </radialGradient>
+          <radialGradient id="crystal-mist" cx="40%" cy="35%">
+            <stop offset="0%" stopColor="var(--elysia-mist)" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#ffffff" stopOpacity="0.15" />
+          </radialGradient>
+          {/* 光丝连线渐变 */}
+          <linearGradient id="silk-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="var(--elysia-bowstring)" stopOpacity="0.4" />
+            <stop offset="50%" stopColor="var(--elysia-lavender)" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="var(--elysia-butterfly)" stopOpacity="0.4" />
+          </linearGradient>
+          {/* 玻璃模糊滤镜 */}
+          <filter id="glass-blur" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="6" />
+          </filter>
+        </defs>
+
+        {/* 中心装饰花朵 */}
+        <g opacity="0.1" transform={`translate(${typeof window !== 'undefined' ? window.innerWidth / 2 : 600}, ${typeof window !== 'undefined' ? window.innerHeight / 2 : 400})`}>
+          {[0, 60, 120, 180, 240, 300].map((angle) => (
+            <ellipse
+              key={`flower-${angle}`}
+              cx={0}
+              cy={-28}
+              rx={12}
+              ry={28}
+              fill="var(--elysia-crystal)"
+              transform={`rotate(${angle})`}
+            />
+          ))}
+          <circle r={8} fill="var(--elysia-butterfly)" opacity="0.3" />
+        </g>
+
+        {/* 光丝连线 */}
+        <g>
           {links.map((link, i) => {
+            const source = link.source as SimulationNode;
+            const target = link.target as SimulationNode;
             const isHighlighted = selectedNodeId && (
-              (link.source as SimulationNode).id === selectedNodeId ||
-              (link.target as SimulationNode).id === selectedNodeId
+              source.id === selectedNodeId || target.id === selectedNodeId
             );
 
+            // 贝塞尔曲线控制点：中点垂直偏移
+            const mx = ((source.x ?? 0) + (target.x ?? 0)) / 2;
+            const my = ((source.y ?? 0) + (target.y ?? 0)) / 2;
+            const dx = (target.x ?? 0) - (source.x ?? 0);
+            const dy = (target.y ?? 0) - (source.y ?? 0);
+            const len = Math.sqrt(dx * dx + dy * dy);
+            const offset = Math.min(len * 0.2, 40) * (i % 2 === 0 ? 1 : -1);
+            const nx = len > 0 ? -dy / len : 0;
+            const ny = len > 0 ? dx / len : 0;
+            const cx = mx + nx * offset;
+            const cy = my + ny * offset;
+
+            const d = `M ${source.x ?? 0},${source.y ?? 0} Q ${cx},${cy} ${target.x ?? 0},${target.y ?? 0}`;
+            const strength = link.strength ?? 0.5;
+
             return (
-              <motion.line
-                key={`link-${i}`}
-                x1={(link.source as SimulationNode).x}
-                y1={(link.source as SimulationNode).y}
-                x2={(link.target as SimulationNode).x}
-                y2={(link.target as SimulationNode).y}
-                stroke={isHighlighted ? "rgba(255,182,193,0.8)" : "rgba(148,163,184,0.3)"}
-                strokeWidth={isHighlighted ? 2 : Math.max(0.5, link.strength * 2)}
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 1, ease: "easeOut" }}
-              />
+              <g key={`link-${i}`}>
+                {/* 底层光晕 */}
+                {isHighlighted && (
+                  <path
+                    d={d}
+                    stroke="var(--elysia-lavender)"
+                    strokeWidth="5"
+                    fill="none"
+                    opacity="0.12"
+                    strokeLinecap="round"
+                  />
+                )}
+                {/* 主光丝 */}
+                <path
+                  d={d}
+                  stroke={isHighlighted ? "var(--elysia-butterfly)" : "url(#silk-gradient)"}
+                  strokeWidth={isHighlighted ? 1.8 : (strength > 0.7 ? 1.5 : 0.8)}
+                  fill="none"
+                  opacity={isHighlighted ? 0.7 : (strength > 0.7 ? 0.45 : 0.2)}
+                  strokeLinecap="round"
+                  strokeDasharray={strength > 0.7 ? "8 12" : "4 16"}
+                  className={reduceMotion ? "" : "animate-silk-flow"}
+                />
+              </g>
             );
           })}
         </g>
       </svg>
 
-      {/* HTML Nodes overlay for better interaction/rendering */}
+      {/* 水晶气泡节点 */}
       <div className="absolute inset-0 w-full h-full z-20">
         <AnimatePresence>
           {nodes.map(node => {
@@ -174,19 +256,32 @@ export const MindMapView: React.FC = () => {
 
             const isDimmed = selectedNodeId !== null && !isSelected && !isRelated;
 
+            // 节点类型色调映射
+            const isTheme = node.type === 'theme';
+            const nodeSize = isTheme ? 120 : 80;
+            const colorMap: Record<string, { bg: string; border: string; glow: string }> = {
+              record:  { bg: 'var(--elysia-butterfly)', border: 'var(--elysia-coral)',     glow: 'var(--elysia-petal)' },
+              quote:   { bg: 'var(--elysia-gold)',      border: '#ffe4a0',                 glow: 'rgba(255,244,216,0.2)' },
+              emotion: { bg: 'var(--elysia-lavender)',   border: 'var(--elysia-crystal)',   glow: 'rgba(200,162,232,0.15)' },
+              theme:   { bg: 'var(--elysia-bowstring)',  border: 'var(--elysia-mist)',      glow: 'rgba(168,216,234,0.15)' },
+              comment: { bg: 'var(--elysia-mist)',       border: '#d0e4ff',                 glow: 'rgba(230,241,255,0.15)' },
+            };
+            const colors = colorMap[node.type] || colorMap.record;
+
             return (
               <motion.div
                 key={node.id}
-                layoutId={`node-${node.id}`}
-                className={`absolute cursor-grab active:cursor-grabbing rounded-full flex items-center justify-center text-center p-3 sm:p-4 backdrop-blur-md border shadow-sm transition-opacity duration-300 ${
-                  node.type === 'theme'
-                    ? 'bg-amber-100/40 border-amber-200/50 dark:bg-amber-900/40 dark:border-amber-700/50 text-amber-900 dark:text-amber-100 w-24 h-24 sm:w-32 sm:h-32 rounded-full'
-                    : 'bg-white/60 border-white/40 dark:bg-slate-800/60 dark:border-slate-700/40 text-slate-800 dark:text-slate-200 min-w-[100px] max-w-[200px] rounded-2xl'
-                } ${isDimmed ? 'opacity-20' : 'opacity-100'}`}
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: isDimmed ? 0.2 : 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+                transition={{ duration: reduceMotion ? 0.15 : 0.4, ease: "easeOut" }}
+                className="absolute cursor-grab active:cursor-grabbing flex items-center justify-center text-center transition-opacity duration-300"
                 style={{
                   left: node.x,
                   top: node.y,
-                  transform: 'translate(-50%, -50%)'
+                  width: nodeSize,
+                  height: nodeSize,
+                  transform: 'translate(-50%, -50%)',
                 }}
                 drag
                 dragMomentum={false}
@@ -194,19 +289,70 @@ export const MindMapView: React.FC = () => {
                 onDrag={(e: unknown, info: unknown) => dragEvents.onDrag(e, info, node)}
                 onDragEnd={(e: unknown) => dragEvents.onDragEnd(e, node)}
                 onClick={() => setSelectedNodeId(isSelected ? null : node.id)}
-                whileHover={{ scale: 1.05 }}
+                whileHover={{ scale: 1.08 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <span className="text-xs sm:text-sm font-medium line-clamp-3 pointer-events-none">
+                {/* 外层光晕 */}
+                {(node.isFocus || isSelected) && (
+                  <div
+                    className="absolute rounded-full -z-10 pointer-events-none"
+                    style={{
+                      inset: '-12px',
+                      background: `radial-gradient(circle, ${colors.glow} 0%, transparent 70%)`,
+                      filter: 'blur(8px)',
+                    }}
+                  />
+                )}
+
+                {/* 主气泡 */}
+                <div
+                  className={`absolute inset-0 rounded-full ${reduceMotion ? '' : 'backdrop-blur-sm'}`}
+                  style={{
+                    background: `radial-gradient(ellipse at 40% 35%, ${colors.bg}80 0%, ${colors.bg}33 100%)`,
+                    border: `1px solid ${colors.border}66`,
+                    boxShadow: isSelected
+                      ? `0 0 20px 4px ${colors.glow}, inset 0 0 12px ${colors.bg}22`
+                      : `inset 0 0 12px ${colors.bg}22`,
+                  }}
+                />
+
+                {/* 内部高光弧 — 模拟玻璃反射 */}
+                <div
+                  className="absolute pointer-events-none rounded-full"
+                  style={{
+                    top: '15%',
+                    left: '20%',
+                    width: '60%',
+                    height: '30%',
+                    background: 'linear-gradient(180deg, rgba(255,255,255,0.25) 0%, transparent 100%)',
+                    borderRadius: '50%',
+                  }}
+                />
+
+                {/* 内部微光脉冲 */}
+                {!reduceMotion && (
+                  <div
+                    className="absolute rounded-full pointer-events-none animate-crystal-pulse"
+                    style={{
+                      inset: '30%',
+                      background: `radial-gradient(circle, ${colors.bg}22 0%, transparent 70%)`,
+                    }}
+                  />
+                )}
+
+                {/* 文字标签 */}
+                <span className="relative z-10 text-xs sm:text-sm font-medium line-clamp-3 pointer-events-none px-2 text-slate-700 dark:text-slate-200">
                   {node.label}
                 </span>
 
-                {/* Node Glow */}
-                {node.isFocus && (
-                  <div className="absolute -inset-2 bg-pink-300/30 rounded-full blur-xl -z-10 pointer-events-none" />
-                )}
+                {/* 选中环 */}
                 {isSelected && (
-                  <div className="absolute -inset-1 ring-2 ring-pink-400/50 rounded-[inherit] -z-10 pointer-events-none" />
+                  <div
+                    className="absolute -inset-1 rounded-full pointer-events-none"
+                    style={{
+                      border: `2px solid ${colors.border}88`,
+                    }}
+                  />
                 )}
               </motion.div>
             );

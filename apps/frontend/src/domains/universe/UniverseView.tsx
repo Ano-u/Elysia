@@ -1,9 +1,54 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { motion, useMotionValue } from "framer-motion";
 import { UniverseCard } from "./UniverseCard";
+import { ButterflyDecor } from "./ButterflyDecor";
+import { BowstringLine } from "./BowstringLine";
+import { EmojiDock } from "./EmojiDock";
 import { useUiStore } from "../../store/uiStore";
 import { useQuery } from "@tanstack/react-query";
 import { getUniverseViewport } from "../../lib/apiClient";
+
+/**
+ * 简单碰撞推开：遍历所有卡片，如果两张卡片中心距离 < minDist，就互相推开。
+ * 迭代几轮直到没有重叠。
+ */
+function resolveCollisions(
+  positions: { x: number; y: number }[],
+  cardW: number,
+  cardH: number,
+  iterations = 8,
+) {
+  const minDistX = cardW + 16; // 卡片宽 + 间距
+  const minDistY = cardH + 12;
+
+  for (let iter = 0; iter < iterations; iter++) {
+    let moved = false;
+    for (let i = 0; i < positions.length; i++) {
+      for (let j = i + 1; j < positions.length; j++) {
+        const dx = positions[j].x - positions[i].x;
+        const dy = positions[j].y - positions[i].y;
+        const overlapX = minDistX - Math.abs(dx);
+        const overlapY = minDistY - Math.abs(dy);
+
+        if (overlapX > 0 && overlapY > 0) {
+          // 选择推开距离更小的轴
+          if (overlapX < overlapY) {
+            const pushX = (overlapX / 2 + 1) * (dx >= 0 ? 1 : -1);
+            positions[i].x -= pushX;
+            positions[j].x += pushX;
+          } else {
+            const pushY = (overlapY / 2 + 1) * (dy >= 0 ? 1 : -1);
+            positions[i].y -= pushY;
+            positions[j].y += pushY;
+          }
+          moved = true;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+  return positions;
+}
 
 export const UniverseView: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -15,27 +60,35 @@ export const UniverseView: React.FC = () => {
 
   const canvasSize = 4000;
 
-  // Calculate initial viewport offset based on initial state
   const initialWidth = typeof window !== "undefined" ? window.innerWidth : 1200;
   const initialHeight = typeof window !== "undefined" ? window.innerHeight : 800;
   const initialXOffset = -(canvasSize / 2 - initialWidth / 2);
   const initialYOffset = -(canvasSize / 2 - initialHeight / 2);
 
-  // Create motion values to track the canvas position
   const x = useMotionValue(initialXOffset);
   const y = useMotionValue(initialYOffset);
 
-  // Derive coordinates for API request
+  // 当前视口中心在画布上的坐标（实时更新）
+  const [viewportCenter, setViewportCenter] = useState({ x: canvasSize / 2, y: canvasSize / 2 });
+
   const [requestCoords, setRequestCoords] = useState({ x: 0, y: 0 });
 
-  // Debounce API requests on drag and convert canvas position to virtual universe coords.
+  // 监听画布拖动，更新视口中心和 API 请求坐标
   useEffect(() => {
     let timeoutId: number | null = null;
+    let rafId: number | null = null;
 
-    const schedule = () => {
-      if (timeoutId) {
-        window.clearTimeout(timeoutId);
-      }
+    const updateCenter = () => {
+      const latestX = x.get();
+      const latestY = y.get();
+      // 画布偏移 → 视口中心在画布上的位置
+      const cx = -latestX + viewportSize.width / 2;
+      const cy = -latestY + viewportSize.height / 2;
+      setViewportCenter({ x: cx, y: cy });
+    };
+
+    const scheduleApi = () => {
+      if (timeoutId) window.clearTimeout(timeoutId);
       timeoutId = window.setTimeout(() => {
         const latestX = x.get();
         const latestY = y.get();
@@ -45,60 +98,84 @@ export const UniverseView: React.FC = () => {
       }, 420);
     };
 
-    const unsubscribeX = x.on("change", schedule);
-    const unsubscribeY = y.on("change", schedule);
-    schedule();
+    const onChange = () => {
+      // 用 rAF 节流视口中心更新
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        updateCenter();
+        rafId = null;
+      });
+      scheduleApi();
+    };
+
+    const unsubX = x.on("change", onChange);
+    const unsubY = y.on("change", onChange);
+    updateCenter();
+    scheduleApi();
 
     return () => {
-      unsubscribeX();
-      unsubscribeY();
-      if (timeoutId) {
-        window.clearTimeout(timeoutId);
-      }
+      unsubX();
+      unsubY();
+      if (timeoutId) window.clearTimeout(timeoutId);
+      if (rafId) cancelAnimationFrame(rafId);
     };
-  }, [canvasSize, x, y, viewportSize.height, viewportSize.width]);
+  }, [canvasSize, x, y, viewportSize.width, viewportSize.height]);
 
   const { data: universeData, isLoading } = useQuery({
     queryKey: ['universe', 'viewport', requestCoords.x, requestCoords.y],
     queryFn: () => {
-      // Calculate virtual view width based on physical window
       const w = viewportSize.width * 2;
       const h = viewportSize.height * 2;
-      // Coordinates for query top-left corner
       const reqX = Math.round(requestCoords.x - w / 2);
       const reqY = Math.round(requestCoords.y - h / 2);
-
       return getUniverseViewport(reqX, reqY, w, h);
     },
-    staleTime: 1000 * 30, // 30s stale time
-    placeholderData: (prev) => prev, // Keep old data while fetching
+    staleTime: 1000 * 30,
+    placeholderData: (prev) => prev,
   });
 
   const cards = universeData?.items || [];
-  // Use backend provided focus logic or fallback to first 3
-  const focusedIds = universeData?.focus
-    ? [universeData.focus.primary, ...universeData.focus.secondary].filter(Boolean)
-    : [];
+
+  // 布局：使用后端坐标 + 碰撞推开
+  const layoutCards = useMemo(() => {
+    if (cards.length === 0) return [];
+
+    const center = canvasSize / 2;
+    const cardW = 256; // w-64 = 16rem = 256px
+    const cardH = 120; // 估算高度
+
+    // 用后端坐标映射到画布
+    const positions = cards.map((card) => ({
+      x: center + card.coord.x,
+      y: center + card.coord.y,
+    }));
+
+    // 碰撞推开
+    resolveCollisions(positions, cardW, cardH);
+
+    // 为每张卡片决定是否显示金句（随机但稳定）
+    return cards.map((card, i) => {
+      // 用 id 的 charCode 做伪随机，保证同一卡片每次结果一致
+      const hash = card.id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+      const showQuote = hash % 3 !== 0; // 约 2/3 的卡片显示金句
+
+      return {
+        card,
+        physicalX: positions[i].x,
+        physicalY: positions[i].y,
+        showQuote,
+      };
+    });
+  }, [cards, canvasSize]);
 
   useEffect(() => {
     const handleResize = () => {
       setViewportSize({ width: window.innerWidth, height: window.innerHeight });
     };
-
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Update view when window resizes
-  useEffect(() => {
-    if (viewportSize.width && viewportSize.height) {
-      // Since motion values are updated through interaction mostly,
-      // we only want to ensure our drag constraints stay correct.
-      // We don't reset position on every resize unless it's strictly necessary.
-    }
-  }, [viewportSize.width, viewportSize.height, x, y, canvasSize]);
-
-  // Use framer-motion's drag constraints to keep the canvas in view
   const dragConstraints = {
     top: -(canvasSize - viewportSize.height),
     left: -(canvasSize - viewportSize.width),
@@ -106,12 +183,44 @@ export const UniverseView: React.FC = () => {
     bottom: 0,
   };
 
+  // 计算卡片到视口中心的归一化距离
+  const getDistanceRatio = useCallback(
+    (px: number, py: number) => {
+      const dx = px - viewportCenter.x;
+      const dy = py - viewportCenter.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      // 以视口对角线的一半作为最大距离参考
+      const maxDist = Math.sqrt(
+        viewportSize.width * viewportSize.width + viewportSize.height * viewportSize.height
+      ) / 2;
+      return Math.min(dist / maxDist, 1);
+    },
+    [viewportCenter.x, viewportCenter.y, viewportSize.width, viewportSize.height],
+  );
+
+  // 找出最近的两张卡片用于弓弦连线
+  const nearestPair = useMemo(() => {
+    if (layoutCards.length < 2) return null;
+    const sorted = [...layoutCards].sort(
+      (a, b) =>
+        getDistanceRatio(a.physicalX, a.physicalY) -
+        getDistanceRatio(b.physicalX, b.physicalY)
+    );
+    return { primary: sorted[0], secondary: sorted.slice(1, 3) };
+  }, [layoutCards, getDistanceRatio]);
+
+  const handleReaction = useCallback((cardId: string, emojiType: string) => {
+    // TODO: 调用 API 发送反应
+    console.log(`Reaction: ${emojiType} on card ${cardId}`);
+  }, []);
+
   return (
     <div
-      className="absolute inset-0 overflow-hidden bg-transparent z-10"
+      className="absolute inset-0 overflow-hidden bg-slate-950/20 dark:bg-slate-950/45 z-10"
       ref={containerRef}
     >
-      {/* Background stars / dust effect */}
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_18%_12%,rgba(255,255,255,0.34),transparent_38%),radial-gradient(circle_at_82%_10%,rgba(56,189,248,0.2),transparent_36%),radial-gradient(circle_at_50%_100%,rgba(59,130,246,0.16),transparent_46%)]" />
+      {/* 星尘背景 */}
       <div
         className="absolute inset-0 pointer-events-none opacity-30 dark:opacity-40"
         style={{
@@ -122,22 +231,22 @@ export const UniverseView: React.FC = () => {
       />
 
       {isLoading && cards.length === 0 && (
-         <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-            <div className="font-elysia-poem text-[1.5rem] leading-none text-white/70 animate-pulse">正在聆听星海回响...</div>
-         </div>
+        <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+          <div className="font-elysia-poem text-[1.5rem] leading-none text-white/70 animate-pulse">正在聆听星海回响...</div>
+        </div>
       )}
 
       {!isLoading && cards.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-          <div className="rounded-full border border-white/40 bg-white/40 px-5 py-2 text-sm text-slate-600 backdrop-blur-md dark:border-white/15 dark:bg-white/8 dark:text-slate-200/85">
+          <div className="rounded-full border border-white/50 bg-white/70 px-5 py-2 text-sm text-slate-700 backdrop-blur-md dark:border-white/20 dark:bg-black/35 dark:text-slate-100/90">
             还没有公开回响，先在 Elysia 写下一句吧。
           </div>
         </div>
       )}
 
       <div className="pointer-events-none absolute left-1/2 top-24 z-30 -translate-x-1/2">
-        <div className="rounded-full border border-white/45 bg-white/45 px-4 py-1.5 text-xs tracking-[0.14em] text-slate-500 backdrop-blur-md dark:border-white/12 dark:bg-black/18 dark:text-slate-300/70">
-          拖动画布漫游 · 焦点会在你附近亮起
+        <div className="rounded-full border border-white/55 bg-white/72 px-4 py-1.5 text-xs tracking-[0.14em] text-slate-600 backdrop-blur-md dark:border-white/18 dark:bg-black/35 dark:text-slate-200/80">
+          拖动画布漫游 · 靠近中心的回响会清晰浮现
         </div>
       </div>
 
@@ -149,63 +258,82 @@ export const UniverseView: React.FC = () => {
         style={{ x, y, width: canvasSize, height: canvasSize }}
         className="relative cursor-grab active:cursor-grabbing touch-none"
       >
-        {/* Origin Marker (for debugging/visual reference) */}
-        <div className="absolute top-1/2 left-1/2 w-4 h-4 bg-blue-500/20 rounded-full -translate-x-1/2 -translate-y-1/2 blur-sm" />
+        {/* 蝴蝶装饰 */}
+        <ButterflyDecor />
 
-        {cards.map((card, index) => {
-          // Convert virtual coordinate to physical canvas coordinate
-          // Virtual 0,0 is physical canvasSize/2, canvasSize/2
-          const physicalX = (canvasSize / 2) + card.coord.x;
-          const physicalY = (canvasSize / 2) + card.coord.y;
+        {/* 背景花瓣飘落 */}
+        {!reduceMotion && (
+          <div className="absolute inset-0 pointer-events-none z-[2] overflow-hidden">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <div
+                key={`petal-${i}`}
+                className="absolute animate-petal-float"
+                style={{
+                  left: `${10 + (i * 8.5) % 80}%`,
+                  top: "-20px",
+                  width: `${6 + (i % 3) * 2}px`,
+                  height: `${8 + (i % 4) * 2}px`,
+                  borderRadius: "50% 0 50% 50%",
+                  background: `linear-gradient(135deg, var(--elysia-butterfly), var(--elysia-crystal))`,
+                  opacity: 0.08 + (i % 4) * 0.02,
+                  animationDelay: `${i * -2.3}s`,
+                  animationDuration: `${18 + (i % 5) * 3}s`,
+                  transform: `rotate(${i * 36}deg)`,
+                }}
+              />
+            ))}
+          </div>
+        )}
 
-          let focusRank = -1;
-          if (focusedIds.length > 0) {
-            const idx = focusedIds.indexOf(card.id);
-            focusRank = idx;
-          } else {
-             // Fallback to closest center distance if no focus provided
-             focusRank = index < 3 ? index : -1;
-          }
+        {/* 弓弦连线：最近的卡片之间 */}
+        {nearestPair && nearestPair.secondary.length > 0 && (
+          <svg
+            className="absolute inset-0 pointer-events-none z-[3]"
+            width={canvasSize}
+            height={canvasSize}
+          >
+            {nearestPair.secondary.map((sec) => (
+              <BowstringLine
+                key={`bow-${sec.card.id}`}
+                id={sec.card.id}
+                x1={nearestPair.primary.physicalX}
+                y1={nearestPair.primary.physicalY}
+                x2={sec.physicalX}
+                y2={sec.physicalY}
+              />
+            ))}
+          </svg>
+        )}
 
-          // Format relative time simple string
+        {/* 内容卡片 */}
+        {layoutCards.map(({ card, physicalX, physicalY, showQuote }) => {
           const rtf = new Intl.RelativeTimeFormat('zh', { numeric: 'auto' });
-          const daysDifference = Math.round((new Date(card.createdAt).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-          const timeStr = rtf.format(daysDifference, 'day');
-
-          const content = card.quote ? `${card.moodPhrase}\n\n> ${card.quote}` : card.moodPhrase;
+          const daysDiff = Math.round(
+            (new Date(card.createdAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+          );
+          const timeStr = rtf.format(daysDiff, 'day');
+          const distanceRatio = getDistanceRatio(physicalX, physicalY);
 
           return (
             <UniverseCard
               key={card.id}
               x={physicalX}
               y={physicalY}
-              content={content}
+              title={card.moodPhrase}
+              quote={card.quote}
+              tags={card.tags || []}
+              showQuote={showQuote}
               time={timeStr}
               author={card.authorName || '无名星光'}
-              focusRank={focusRank}
+              distanceRatio={distanceRatio}
+              onReaction={(emojiType) => handleReaction(card.id, emojiType)}
             />
           );
         })}
       </motion.div>
 
-      {/* Simple draggable emoji for testing interaction */}
-      <div className="absolute bottom-8 right-8 z-50 flex gap-4">
-        {["💖", "✨", "🌸"].map((emoji, i) => (
-          <motion.div
-            key={i}
-            className="h-12 w-12 cursor-grab rounded-full border border-white/25 bg-white/12 text-2xl shadow-lg backdrop-blur-md flex items-center justify-center"
-            drag
-            dragSnapToOrigin
-            whileDrag={{ scale: 1.2, zIndex: 100 }}
-            onDragStart={() => {
-              // Create ghost data transfer if needed, but framer-motion handles coordinates
-              // We'll rely on hit detection in the card
-            }}
-          >
-            {emoji}
-          </motion.div>
-        ))}
-      </div>
+      {/* 表情拖拽面板 */}
+      <EmojiDock />
     </div>
   );
 };

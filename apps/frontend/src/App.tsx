@@ -81,6 +81,9 @@ function App() {
 
   const canOpenAdmin = authQuery.data?.user?.role === "admin";
   const activeView: AppView = !canOpenAdmin && currentView === "admin" ? "home" : currentView;
+  const isUniverseView = activeView === "universe";
+  const isMindMapView = activeView === "mindmap";
+  const showSceneNav = isUniverseView || isMindMapView;
 
   useEffect(() => {
     if (
@@ -200,6 +203,40 @@ function App() {
           </CrystalButton>
         </motion.div>
 
+        {showSceneNav && (
+          <motion.div
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
+            animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute left-6 top-6 z-[60] flex flex-wrap items-center gap-2 rounded-full border border-white/50 bg-white/58 p-1.5 shadow-lg backdrop-blur-xl dark:border-white/15 dark:bg-black/28"
+          >
+            <CrystalButton
+              variant="ghost"
+              size="sm"
+              onClick={() => setCurrentView("home")}
+              className="rounded-full px-4"
+            >
+              返回往世乐土
+            </CrystalButton>
+            <CrystalButton
+              variant={isUniverseView ? "primary" : "ghost"}
+              size="sm"
+              onClick={() => setCurrentView("universe")}
+              className="rounded-full px-4"
+            >
+              星海回响
+            </CrystalButton>
+            <CrystalButton
+              variant={isMindMapView ? "primary" : "ghost"}
+              size="sm"
+              onClick={() => setCurrentView("mindmap")}
+              className="rounded-full px-4"
+            >
+              记忆织网
+            </CrystalButton>
+          </motion.div>
+        )}
+
 
         <AnimatePresence mode="wait">
           {activeView === "home" && (
@@ -228,11 +265,6 @@ function App() {
               transition={{ duration: reduceMotion ? 0.28 : 0.5, ease: [0.22, 1, 0.36, 1] }}
               className="absolute inset-0 h-full w-full"
             >
-              <div className="absolute left-6 top-6 z-50">
-                <CrystalButton variant="ghost" onClick={() => setCurrentView("home")} className="rounded-full">
-                  返回 Elysia
-                </CrystalButton>
-              </div>
               <UniverseView />
             </motion.div>
           )}
@@ -245,11 +277,6 @@ function App() {
               transition={{ duration: reduceMotion ? 0.28 : 0.5, ease: [0.22, 1, 0.36, 1] }}
               className="absolute inset-0 h-full w-full"
             >
-              <div className="absolute left-6 top-6 z-50">
-                <CrystalButton variant="ghost" onClick={() => setCurrentView("home")} className="rounded-full">
-                  返回 Elysia
-                </CrystalButton>
-              </div>
               <MindMapView />
             </motion.div>
           )}

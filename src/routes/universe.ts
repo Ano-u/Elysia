@@ -63,8 +63,8 @@ export async function universeRoutes(app: FastifyInstance): Promise<void> {
             u.avatar_url,
             COALESCE(SUM(CASE WHEN re.reaction_type = 'heart' THEN 1 ELSE 0 END), 0)::text AS hearts,
             COALESCE(SUM(CASE WHEN re.reaction_type = 'hug' THEN 1 ELSE 0 END), 0)::text AS hugs,
-            ((ABS(hashtext(r.id::text)) % 200000)::double precision / 1000.0) - 100.0 AS vx,
-            ((ABS(hashtext(REVERSE(r.id::text))) % 200000)::double precision / 1000.0) - 100.0 AS vy,
+            ((ABS(hashtext(r.id::text || ':x')) % 180000)::double precision / 100.0) - 900.0 AS vx,
+            ((ABS(hashtext(r.id::text || ':y')) % 180000)::double precision / 100.0) - 900.0 AS vy,
             CASE
               WHEN $1::uuid IS NULL THEN 0
               WHEN EXISTS (

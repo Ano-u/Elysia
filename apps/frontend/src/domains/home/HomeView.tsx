@@ -170,33 +170,6 @@ function readInitialDraft(): DraftPayload {
   }
 }
 
-const TEST_DATA: RecordSummary[] = [
-  {
-    id: "test-1",
-    moodPhrase: "在这个春天的午后，我想起了一些往事。",
-    quote: "时间是唯一的解药，也是唯一的毒药。",
-    extraEmotions: ["想念", "平静"],
-    description: "这是第一条测试数据，设置为公开可见。\n点击右侧图标可以切换状态。",
-    visibilityIntent: "public",
-    publicationStatus: "published",
-    isPublic: true,
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000).toISOString(),
-  },
-  {
-    id: "test-2",
-    moodPhrase: "深夜的星空总是让人感到自己的渺小。",
-    quote: "我们都是星尘，最终也将回归星辰。",
-    extraEmotions: ["孤独", "希望"],
-    description: "这是第二条测试数据，设置为私密。仅在往世乐土中可见。\n更多描述内容示例。",
-    visibilityIntent: "private",
-    publicationStatus: "private",
-    isPublic: false,
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    updatedAt: new Date(Date.now() - 86400000).toISOString(),
-  }
-];
-
 export const HomeView: React.FC<HomeViewProps> = ({
   onNavigate,
   viewerUserId = null,
@@ -461,7 +434,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const loadingMessage = useRotatingCopy(FEED_LOADING_MESSAGES, 10000, isFeedLoading);
   const feedErrorMessage = isFeedError ? resolveCreateErrorMessage(feedError) : null;
 
-  const allItems = [...TEST_DATA, ...(feedData?.items ?? [])].sort(
+  const allItems = [...(feedData?.items ?? [])].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
