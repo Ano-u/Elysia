@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LiquidCard } from "./LiquidCard";
-import { ActionPairRow } from "./ActionPairRow";
-import { ChevronDown, ChevronUp, Tag as TagIcon, Quote } from "lucide-react";
+import { ChevronDown, ChevronUp, Quote } from "lucide-react";
 import { useRotatingCopy } from "../../lib/rotatingCopy";
+
+export const PREDEFINED_TAGS = ["温柔", "热烈", "想念", "孤独", "平静", "欢欣", "迷茫", "希望"];
 
 interface MainInputCardProps {
   moodPhrase: string;
@@ -12,19 +13,9 @@ interface MainInputCardProps {
   setQuote: (value: string) => void;
   description: string;
   setDescription: (value: string) => void;
-  extraEmotions: string[];
-  setExtraEmotions: (value: string[]) => void;
-  isPublic: boolean;
-  onPublicToggle: (isPublic: boolean) => void;
-  onSave: () => void;
-  onJumpUniverse: () => void;
   isPending?: boolean;
-  saveAnimationEvent?: { token: number; status: "success" | "error" } | null;
-  feedbackMessage?: string | null;
-  feedbackTone?: "error" | "success";
 }
 
-const PREDEFINED_TAGS = ["温柔", "热烈", "想念", "孤独", "平静", "欢欣", "迷茫", "希望"];
 const COMPANION_MESSAGES = [
   "爱莉希雅听得懂，这里很安静，正适合让心情轻轻开口。",
   "把这一刻轻轻放下吧，爱莉希雅会认真倾听呀♪",
@@ -65,16 +56,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
   setQuote,
   description,
   setDescription,
-  extraEmotions,
-  setExtraEmotions,
-  isPublic,
-  onPublicToggle,
-  onSave,
-  onJumpUniverse,
   isPending,
-  saveAnimationEvent,
-  feedbackMessage,
-  feedbackTone = "success",
 }) => {
   const editorAreaRef = useRef<HTMLDivElement>(null);
   const quoteInputRef = useRef<HTMLInputElement>(null);
@@ -148,223 +130,155 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
     return () => window.cancelAnimationFrame(frameId);
   }, [showDetails, isDescFocused]);
 
-  const toggleTag = (tag: string) => {
-    if (extraEmotions.includes(tag)) {
-      setExtraEmotions(extraEmotions.filter((t) => t !== tag));
-    } else if (extraEmotions.length < 8) {
-      setExtraEmotions([...extraEmotions, tag]);
-    }
-  };
-
   return (
-    <div className="w-full max-w-4xl mx-auto flex flex-col gap-10">
-      {/* Card: Mood + Quote + Details */}
-      <LiquidCard
-        ref={editorAreaRef}
-        className="bg-white/45 dark:bg-black/23 overflow-hidden p-10 transition-all duration-700 shadow-2xl"
-      >
-        <div className="flex flex-col gap-8">
-          {/* Main Input Section */}
-          <div className="relative">
-            <AnimatePresence mode="wait">
-              <motion.p
-                key={ambientMessage}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-                className="mb-6 max-w-3xl text-sm italic leading-relaxed text-slate-500/60 dark:text-slate-300/80"
-              >
-                {ambientMessage}
-              </motion.p>
-            </AnimatePresence>
-
-            <textarea
-              autoFocus={hasValue}
-              maxLength={200}
-              className={`font-elysia-display w-full resize-none border-none bg-transparent p-0 outline-none placeholder:text-slate-400/40 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-300/20 transition-all duration-700 ease-in-out ${
-                isLanding ? "text-[2.2rem] min-h-[120px]" : isCompact ? "text-2xl min-h-[40px] font-bold" : "text-[2.4rem] min-h-[140px]"
-              }`}
-              placeholder="把这一刻轻轻放下吧，爱莉希雅会认真倾听呀♪"
-              value={moodPhrase}
-              onChange={(e) => setMoodPhrase(e.target.value)}
-              onFocus={() => setIsFocused(true)}
-              onBlur={(e) => {
-                if (!isTargetInsideEditor(e.relatedTarget)) {
-                  setIsFocused(false);
-                }
-              }}
-              disabled={isPending}
-            />
-          </div>
-
-          {/* Quote & Details Transformation */}
-          <AnimatePresence>
-            {hasValue && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="flex flex-col gap-8 overflow-hidden"
-              >
-                {/* Row 1: Quote */}
-                <div className="flex flex-col gap-3">
-                  <AnimatePresence>
-                    {showQuoteInput ? (
-                      <motion.div
-                        key="quote-input"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="flex flex-col gap-2"
-                      >
-                        <span className="text-[10px] tracking-widest text-slate-400 uppercase font-bold flex items-center gap-1">
-                          <Quote
-                            className="w-3 h-3"
-                            style={{ transform: 'scale(-1, -1)' }}
-                          /> 今日誓言
-                        </span>
-                        <input
-                          ref={quoteInputRef}
-                          type="text"
-                          maxLength={200}
-                          value={quote}
-                          onChange={(e) => setQuote(e.target.value)}
-                          onFocus={() => setIsQuoteFocused(true)}
-                          onBlur={(e) => {
-                            if (!isTargetInsideEditor(e.relatedTarget)) {
-                              setIsQuoteFocused(false);
-                            }
-                          }}
-                          placeholder="今天想把哪一句，留成只属于你的誓言呢？♪"
-                          className="w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-3 text-base italic text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 transition-all shadow-inner"
-                        />
-                      </motion.div>
-                    ) : hasQuote ? (
-                      <motion.div
-                        key="quote-display"
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        onClick={activateQuoteEditor}
-                        className="relative pl-6 py-1 cursor-pointer group"
-                      >
-                        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-pink-300/60 rounded-full group-hover:bg-pink-400 transition-colors" />
-                        <p className="italic text-slate-600 dark:text-slate-300 text-base leading-relaxed">
-                          {quote}
-                        </p>
-                      </motion.div>
-                    ) : null}
-                  </AnimatePresence>
-                </div>
-
-                {/* Row 2: Details (Unfold with bullet transformation) */}
-                <div className="flex flex-col gap-4">
-                  <button
-                    onClick={() => {
-                      if (showDetails) {
-                        setShowDetails(false);
-                        setIsDescFocused(false);
-                        return;
-                      }
-                      activateDescriptionEditor();
-                    }}
-                    className="flex items-center gap-2 text-[10px] tracking-widest text-slate-400 uppercase font-bold hover:text-pink-400 transition-colors w-fit"
-                  >
-                    {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                    再多告诉爱莉一点吧
-                  </button>
-
-                  <AnimatePresence>
-                    {showDetails && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-                        className="overflow-hidden"
-                      >
-                        <textarea
-                          ref={descriptionTextareaRef}
-                          value={description}
-                          maxLength={1000}
-                          onChange={(e) => setDescription(e.target.value)}
-                          onFocus={() => setIsDescFocused(true)}
-                          onBlur={(e) => {
-                            if (!isTargetInsideEditor(e.relatedTarget)) {
-                              setIsDescFocused(false);
-                            }
-                          }}
-                          onClick={activateDescriptionEditor}
-                          placeholder="补一两句细节吧，好让未来的你认出今天的心跳♪"
-                          className={`w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-4 text-sm text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 resize-none shadow-inner transition-[min-height] duration-300 ${
-                            isDescFocused ? "min-h-[140px]" : "min-h-[82px]"
-                          }`}
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </motion.div>
-            )}
+    <LiquidCard
+      ref={editorAreaRef}
+      className="w-full max-w-4xl mx-auto bg-white/45 dark:bg-black/23 overflow-hidden p-10 transition-all duration-700 shadow-2xl"
+    >
+      <div className="flex flex-col gap-8">
+        {/* Main Input Section */}
+        <div className="relative">
+          <AnimatePresence mode="wait">
+            <motion.p
+              key={ambientMessage}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+              className="mb-6 max-w-3xl text-sm italic leading-relaxed text-slate-500/60 dark:text-slate-300/80"
+            >
+              {ambientMessage}
+            </motion.p>
           </AnimatePresence>
-        </div>
-      </LiquidCard>
 
-      {/* Outside: Emotions & Buttons (Always visible) */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-8 px-6">
-        <div className={`flex flex-wrap gap-2.5 flex-1 transition-all duration-500 ${hasValue ? "opacity-100 translate-y-0" : "opacity-40 grayscale pointer-events-none"}`}>
-          <div className="flex items-center gap-2 mr-3">
-            <TagIcon className="w-4 h-4 text-slate-400" />
-            <span className="text-[10px] tracking-widest text-slate-500 dark:text-slate-400 uppercase font-black">情绪</span>
-          </div>
-          {PREDEFINED_TAGS.map((tag) => {
-            const active = extraEmotions.includes(tag);
-            return (
-              <button
-                key={tag}
-                onClick={() => toggleTag(tag)}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold border-2 transition-all ${
-                  active
-                    ? "bg-pink-100 dark:bg-pink-900/40 border-pink-200 dark:border-pink-800 text-pink-600 dark:text-pink-300 shadow-glow"
-                    : "bg-white/20 dark:bg-black/20 border-white/60 dark:border-white/10 text-slate-500 hover:border-pink-200"
-                }`}
-              >
-                {tag}
-              </button>
-            );
-          })}
-        </div>
-
-        <ActionPairRow
-          type="save-universe"
-          leftLabel="留下痕迹"
-          rightLabel="星海回响"
-          onLeftClick={onSave}
-          onRightClick={onJumpUniverse}
-          isRightActive={isPublic}
-          leftActionEvent={saveAnimationEvent}
-          rightActiveLabel={isPublic ? "星海已连接" : "私密存储中"}
-          isSwitched={isPublic}
-          onSwitchToggle={onPublicToggle}
-          isPending={isPending}
-        />
-      </div>
-
-      <AnimatePresence>
-        {feedbackMessage ? (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className={`mx-6 rounded-[1.4rem] border px-4 py-3 text-sm leading-relaxed ${
-              feedbackTone === "error"
-                ? "border-amber-200/70 bg-amber-50/75 text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-200"
-                : "border-emerald-200/70 bg-emerald-50/70 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-900/20 dark:text-emerald-200"
+          <textarea
+            autoFocus={hasValue}
+            maxLength={200}
+            className={`font-elysia-display w-full resize-none border-none bg-transparent p-0 outline-none placeholder:text-slate-400/40 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-300/20 transition-all duration-700 ease-in-out ${
+              isLanding ? "text-[2.2rem] min-h-[120px]" : isCompact ? "text-2xl min-h-[40px] font-bold" : "text-[2.4rem] min-h-[140px]"
             }`}
-          >
-            {feedbackMessage}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-    </div>
+            placeholder="把这一刻轻轻放下吧，爱莉希雅会认真倾听呀♪"
+            value={moodPhrase}
+            onChange={(e) => setMoodPhrase(e.target.value)}
+            onFocus={() => setIsFocused(true)}
+            onBlur={(e) => {
+              if (!isTargetInsideEditor(e.relatedTarget)) {
+                setIsFocused(false);
+              }
+            }}
+            disabled={isPending}
+          />
+        </div>
+
+        {/* Quote & Details Transformation */}
+        <AnimatePresence>
+          {hasValue && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="flex flex-col gap-8 overflow-hidden"
+            >
+              {/* Row 1: Quote */}
+              <div className="flex flex-col gap-3">
+                <AnimatePresence>
+                  {showQuoteInput ? (
+                    <motion.div
+                      key="quote-input"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="flex flex-col gap-2"
+                    >
+                      <span className="text-[10px] tracking-widest text-slate-400 uppercase font-bold flex items-center gap-1">
+                        <Quote
+                          className="w-3 h-3"
+                          style={{ transform: 'scale(-1, -1)' }}
+                        /> 今日誓言
+                      </span>
+                      <input
+                        ref={quoteInputRef}
+                        type="text"
+                        maxLength={200}
+                        value={quote}
+                        onChange={(e) => setQuote(e.target.value)}
+                        onFocus={() => setIsQuoteFocused(true)}
+                        onBlur={(e) => {
+                          if (!isTargetInsideEditor(e.relatedTarget)) {
+                            setIsQuoteFocused(false);
+                          }
+                        }}
+                        placeholder="今天想把哪一句，留成只属于你的誓言呢？♪"
+                        className="w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-3 text-base italic text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 transition-all shadow-inner"
+                      />
+                    </motion.div>
+                  ) : hasQuote ? (
+                    <motion.div
+                      key="quote-display"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      onClick={activateQuoteEditor}
+                      className="relative pl-6 py-1 cursor-pointer group"
+                    >
+                      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-pink-300/60 rounded-full group-hover:bg-pink-400 transition-colors" />
+                      <p className="italic text-slate-600 dark:text-slate-300 text-base leading-relaxed">
+                        {quote}
+                      </p>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
+              </div>
+
+              {/* Row 2: Details (Unfold with bullet transformation) */}
+              <div className="flex flex-col gap-4">
+                <button
+                  onClick={() => {
+                    if (showDetails) {
+                      setShowDetails(false);
+                      setIsDescFocused(false);
+                      return;
+                    }
+                    activateDescriptionEditor();
+                  }}
+                  className="flex items-center gap-2 text-[10px] tracking-widest text-slate-400 uppercase font-bold hover:text-pink-400 transition-colors w-fit"
+                >
+                  {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  再多告诉爱莉一点吧
+                </button>
+
+                <AnimatePresence>
+                  {showDetails && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                      className="overflow-hidden"
+                    >
+                      <textarea
+                        ref={descriptionTextareaRef}
+                        value={description}
+                        maxLength={1000}
+                        onChange={(e) => setDescription(e.target.value)}
+                        onFocus={() => setIsDescFocused(true)}
+                        onBlur={(e) => {
+                          if (!isTargetInsideEditor(e.relatedTarget)) {
+                            setIsDescFocused(false);
+                          }
+                        }}
+                        onClick={activateDescriptionEditor}
+                        placeholder="补一两句细节吧，好让未来的你认出今天的心跳♪"
+                        className={`w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-4 text-sm text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 resize-none shadow-inner transition-[min-height] duration-300 ${
+                          isDescFocused ? "min-h-[140px]" : "min-h-[82px]"
+                        }`}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </LiquidCard>
   );
 };

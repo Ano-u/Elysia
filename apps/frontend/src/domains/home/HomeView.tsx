@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LiquidCard } from "../../components/ui/LiquidCard";
-import { MainInputCard } from "../../components/ui/MainInputCard";
+import { MainInputCard, PREDEFINED_TAGS } from "../../components/ui/MainInputCard";
 import { ActionPairRow } from "../../components/ui/ActionPairRow";
 import { HomeGuideOverlay, type HomeGuideStepContent } from "../../components/ui/HomeGuideOverlay";
 import {
@@ -13,7 +13,7 @@ import {
   updateRecordVisibility,
 } from "../../lib/apiClient";
 import type { RecordSummary, VisibilityIntent, CreateRecordRequest } from "../../types/api";
-import { Clock, PenLine, Loader, Check, X, Lock, Compass, Eye, AlertTriangle } from "lucide-react";
+import { Clock, PenLine, Loader, Check, X, Lock, Compass, Eye, AlertTriangle, Tag as TagIcon } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { pickRandomCopy, useRotatingCopy } from "../../lib/rotatingCopy";
 import { getCreateSuccessMessage, getPublicationStatusMeta, type PublicationTone } from "../../lib/publicationCopy";
@@ -302,6 +302,16 @@ export const HomeView: React.FC<HomeViewProps> = ({
     },
   });
 
+  const handleEmotionToggle = (tag: string) => {
+    const next = draft.extraEmotions.includes(tag)
+      ? draft.extraEmotions.filter((t) => t !== tag)
+      : draft.extraEmotions.length < 8
+        ? [...draft.extraEmotions, tag]
+        : draft.extraEmotions;
+    setDraft({ ...draft, extraEmotions: next });
+    setFeedbackMessage(null);
+  };
+
   const handleSave = () => {
     const moodPhrase = draft.moodPhrase.trim();
     const moodCheck = validateMoodPhraseLength(moodPhrase);
@@ -447,6 +457,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   const mindMapProgress = onboardingData ? onboardingData.progress.completed_days.length : 0;
   const isMindMapActive = mindMapProgress >= 7;
+  const hasComposerValue = draft.moodPhrase.trim().length > 0;
   const loadingMessage = useRotatingCopy(FEED_LOADING_MESSAGES, 10000, isFeedLoading);
   const feedErrorMessage = isFeedError ? resolveCreateErrorMessage(feedError) : null;
 
@@ -486,7 +497,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
       <div className="relative z-10 flex flex-col items-center max-w-6xl mx-auto px-4 pt-16 pb-32 gap-16">
         {/* Section 1: Landing Header & Input */}
-        <section className="w-full flex flex-col items-center gap-16">
+        <section className="w-full flex flex-col items-center gap-16 max-w-4xl">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -500,7 +511,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </p>
           </motion.div>
 
-          <div ref={composerGuideRef} className={`${guideTargetClass(0)} rounded-[2.25rem]`}>
+          <div ref={composerGuideRef} className={`${guideTargetClass(0)} rounded-[2.25rem] w-full flex flex-col gap-10`}>
             <MainInputCard
               moodPhrase={draft.moodPhrase}
               setMoodPhrase={(v) => {
@@ -517,23 +528,93 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 setDraft({ ...draft, description: v });
                 setFeedbackMessage(null);
               }}
-              extraEmotions={draft.extraEmotions}
-              setExtraEmotions={(v) => {
-                setDraft({ ...draft, extraEmotions: v });
-                setFeedbackMessage(null);
-              }}
-              isPublic={draft.visibilityIntent === "public"}
-              onPublicToggle={(isP) => {
-                setDraft({ ...draft, visibilityIntent: isP ? "public" : "private" });
-                setFeedbackMessage(null);
-              }}
-              onSave={handleSave}
-              onJumpUniverse={() => onNavigate("universe")}
               isPending={createMutation.isPending}
-              saveAnimationEvent={saveAnimationEvent}
-              feedbackMessage={feedbackMessage}
-              feedbackTone={feedbackTone}
             />
+
+            {/* Emotions & Actions */}
+            <div className="flex flex-col gap-8 px-6">
+              {/* Desktop: emotions + save-universe in one row */}
+              <div className="hidden lg:flex items-center justify-between gap-8">
+                {hasComposerValue ? (
+                  <EmotionSelector
+                    extraEmotions={draft.extraEmotions}
+                    onToggle={handleEmotionToggle}
+                  />
+                ) : <div />}
+                <ActionPairRow
+                  type="save-universe"
+                  leftLabel="留下痕迹"
+                  rightLabel="星海回响"
+                  onLeftClick={handleSave}
+                  onRightClick={() => onNavigate("universe")}
+                  isRightActive={draft.visibilityIntent === "public"}
+                  leftActionEvent={saveAnimationEvent}
+                  rightActiveLabel={draft.visibilityIntent === "public" ? "星海已连接" : "私密存储中"}
+                  isSwitched={draft.visibilityIntent === "public"}
+                  onSwitchToggle={(isP) => {
+                    setDraft({ ...draft, visibilityIntent: isP ? "public" : "private" });
+                    setFeedbackMessage(null);
+                  }}
+                  isPending={createMutation.isPending}
+                />
+              </div>
+
+              {/* Mobile: emotions above, both action pairs in one row below */}
+              <div className="flex flex-col gap-6 lg:hidden">
+                {hasComposerValue && (
+                  <EmotionSelector
+                    extraEmotions={draft.extraEmotions}
+                    onToggle={handleEmotionToggle}
+                  />
+                )}
+                <div className="flex items-start justify-center gap-4">
+                  <ActionPairRow
+                    type="timeline-mindmap"
+                    leftLabel="视图切换"
+                    rightLabel="记忆织网"
+                    onLeftClick={() => setShowOnlyPublic(!showOnlyPublic)}
+                    onRightClick={() => onNavigate("mindmap")}
+                    isRightActive={isMindMapActive}
+                    rightActiveLabel={isMindMapActive ? "织网已就绪" : `激活进度 ${mindMapProgress}/7`}
+                    progress={mindMapProgress}
+                  />
+                  <ActionPairRow
+                    type="save-universe"
+                    leftLabel="留下痕迹"
+                    rightLabel="星海回响"
+                    onLeftClick={handleSave}
+                    onRightClick={() => onNavigate("universe")}
+                    isRightActive={draft.visibilityIntent === "public"}
+                    leftActionEvent={saveAnimationEvent}
+                    rightActiveLabel={draft.visibilityIntent === "public" ? "星海已连接" : "私密存储中"}
+                    isSwitched={draft.visibilityIntent === "public"}
+                    onSwitchToggle={(isP) => {
+                      setDraft({ ...draft, visibilityIntent: isP ? "public" : "private" });
+                      setFeedbackMessage(null);
+                    }}
+                    isPending={createMutation.isPending}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Feedback message */}
+            <AnimatePresence>
+              {feedbackMessage ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className={`mx-6 rounded-[1.4rem] border px-4 py-3 text-sm leading-relaxed ${
+                    feedbackTone === "error"
+                      ? "border-amber-200/70 bg-amber-50/75 text-amber-700 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-200"
+                      : "border-emerald-200/70 bg-emerald-50/70 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-900/20 dark:text-emerald-200"
+                  }`}
+                >
+                  {feedbackMessage}
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
           </div>
         </section>
 
@@ -545,16 +626,18 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <div ref={timelineSwitchGuideRef} className={`${guideTargetClass(1)} rounded-[1.35rem] flex items-center justify-between px-6`}>
             <h2 className="font-elysia-title elysia-dream-title text-[2.9rem] sm:text-[3.4rem] tracking-tight">往世乐土</h2>
 
-            <ActionPairRow
-              type="timeline-mindmap"
-              leftLabel="视图切换"
-              rightLabel="记忆织网"
-              onLeftClick={() => setShowOnlyPublic(!showOnlyPublic)}
-              onRightClick={() => onNavigate("mindmap")}
-              isRightActive={isMindMapActive}
-              rightActiveLabel={isMindMapActive ? "织网已就绪" : `激活进度 ${mindMapProgress}/7`}
-              progress={mindMapProgress}
-            />
+            <div className="hidden lg:block">
+              <ActionPairRow
+                type="timeline-mindmap"
+                leftLabel="视图切换"
+                rightLabel="记忆织网"
+                onLeftClick={() => setShowOnlyPublic(!showOnlyPublic)}
+                onRightClick={() => onNavigate("mindmap")}
+                isRightActive={isMindMapActive}
+                rightActiveLabel={isMindMapActive ? "织网已就绪" : `激活进度 ${mindMapProgress}/7`}
+                progress={mindMapProgress}
+              />
+            </div>
           </div>
 
           <div ref={timelineListGuideRef} className={`${guideTargetClass(2)} rounded-[1.75rem] grid grid-cols-1 gap-10 px-6`}>
@@ -844,7 +927,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
               {emotionTags.length > 0 && (
                 <div className="flex flex-wrap gap-2 justify-end pt-1 shrink-0 max-w-[200px]">
                   {emotionTags.map(e => (
-                    <span key={e} className="px-3 py-1 rounded-full bg-pink-100/40 dark:bg-pink-900/10 border-2 border-pink-200/30 dark:border-pink-800/20 text-[10px] font-bold text-pink-600 dark:text-pink-300 shadow-sm">
+                    <span key={e} className="px-3 py-1 rounded-full bg-pink-100/40 dark:bg-pink-900/10 border-2 border-pink-200/30 dark:border-pink-800/20 text-[10px] text-pink-600 dark:text-pink-300">
                       {e}
                     </span>
                   ))}
@@ -883,3 +966,31 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
     </div>
   );
 };
+
+const EmotionSelector: React.FC<{
+  extraEmotions: string[];
+  onToggle: (tag: string) => void;
+}> = ({ extraEmotions, onToggle }) => (
+  <div className="flex flex-wrap gap-2.5 flex-1">
+    <div className="flex items-center gap-2 mr-3">
+      <TagIcon className="w-4 h-4 text-slate-400" />
+      <span className="text-[10px] tracking-widest text-slate-500 dark:text-slate-400 uppercase font-black">情绪</span>
+    </div>
+    {PREDEFINED_TAGS.map((tag) => {
+      const active = extraEmotions.includes(tag);
+      return (
+        <button
+          key={tag}
+          onClick={() => onToggle(tag)}
+          className={`px-3 py-1 rounded-full text-[10px] border-2 transition-all ${
+            active
+              ? "bg-pink-100/40 dark:bg-pink-900/10 border-pink-200/30 dark:border-pink-800/20 text-pink-600 dark:text-pink-300 shadow-glow"
+              : "bg-white/20 dark:bg-black/20 border-white/30 dark:border-white/10 text-slate-500 hover:border-pink-200"
+          }`}
+        >
+          {tag}
+        </button>
+      );
+    })}
+  </div>
+);

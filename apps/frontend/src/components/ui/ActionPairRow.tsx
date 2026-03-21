@@ -78,7 +78,7 @@ export const ActionPairRow: React.FC<ActionPairRowProps> = ({
     return () => clearTimeout(timer);
   }, [isSaveUniverse, leftActionEvent?.token, leftActionEvent?.status]);
 
-  const showLabelOnHover = isSaveUniverse && isDesktopHoverMode;
+  const showLabelOnHover = isDesktopHoverMode;
 
   const handleIconMouseEnter = (side: "left" | "right") => {
     if (!showLabelOnHover || clickedIconLock === side) return;
@@ -152,7 +152,7 @@ export const ActionPairRow: React.FC<ActionPairRowProps> = ({
   return (
     <div className="flex flex-col items-center gap-3 w-fit group">
       {/* Labels Row */}
-      {!isSaveUniverse && (
+      {!isDesktopHoverMode && (
         <div className="flex justify-between w-full px-2">
           <span className="text-[10px] tracking-widest text-slate-500 dark:text-slate-400 uppercase font-bold drop-shadow-sm">
             {leftLabel}
@@ -239,7 +239,7 @@ export const ActionPairRow: React.FC<ActionPairRowProps> = ({
             {/* Glowing pulse moving across the link */}
             <motion.div
               animate={{ x: ["-100%", "300%"] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+              transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
               className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/50 to-transparent blur-[2px] z-10 pointer-events-none"
             />
           </div>
@@ -248,7 +248,7 @@ export const ActionPairRow: React.FC<ActionPairRowProps> = ({
           <motion.div
             className={`absolute w-6 h-6 bg-white shadow-md rounded-full border border-pink-100 flex items-center justify-center z-20 pointer-events-none ${isToggleMode ? "group-hover/track:scale-110" : ""} transition-transform`}
             animate={{
-               left: `calc(${fillPercentage}% - 12px)`, // Center the thumb on the edge
+               left: `calc(${fillPercentage}% - 6px - (${fillPercentage} / 100 * 12px))`, // Center the thumb on the edge
             }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
           >
