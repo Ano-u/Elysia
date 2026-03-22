@@ -451,7 +451,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     isGuideSpotlight && guideStep === index ? "relative z-[122]" : "relative z-10";
 
   return (
-    <div className="relative h-full w-full overflow-y-auto hide-scrollbar bg-[#f8fbff] dark:bg-[#0d1422] transition-all duration-700">
+    <div className="relative h-full w-full overflow-y-auto overflow-x-hidden hide-scrollbar bg-[#f8fbff] dark:bg-[#0d1422] transition-all duration-700">
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         <motion.div
           animate={{ scale: [1, 1.05, 1], x: [0, -10, 0], y: [0, 5, 0] }}
@@ -507,7 +507,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             {/* Emotions & Actions */}
             <div className="flex flex-col gap-8 px-6">
               {/* Desktop: emotions + save-universe in one row */}
-              <div className="hidden lg:flex items-center justify-between gap-8">
+              <div className="hidden lg:flex items-center justify-between gap-8 transition-all duration-700">
                 {hasComposerValue ? (
                   <EmotionSelector
                     extraEmotions={draft.extraEmotions}
@@ -540,7 +540,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     onToggle={handleEmotionToggle}
                   />
                 )}
-                <div className="flex items-start justify-center gap-4">
+                <div className="flex items-start justify-center gap-2 sm:gap-4 -ml-2 -mr-2 sm:mx-0 origin-top scale-[0.78] min-[390px]:scale-[0.92] sm:scale-100">
                   <ActionPairRow
                     type="timeline-mindmap"
                     leftLabel="视图切换"
@@ -889,7 +889,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
                     onClick={openEditMode}
                     disabled={actionBusy}
                     title="修改"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 shrink-0 p-1 rounded-full text-violet-400 hover:text-violet-600 dark:text-violet-300 dark:hover:text-violet-100"
+                    className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-200 shrink-0 p-1 rounded-full text-violet-400 hover:text-violet-600 dark:text-violet-300 dark:hover:text-violet-100"
                   >
                     <PenLine className="w-4 h-4" />
                   </button>
@@ -944,7 +944,7 @@ const EmotionSelector: React.FC<{
   extraEmotions: string[];
   onToggle: (tag: string) => void;
 }> = ({ extraEmotions, onToggle }) => (
-  <div className="flex flex-wrap gap-2.5 flex-1">
+  <div className="flex flex-wrap gap-2.5 flex-1 mb-6">
     <div className="flex items-center gap-2 mr-3">
       <TagIcon className="w-4 h-4 text-slate-400" />
       <span className="text-[10px] tracking-widest text-slate-500 dark:text-slate-400 uppercase font-black">情绪</span>

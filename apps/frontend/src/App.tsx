@@ -300,11 +300,21 @@ function App() {
         </AnimatePresence>
 
         {canOpenAdmin && activeView === "home" && (
-          <div className="absolute bottom-6 right-6 z-50">
+          <motion.div
+            initial={false}
+            animate={{
+              opacity: showTopControls ? 1 : 0,
+              y: showTopControls ? 0 : -12,
+            }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            onMouseEnter={() => setIsTopControlsHovered(true)}
+            onMouseLeave={() => setIsTopControlsHovered(false)}
+            className={`absolute left-6 top-6 z-50 flex gap-3 ${showTopControls ? "pointer-events-auto" : "pointer-events-none"}`}
+          >
             <CrystalButton variant="ghost" size="icon" onClick={() => setCurrentView("admin")} className="rounded-full">
               <Shield className="h-5 w-5" />
             </CrystalButton>
-          </div>
+          </motion.div>
         )}
 
         <AccessApplicationModal />

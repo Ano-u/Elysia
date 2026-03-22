@@ -163,7 +163,7 @@ export const ActionPairRow: React.FC<ActionPairRowProps> = ({
         </div>
       )}
 
-      <div className="relative flex items-center gap-2 p-2 bg-white/40 dark:bg-black/20 rounded-[2rem] border border-white/60 dark:border-white/10 backdrop-blur-2xl shadow-xl transition-all duration-500 hover:shadow-2xl hover:bg-white/50">
+      <div className="relative flex items-center gap-1 p-2 bg-white/40 dark:bg-black/20 rounded-[2rem] border border-white/60 dark:border-white/10 backdrop-blur-2xl shadow-xl transition-all duration-500 hover:shadow-2xl hover:bg-white/50">
 
         {/* Left Button */}
         <div className="relative z-10">

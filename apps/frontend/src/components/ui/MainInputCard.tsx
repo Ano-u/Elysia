@@ -154,12 +154,17 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
           <textarea
             autoFocus={hasValue}
             maxLength={200}
-            className={`font-elysia-display w-full resize-none border-none bg-transparent p-0 outline-none placeholder:text-slate-400/40 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-300/20 transition-all duration-700 ease-in-out ${
-              isLanding ? "text-[2.2rem] min-h-[120px]" : isCompact ? "text-2xl min-h-[40px] font-bold" : "text-[2.4rem] min-h-[140px]"
+            rows={1}
+            className={`font-elysia-display w-full resize-none border-none bg-transparent p-0 outline-none placeholder:text-slate-400/40 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-300/20 transition-all duration-700 ease-in-out overflow-hidden ${
+              isLanding ? "text-2xl sm:text-[2.2rem] min-h-[64px] sm:min-h-[120px]" : isCompact ? "text-xl sm:text-2xl min-h-[32px] sm:min-h-[40px] font-bold" : "text-[1.35rem] sm:text-[2.4rem] min-h-[64px] sm:min-h-[140px]"
             }`}
             placeholder="嗨，今天有什么绚丽的想法，想要告诉我吗？♪"
             value={moodPhrase}
-            onChange={(e) => setMoodPhrase(e.target.value)}
+            onChange={(e) => {
+              setMoodPhrase(e.target.value);
+              e.target.style.height = "auto";
+              e.target.style.height = `${e.target.scrollHeight}px`;
+            }}
             onFocus={() => setIsFocused(true)}
             onBlur={(e) => {
               if (!isTargetInsideEditor(e.relatedTarget)) {
@@ -230,20 +235,27 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
 
               {/* Row 2: Details (Unfold with bullet transformation) */}
               <div className="flex flex-col gap-4">
-                <button
-                  onClick={() => {
-                    if (showDetails) {
-                      setShowDetails(false);
-                      setIsDescFocused(false);
-                      return;
-                    }
-                    activateDescriptionEditor();
-                  }}
-                  className="flex items-center gap-2 text-[10px] tracking-widest text-slate-400 uppercase font-bold hover:text-pink-400 transition-colors w-fit"
-                >
-                  {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                  再多告诉爱莉一点吧
-                </button>
+                <AnimatePresence>
+                  {!isCompact && (
+                    <motion.button
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      onClick={() => {
+                        if (showDetails) {
+                          setShowDetails(false);
+                          setIsDescFocused(false);
+                          return;
+                        }
+                        activateDescriptionEditor();
+                      }}
+                      className="flex items-center gap-2 text-[10px] tracking-widest text-slate-400 uppercase font-bold hover:text-pink-400 transition-colors w-fit overflow-hidden"
+                    >
+                      {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      再多告诉爱莉一点吧
+                    </motion.button>
+                  )}
+                </AnimatePresence>
 
                 <AnimatePresence>
                   {showDetails && (
