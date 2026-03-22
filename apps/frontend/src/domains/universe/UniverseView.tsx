@@ -2,11 +2,11 @@ import React, { useRef, useState, useEffect, useMemo, useCallback } from "react"
 import { motion, useMotionValue } from "framer-motion";
 import { UniverseCard } from "./UniverseCard";
 import { ButterflyDecor } from "./ButterflyDecor";
-import { BowstringLine } from "./BowstringLine";
 import { EmojiDock } from "./EmojiDock";
 import { useUiStore } from "../../store/uiStore";
 import { useQuery } from "@tanstack/react-query";
 import { getUniverseViewport } from "../../lib/apiClient";
+import { StarSeaCanvas } from "./StarSeaCanvas";
 
 /**
  * 简单碰撞推开：遍历所有卡片，如果两张卡片中心距离 < minDist，就互相推开。
@@ -198,15 +198,19 @@ export const UniverseView: React.FC = () => {
     [viewportCenter.x, viewportCenter.y, viewportSize.width, viewportSize.height],
   );
 
-  // 找出最近的两张卡片用于弓弦连线
-  const nearestPair = useMemo(() => {
-    if (layoutCards.length < 2) return null;
-    const sorted = [...layoutCards].sort(
-      (a, b) =>
-        getDistanceRatio(a.physicalX, a.physicalY) -
-        getDistanceRatio(b.physicalX, b.physicalY)
-    );
-    return { primary: sorted[0], secondary: sorted.slice(1, 3) };
+  // 找出当前最靠近中心的活跃卡片
+  const activeIndex = useMemo(() => {
+    if (layoutCards.length === 0) return -1;
+    let minIdx = 0;
+    let minD = getDistanceRatio(layoutCards[0].physicalX, layoutCards[0].physicalY);
+    for (let i = 1; i < layoutCards.length; i++) {
+      const d = getDistanceRatio(layoutCards[i].physicalX, layoutCards[i].physicalY);
+      if (d < minD) {
+        minD = d;
+        minIdx = i;
+      }
+    }
+    return minIdx;
   }, [layoutCards, getDistanceRatio]);
 
   const handleReaction = useCallback((cardId: string, emojiType: string) => {
@@ -216,10 +220,14 @@ export const UniverseView: React.FC = () => {
 
   return (
     <div
-      className="absolute inset-0 overflow-hidden bg-slate-950/20 dark:bg-slate-950/45 z-10"
+      className="absolute inset-0 overflow-hidden bg-[var(--universe-void-purple)] dark:bg-[var(--universe-deep-space)] z-10 transition-colors duration-1000"
       ref={containerRef}
     >
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_18%_12%,rgba(255,255,255,0.34),transparent_38%),radial-gradient(circle_at_82%_10%,rgba(56,189,248,0.2),transparent_36%),radial-gradient(circle_at_50%_100%,rgba(59,130,246,0.16),transparent_46%)]" />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_18%_12%,rgba(147,112,219,0.34),transparent_38%),radial-gradient(circle_at_82%_10%,rgba(255,182,193,0.25),transparent_36%),radial-gradient(circle_at_50%_100%,rgba(168,216,234,0.2),transparent_46%)] animate-nebula mix-blend-screen" />
+      
+      {/* 晶体飞鳐与粒子层 */}
+      <StarSeaCanvas />
+
       {/* 星尘背景 */}
       <div
         className="absolute inset-0 pointer-events-none opacity-30 dark:opacity-40"
@@ -232,21 +240,21 @@ export const UniverseView: React.FC = () => {
 
       {isLoading && cards.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-          <div className="font-elysia-poem text-[1.5rem] leading-none text-white/70 animate-pulse">正在聆听星海回响...</div>
+          <div className="font-elysia-poem text-[1.5rem] leading-none text-white/70 animate-pulse">正在聆听星海的回响呢...♪</div>
         </div>
       )}
 
       {!isLoading && cards.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-          <div className="rounded-full border border-white/50 bg-white/70 px-5 py-2 text-sm text-slate-700 backdrop-blur-md dark:border-white/20 dark:bg-black/35 dark:text-slate-100/90">
-            还没有公开回响，先在 Elysia 写下一句吧。
+          <div className="rounded-full border border-white/50 bg-white/20 px-5 py-2 text-sm text-slate-100 backdrop-blur-md shadow-[0_0_15px_rgba(255,182,193,0.3)] dark:border-white/20 dark:bg-black/35 dark:text-slate-100/90">
+            星海里还很安静呀，要不要成为第一个留下奇迹的人呢？♪
           </div>
         </div>
       )}
 
       <div className="pointer-events-none absolute left-1/2 top-24 z-30 -translate-x-1/2">
-        <div className="rounded-full border border-white/55 bg-white/72 px-4 py-1.5 text-xs tracking-[0.14em] text-slate-600 backdrop-blur-md dark:border-white/18 dark:bg-black/35 dark:text-slate-200/80">
-          拖动画布漫游 · 靠近中心的回响会清晰浮现
+        <div className="rounded-full border border-white/40 bg-white/20 px-4 py-1.5 text-xs tracking-[0.14em] text-slate-200 backdrop-blur-md shadow-[0_0_10px_rgba(255,255,255,0.2)] dark:border-white/18 dark:bg-black/35 dark:text-slate-200/80">
+          拖动画布漫游 · 靠近中心的回响会如水晶般清晰哦♪
         </div>
       </div>
 
@@ -263,7 +271,7 @@ export const UniverseView: React.FC = () => {
 
         {/* 背景花瓣飘落 */}
         {!reduceMotion && (
-          <div className="absolute inset-0 pointer-events-none z-[2] overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none z-[0] overflow-hidden">
             {Array.from({ length: 10 }).map((_, i) => (
               <div
                 key={`petal-${i}`}
@@ -285,28 +293,26 @@ export const UniverseView: React.FC = () => {
           </div>
         )}
 
-        {/* 弓弦连线：最近的卡片之间 */}
-        {nearestPair && nearestPair.secondary.length > 0 && (
-          <svg
-            className="absolute inset-0 pointer-events-none z-[3]"
-            width={canvasSize}
-            height={canvasSize}
-          >
-            {nearestPair.secondary.map((sec) => (
-              <BowstringLine
-                key={`bow-${sec.card.id}`}
-                id={sec.card.id}
-                x1={nearestPair.primary.physicalX}
-                y1={nearestPair.primary.physicalY}
-                x2={sec.physicalX}
-                y2={sec.physicalY}
-              />
-            ))}
-          </svg>
+        {/* 焦点卡片的大范围照亮光晕 */}
+        {activeIndex >= 0 && layoutCards[activeIndex] && !reduceMotion && (
+          <motion.div
+            className="absolute pointer-events-none rounded-full z-[5]"
+            animate={{
+              x: layoutCards[activeIndex].physicalX - 400,
+              y: layoutCards[activeIndex].physicalY - 400,
+            }}
+            transition={{ type: "spring", damping: 30, stiffness: 80 }}
+            style={{
+              width: 800,
+              height: 800,
+              background: "radial-gradient(circle, rgba(255,255,255,0.25) 0%, rgba(255,182,193,0.08) 30%, transparent 65%)",
+              mixBlendMode: "overlay"
+            }}
+          />
         )}
 
         {/* 内容卡片 */}
-        {layoutCards.map(({ card, physicalX, physicalY, showQuote }) => {
+        {layoutCards.map(({ card, physicalX, physicalY, showQuote }, i) => {
           const rtf = new Intl.RelativeTimeFormat('zh', { numeric: 'auto' });
           const daysDiff = Math.round(
             (new Date(card.createdAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
@@ -326,6 +332,7 @@ export const UniverseView: React.FC = () => {
               time={timeStr}
               author={card.authorName || '无名星光'}
               distanceRatio={distanceRatio}
+              isActive={i === activeIndex}
               onReaction={(emojiType) => handleReaction(card.id, emojiType)}
             />
           );

@@ -157,7 +157,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
             className={`font-elysia-display w-full resize-none border-none bg-transparent p-0 outline-none placeholder:text-slate-400/40 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-300/20 transition-all duration-700 ease-in-out ${
               isLanding ? "text-[2.2rem] min-h-[120px]" : isCompact ? "text-2xl min-h-[40px] font-bold" : "text-[2.4rem] min-h-[140px]"
             }`}
-            placeholder="把这一刻轻轻放下吧，爱莉希雅会认真倾听呀♪"
+            placeholder="嗨，今天有什么绚丽的想法，想要告诉我吗？♪"
             value={moodPhrase}
             onChange={(e) => setMoodPhrase(e.target.value)}
             onFocus={() => setIsFocused(true)}
@@ -207,7 +207,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                             setIsQuoteFocused(false);
                           }
                         }}
-                        placeholder="今天想把哪一句，留成只属于你的誓言呢？♪"
+                        placeholder="把这份无瑕的记忆交给我保管吧♪ (今日誓言)"
                         className="w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-3 text-base italic text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 transition-all shadow-inner"
                       />
                     </motion.div>
@@ -266,7 +266,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                           }
                         }}
                         onClick={activateDescriptionEditor}
-                        placeholder="补一两句细节吧，好让未来的你认出今天的心跳♪"
+                        placeholder="遇到烦心事了吗？不如深呼吸，让思绪像飞花一样飘散吧~ 需不需要我给你一点小灵感呢？♪"
                         className={`w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-4 text-sm text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 resize-none shadow-inner transition-[min-height] duration-300 ${
                           isDescFocused ? "min-h-[140px]" : "min-h-[82px]"
                         }`}

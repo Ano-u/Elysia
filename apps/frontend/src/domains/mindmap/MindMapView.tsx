@@ -91,7 +91,7 @@ export const MindMapView: React.FC = () => {
   if (isLoading) {
      return (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/20 dark:bg-slate-950/45">
-          <div className="font-elysia-poem text-[1.5rem] leading-none text-slate-600 dark:text-slate-200/90 animate-pulse">正在织起你的记忆星线...</div>
+          <div className="font-elysia-poem text-[1.5rem] leading-none text-slate-600 dark:text-slate-200/90 animate-pulse">正在为您寻找失落的记忆刻印呢...♪</div>
         </div>
      );
   }
@@ -100,7 +100,7 @@ export const MindMapView: React.FC = () => {
     return (
        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/20 dark:bg-slate-950/45">
          <div className="rounded-full border border-rose-200/70 bg-white/75 px-5 py-2 text-sm text-rose-500 backdrop-blur-md dark:border-rose-400/35 dark:bg-black/40 dark:text-rose-200">
-           记忆织网暂时失去连接，请稍后再试。
+           哎呀，织网的丝线断开了，要稍等一下哦♪
          </div>
        </div>
     );
@@ -164,9 +164,9 @@ export const MindMapView: React.FC = () => {
           </radialGradient>
           {/* 光丝连线渐变 */}
           <linearGradient id="silk-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="var(--elysia-bowstring)" stopOpacity="0.4" />
-            <stop offset="50%" stopColor="var(--elysia-lavender)" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="var(--elysia-butterfly)" stopOpacity="0.4" />
+            <stop offset="0%" stopColor="var(--elysia-gold)" stopOpacity="0.5" />
+            <stop offset="50%" stopColor="var(--elysia-butterfly)" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="var(--elysia-gold)" stopOpacity="0.5" />
           </linearGradient>
           {/* 玻璃模糊滤镜 */}
           <filter id="glass-blur" x="-50%" y="-50%" width="200%" height="200%">
@@ -258,15 +258,15 @@ export const MindMapView: React.FC = () => {
 
             // 节点类型色调映射
             const isTheme = node.type === 'theme';
-            const nodeSize = isTheme ? 120 : 80;
-            const colorMap: Record<string, { bg: string; border: string; glow: string }> = {
-              record:  { bg: 'var(--elysia-butterfly)', border: 'var(--elysia-coral)',     glow: 'var(--elysia-petal)' },
-              quote:   { bg: 'var(--elysia-gold)',      border: '#ffe4a0',                 glow: 'rgba(255,244,216,0.2)' },
-              emotion: { bg: 'var(--elysia-lavender)',   border: 'var(--elysia-crystal)',   glow: 'rgba(200,162,232,0.15)' },
-              theme:   { bg: 'var(--elysia-bowstring)',  border: 'var(--elysia-mist)',      glow: 'rgba(168,216,234,0.15)' },
-              comment: { bg: 'var(--elysia-mist)',       border: '#d0e4ff',                 glow: 'rgba(230,241,255,0.15)' },
+            const nodeSize = isTheme ? 140 : 110;
+            const colorMap: Record<string, { bg: string; border: string; glow: string; clipPath: string }> = {
+              record:  { bg: 'var(--elysia-butterfly)', border: 'var(--elysia-coral)',     glow: 'var(--elysia-petal)', clipPath: 'polygon(50% 0%, 95% 25%, 95% 75%, 50% 100%, 5% 75%, 5% 25%)' }, // Hexagon
+              quote:   { bg: 'var(--elysia-gold)',      border: '#ffe4a0',                 glow: 'rgba(255,244,216,0.2)', clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)' }, // Rhombus
+              emotion: { bg: 'var(--elysia-lavender)',   border: 'var(--elysia-crystal)',   glow: 'rgba(200,162,232,0.15)', clipPath: 'polygon(50% 0%, 80% 10%, 100% 35%, 100% 70%, 80% 90%, 50% 100%, 20% 90%, 0% 70%, 0% 35%, 20% 10%)' }, // Flower-like decagon
+              theme:   { bg: 'var(--elysia-bowstring)',  border: 'var(--elysia-mist)',      glow: 'rgba(168,216,234,0.15)', clipPath: 'circle(50% at 50% 50%)' },
+              comment: { bg: 'var(--elysia-mist)',       border: '#d0e4ff',                 glow: 'rgba(230,241,255,0.15)', clipPath: 'polygon(10% 0, 100% 0, 90% 100%, 0% 100%)' }, // Parallelogram
             };
-            const colors = colorMap[node.type] || colorMap.record;
+            const shapeProps = colorMap[node.type] || colorMap.record;
 
             return (
               <motion.div
@@ -295,62 +295,63 @@ export const MindMapView: React.FC = () => {
                 {/* 外层光晕 */}
                 {(node.isFocus || isSelected) && (
                   <div
-                    className="absolute rounded-full -z-10 pointer-events-none"
+                    className="absolute -z-10 pointer-events-none"
                     style={{
                       inset: '-12px',
-                      background: `radial-gradient(circle, ${colors.glow} 0%, transparent 70%)`,
+                      background: `radial-gradient(circle, ${shapeProps.glow} 0%, transparent 70%)`,
                       filter: 'blur(8px)',
+                      clipPath: shapeProps.clipPath,
                     }}
                   />
                 )}
 
-                {/* 主气泡 */}
+                {/* 主气泡/刻印 */}
                 <div
-                  className={`absolute inset-0 rounded-full ${reduceMotion ? '' : 'backdrop-blur-sm'}`}
+                  className={`absolute inset-0 ${reduceMotion ? '' : 'backdrop-blur-sm'}`}
                   style={{
-                    background: `radial-gradient(ellipse at 40% 35%, ${colors.bg}80 0%, ${colors.bg}33 100%)`,
-                    border: `1px solid ${colors.border}66`,
-                    boxShadow: isSelected
-                      ? `0 0 20px 4px ${colors.glow}, inset 0 0 12px ${colors.bg}22`
-                      : `inset 0 0 12px ${colors.bg}22`,
+                    background: `radial-gradient(ellipse at 40% 35%, ${shapeProps.bg}80 0%, ${shapeProps.bg}33 100%)`,
+                    border: `1px solid ${shapeProps.border}66`,
+                    clipPath: shapeProps.clipPath,
                   }}
                 />
 
                 {/* 内部高光弧 — 模拟玻璃反射 */}
                 <div
-                  className="absolute pointer-events-none rounded-full"
+                  className="absolute pointer-events-none"
                   style={{
                     top: '15%',
                     left: '20%',
                     width: '60%',
                     height: '30%',
                     background: 'linear-gradient(180deg, rgba(255,255,255,0.25) 0%, transparent 100%)',
-                    borderRadius: '50%',
+                    clipPath: shapeProps.clipPath,
                   }}
                 />
 
                 {/* 内部微光脉冲 */}
                 {!reduceMotion && (
                   <div
-                    className="absolute rounded-full pointer-events-none animate-crystal-pulse"
+                    className="absolute pointer-events-none animate-crystal-pulse"
                     style={{
                       inset: '30%',
-                      background: `radial-gradient(circle, ${colors.bg}22 0%, transparent 70%)`,
+                      background: `radial-gradient(circle, ${shapeProps.bg}22 0%, transparent 70%)`,
+                      clipPath: shapeProps.clipPath,
                     }}
                   />
                 )}
 
                 {/* 文字标签 */}
-                <span className="relative z-10 text-xs sm:text-sm font-medium line-clamp-3 pointer-events-none px-2 text-slate-700 dark:text-slate-200">
+                <span className="relative z-10 text-[10px] sm:text-xs font-medium line-clamp-3 pointer-events-none px-3 text-slate-800 dark:text-slate-100 drop-shadow-md">
                   {node.label}
                 </span>
 
                 {/* 选中环 */}
                 {isSelected && (
                   <div
-                    className="absolute -inset-1 rounded-full pointer-events-none"
+                    className="absolute -inset-1 pointer-events-none"
                     style={{
-                      border: `2px solid ${colors.border}88`,
+                      border: `2px solid ${shapeProps.border}88`,
+                      clipPath: shapeProps.clipPath,
                     }}
                   />
                 )}

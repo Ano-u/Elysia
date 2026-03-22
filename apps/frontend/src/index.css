@@ -89,6 +89,10 @@
     --elysia-butterfly: #f0b6d6;
     --elysia-bowstring: #a8d8ea;
     --elysia-petal: rgba(240, 182, 214, 0.15);
+    
+    /* Universe Star Sea Colors */
+    --universe-deep-space: #0d1b2a;
+    --universe-void-purple: #1a0b2e;
 
     /* Crystal & Liquid Textures */
     --shadow-crystal: 0 10px 35px rgba(135, 171, 214, 0.17);
@@ -140,6 +144,10 @@
     --elysia-butterfly: #c07a9e;
     --elysia-bowstring: #5a9ab5;
     --elysia-petal: rgba(192, 122, 158, 0.12);
+
+    /* Universe Star Sea Colors */
+    --universe-deep-space: #070e16;
+    --universe-void-purple: #10061e;
 
     /* Crystal & Liquid Textures - Dark Mode */
     --shadow-crystal: 0 10px 35px rgba(0, 0, 0, 0.42);
@@ -257,6 +265,16 @@
   }
 
   /* === 爱莉希雅主题动画 === */
+  
+  @keyframes nebula-breathe {
+    0%, 100% { background-position: 0% 50%; opacity: 0.8; }
+    50% { background-position: 100% 50%; opacity: 1; }
+  }
+
+  .animate-nebula {
+    background-size: 200% 200%;
+    animation: nebula-breathe 15s ease infinite;
+  }
 
   @keyframes butterfly-drift {
     0%   { transform: translate(0, 0) rotate(0deg) scale(1); }

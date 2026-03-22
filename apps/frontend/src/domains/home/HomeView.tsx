@@ -828,7 +828,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
                 maxLength={200}
                 value={editMoodPhrase}
                 onChange={(e) => setEditMoodPhrase(e.target.value)}
-                placeholder="把这一刻轻轻写成标题吧♪"
+                placeholder="嗨，今天有什么绚丽的想法，想要告诉我吗？♪"
                 className="w-full bg-white/60 dark:bg-black/30 border-none rounded-2xl px-4 py-3 text-base text-slate-700 dark:text-slate-100 outline-none focus:ring-2 focus:ring-violet-200/60"
               />
             </div>
@@ -840,7 +840,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
                 maxLength={200}
                 value={editQuote}
                 onChange={(e) => setEditQuote(e.target.value)}
-                placeholder="要不要把这一句也轻轻补上？"
+                placeholder="把这份无瑕的记忆交给我保管吧♪ (金句/小结)"
                 className="w-full bg-white/50 dark:bg-black/25 border-none rounded-2xl px-4 py-3 text-sm italic text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/60"
               />
             </div>
@@ -851,7 +851,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
                 value={editDescription}
                 maxLength={1000}
                 onChange={(e) => setEditDescription(e.target.value)}
-                placeholder="补一两句细节，让这份心意更完整♪"
+                placeholder="遇到烦心事了吗？不如深呼吸，让思绪像飞花一样飘散吧~ 需不需要我给你一点小灵感呢？♪"
                 className="w-full min-h-[140px] resize-none bg-white/50 dark:bg-black/25 border-none rounded-2xl px-4 py-3 text-sm leading-relaxed text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/60"
               />
             </div>
