@@ -213,7 +213,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                             setIsQuoteFocused(false);
                           }
                         }}
-                        placeholder="把这份无瑕的记忆交给我保管吧♪ (今日誓言)"
+                        placeholder="把这份无瑕的记忆交给我保管吧♪"
                         className="w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-3 text-base italic text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 transition-all shadow-inner"
                       />
                     </motion.div>

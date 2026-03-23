@@ -13,7 +13,7 @@ import {
   updateRecordVisibility,
 } from "../../lib/apiClient";
 import type { RecordSummary, VisibilityIntent, CreateRecordRequest } from "../../types/api";
-import { Clock, PenLine, Loader, Check, X, Lock, Compass, Eye, AlertTriangle, Tag as TagIcon } from "lucide-react";
+import { Clock, PenLine, Loader, Check, X, Lock, Compass, Eye, AlertTriangle, Tag as TagIcon, Quote, ListChevronsUpDown, Lightbulb } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { pickRandomCopy, useRotatingCopy } from "../../lib/rotatingCopy";
 import { getCreateSuccessMessage, getPublicationStatusMeta, type PublicationTone } from "../../lib/publicationCopy";
@@ -716,6 +716,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
   const [editMoodPhrase, setEditMoodPhrase] = useState(currentItem.moodPhrase);
   const [editQuote, setEditQuote] = useState(currentItem.quote ?? "");
   const [editDescription, setEditDescription] = useState(currentItem.description ?? "");
+  const [editExtraEmotions, setEditExtraEmotions] = useState<string[]>(currentItem.extraEmotions ?? []);
   const [editFeedback, setEditFeedback] = useState<string | null>(null);
   const editFeedbackTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
@@ -737,7 +738,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
   });
 
   const editMutation = useMutation({
-    mutationFn: (payload: { moodPhrase: string; quote: string | null; description: string }) =>
+    mutationFn: (payload: { moodPhrase: string; quote: string | null; description: string; extraEmotions?: string[] }) =>
       updateRecord(currentItem.id, payload),
     onSuccess: () => {
       setIsEditing(false);
@@ -755,7 +756,8 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
     setEditMoodPhrase(currentItem.moodPhrase);
     setEditQuote(currentItem.quote ?? "");
     setEditDescription(currentItem.description ?? "");
-  }, [isEditing, currentItem.moodPhrase, currentItem.quote, currentItem.description, currentItem.updatedAt]);
+    setEditExtraEmotions(currentItem.extraEmotions ?? []);
+  }, [isEditing, currentItem.moodPhrase, currentItem.quote, currentItem.description, currentItem.extraEmotions, currentItem.updatedAt]);
 
   const toggleVisibility = () => {
     if (isMockItem) {
@@ -782,6 +784,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
     setEditMoodPhrase(currentItem.moodPhrase);
     setEditQuote(currentItem.quote ?? "");
     setEditDescription(currentItem.description ?? "");
+    setEditExtraEmotions(currentItem.extraEmotions ?? []);
     setEditFeedback(null);
     setIsEditing(false);
   };
@@ -800,6 +803,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
         moodPhrase,
         quote: editQuote.trim().length > 0 ? editQuote.trim() : null,
         description: editDescription.trim().length > 0 ? editDescription.trim() : null,
+        extraEmotions: editExtraEmotions.length > 0 ? editExtraEmotions : null,
         publicationStatus: "pending_second_review",
         updatedAt: new Date().toISOString(),
       }));
@@ -812,6 +816,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
       moodPhrase,
       quote: editQuote.trim().length > 0 ? editQuote.trim() : null,
       description: editDescription.trim(),
+      extraEmotions: editExtraEmotions.length > 0 ? editExtraEmotions : undefined,
     });
   };
 
@@ -846,39 +851,58 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
         {isEditing ? (
           <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-2">
-              <span className="text-[10px] tracking-widest uppercase font-bold text-slate-400">标题</span>
+              <span className="text-[10px] tracking-widest uppercase font-bold text-slate-400 flex items-center gap-1">
+                <Lightbulb className="w-3 h-3" /> 标题
+              </span>
               <input
                 type="text"
                 maxLength={200}
                 value={editMoodPhrase}
                 onChange={(e) => setEditMoodPhrase(e.target.value)}
                 placeholder="嗨，今天有什么绚丽的想法，想要告诉我吗？♪"
-                className="w-full bg-white/60 dark:bg-black/30 border-none rounded-2xl px-4 py-3 text-base text-slate-700 dark:text-slate-100 outline-none focus:ring-2 focus:ring-violet-200/60"
+                className="w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-4 text-base font-bold text-slate-700 dark:text-slate-100 outline-none focus:ring-2 focus:ring-pink-200/60 shadow-inner overflow-hidden"
               />
             </div>
 
             <div className="flex flex-col gap-2">
-              <span className="text-[10px] tracking-widest uppercase font-bold text-slate-400">今日誓言</span>
+              <span className="text-[10px] tracking-widest uppercase font-bold text-slate-400 flex items-center gap-1">
+                <Quote className="w-3 h-3" style={{ transform: 'scale(-1, -1)' }} /> 今日誓言
+              </span>
               <input
                 type="text"
                 maxLength={200}
                 value={editQuote}
                 onChange={(e) => setEditQuote(e.target.value)}
-                placeholder="把这份无瑕的记忆交给我保管吧♪ (金句/小结)"
-                className="w-full bg-white/50 dark:bg-black/25 border-none rounded-2xl px-4 py-3 text-sm italic text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/60"
+                placeholder="把这份无瑕的记忆交给我保管吧♪"
+                className="w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-3 text-base italic text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/60 transition-all shadow-inner"
               />
             </div>
 
             <div className="flex flex-col gap-2">
-              <span className="text-[10px] tracking-widest uppercase font-bold text-slate-400">描述</span>
+              <span className="text-[10px] tracking-widest uppercase font-bold text-slate-400 flex items-center gap-1">
+                <ListChevronsUpDown className="w-3 h-3" style={{ transform: 'scale(-1, -1)' }} /> 详细描述
+              </span>
               <textarea
                 value={editDescription}
                 maxLength={1000}
                 onChange={(e) => setEditDescription(e.target.value)}
                 placeholder="遇到烦心事了吗？不如深呼吸，让思绪像飞花一样飘散吧~ 需不需要我给你一点小灵感呢？♪"
-                className="w-full min-h-[140px] resize-none bg-white/50 dark:bg-black/25 border-none rounded-2xl px-4 py-3 text-sm leading-relaxed text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/60"
+                className="w-full min-h-[140px] resize-none bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-4 text-sm text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 shadow-inner"
               />
             </div>
+
+            <EmotionSelector
+              extraEmotions={editExtraEmotions}
+              onToggle={(tag) => {
+                const next = editExtraEmotions.includes(tag)
+                  ? editExtraEmotions.filter((t) => t !== tag)
+                  : editExtraEmotions.length < 8
+                    ? [...editExtraEmotions, tag]
+                    : editExtraEmotions;
+                setEditExtraEmotions(next);
+                setEditFeedback(null);
+              }}
+            />
 
             <div className="flex items-center justify-end gap-2">
               <button
