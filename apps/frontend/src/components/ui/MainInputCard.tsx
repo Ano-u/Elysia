@@ -134,7 +134,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
   return (
     <LiquidCard
       ref={editorAreaRef}
-      className="w-full max-w-4xl mx-auto bg-white/45 dark:bg-black/23 overflow-hidden p-10 transition-all duration-700 shadow-2xl"
+      className="w-full max-w-4xl mx-auto bg-white/45 dark:bg-black/30 overflow-hidden p-10 transition-all duration-700 shadow-2xl"
     >
       <div className="flex flex-col gap-8">
         {/* Main Input Section */}
@@ -156,7 +156,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
             autoFocus={hasValue}
             maxLength={200}
             rows={1}
-            className={`font-elysia-display w-full resize-none border-none bg-transparent p-0 outline-none placeholder:text-slate-400/40 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-300/20 transition-all duration-700 ease-in-out overflow-hidden ${
+            className={`font-elysia-display w-full resize-none border-none bg-transparent p-0 outline-none placeholder:text-slate-400/40 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-400/40 transition-all duration-700 ease-in-out overflow-hidden ${
               isLanding ? "text-2xl sm:text-[2.2rem] min-h-[64px] sm:min-h-[120px]" : isCompact ? "text-xl sm:text-2xl min-h-[32px] sm:min-h-[40px] font-bold" : "text-[1.35rem] sm:text-[2.4rem] min-h-[64px] sm:min-h-[140px]"
             }`}
             placeholder="嗨，今天有什么绚丽的想法，想要告诉我吗？♪"
@@ -214,7 +214,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                           }
                         }}
                         placeholder="把这份无瑕的记忆交给我保管吧♪"
-                        className="w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-3 text-base italic text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 transition-all shadow-inner"
+                        className="w-full bg-white/30 dark:bg-black/40 border-none rounded-2xl px-5 py-3 text-base italic text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 transition-all shadow-inner"
                       />
                     </motion.div>
                   ) : hasQuote ? (
@@ -280,7 +280,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                         }}
                         onClick={activateDescriptionEditor}
                         placeholder="遇到烦心事了吗？不如深呼吸，让思绪像飞花一样飘散吧~ 需不需要我给你一点小灵感呢？♪"
-                        className={`w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-4 text-sm text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 resize-none shadow-inner transition-[min-height] duration-300 ${
+                        className={`w-full bg-white/30 dark:bg-black/40 border-none rounded-2xl px-5 py-4 text-sm text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 resize-none shadow-inner transition-[min-height] duration-300 ${
                           isDescFocused ? "min-h-[140px]" : "min-h-[82px]"
                         }`}
                       />

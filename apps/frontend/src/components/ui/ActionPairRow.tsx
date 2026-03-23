@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CrystalButton } from "./CrystalButton";
 import { Send, Compass, Calendar, Network, Star } from "lucide-react";
+import { useUiStore } from "../../store/uiStore";
 
 interface ActionPairRowProps {
   type: "save-universe" | "timeline-mindmap";
@@ -34,6 +35,7 @@ export const ActionPairRow: React.FC<ActionPairRowProps> = ({
   isSwitched,
   onSwitchToggle,
 }) => {
+  const reduceMotion = useUiStore((state) => state.reduceMotion);
   const [isActivated, setIsActivated] = useState(false);
   const [leftSendAnimation, setLeftSendAnimation] = useState<"idle" | "success" | "error">("idle");
   const [hoveredIcon, setHoveredIcon] = useState<"left" | "right" | null>(null);
@@ -123,22 +125,22 @@ export const ActionPairRow: React.FC<ActionPairRowProps> = ({
   const fillPercentage = progress !== undefined ? progress * 100 : (isSwitched ? 100 : 0);
   const showPendingOrbit = isSaveUniverse && Boolean(isPending) && leftSendAnimation === "idle";
   const leftIconToneClass =
-    leftSendAnimation === "success" ? "text-emerald-500" : leftSendAnimation === "error" ? "text-rose-500" : "";
+    leftSendAnimation === "success" ? "text-emerald-500" : leftSendAnimation === "error" ? "text-rose-500" : "text-slate-600 dark:text-slate-300";
   const leftIconMotion =
     leftSendAnimation === "success"
       ? {
-          x: [0, 22, 22, -16, 0],
-          y: [0, -22, -22, 16, 0],
-          opacity: [1, 1, 0, 0, 1],
-          rotate: [0, -12, -12, 8, 0],
-          transition: { duration: 1.05, times: [0, 0.32, 0.42, 0.62, 1], ease: "easeInOut" as const },
+          x: reduceMotion ? 0 : [0, 22, 22, -16, 0],
+          y: reduceMotion ? 0 : [0, -22, -22, 16, 0],
+          opacity: reduceMotion ? [1, 0, 1] : [1, 1, 0, 0, 1],
+          rotate: reduceMotion ? 0 : [0, -12, -12, 8, 0],
+          transition: { duration: 1.05, times: reduceMotion ? [0, 0.5, 1] : [0, 0.32, 0.42, 0.62, 1], ease: "easeInOut" as const },
         }
       : leftSendAnimation === "error"
         ? {
-            x: [0, -4, 4, -3, 3, 0],
+            x: reduceMotion ? 0 : [0, -4, 4, -3, 3, 0],
             y: 0,
             opacity: 1,
-            rotate: [0, -12, 12, -8, 8, 0],
+            rotate: reduceMotion ? 0 : [0, -12, 12, -8, 8, 0],
             transition: { duration: 0.45, ease: "easeInOut" as const },
           }
         : {
@@ -163,7 +165,7 @@ export const ActionPairRow: React.FC<ActionPairRowProps> = ({
         </div>
       )}
 
-      <div className="relative flex items-center gap-1 p-2 bg-white/40 dark:bg-black/20 rounded-[2rem] border border-white/60 dark:border-white/10 backdrop-blur-2xl shadow-xl transition-all duration-500 hover:shadow-2xl hover:bg-white/50">
+      <div className="relative flex items-center gap-1 p-2 bg-white/40 dark:bg-black/40 rounded-[2rem] border border-white/60 dark:border-white/10 backdrop-blur-2xl shadow-xl transition-all duration-500 hover:shadow-2xl hover:bg-white/50 dark:hover:bg-black/50">
 
         {/* Left Button */}
         <div className="relative z-10">
@@ -177,7 +179,7 @@ export const ActionPairRow: React.FC<ActionPairRowProps> = ({
                 className="pointer-events-none absolute -inset-[3px] rounded-full"
               >
                 <motion.div
-                  animate={{ rotate: 360 }}
+                  animate={{ rotate: reduceMotion ? 0 : 360 }}
                   transition={{ duration: 1.05, ease: "linear", repeat: Infinity }}
                   className="h-full w-full rounded-full bg-[conic-gradient(from_0deg,rgba(236,72,153,0)_0deg,rgba(236,72,153,0)_250deg,rgba(244,114,182,0.22)_300deg,rgba(244,114,182,0.72)_334deg,rgba(168,85,247,1)_360deg)]"
                   style={{
@@ -234,23 +236,25 @@ export const ActionPairRow: React.FC<ActionPairRowProps> = ({
             <motion.div
               className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-pink-300 via-purple-300 to-blue-400 opacity-80"
               animate={{ width: `${fillPercentage}%` }}
-              transition={{ type: "spring", stiffness: 100, damping: 20 }}
+              transition={{ type: "spring", stiffness: reduceMotion ? 1000 : 100, damping: reduceMotion ? 40 : 20 }}
             />
             {/* Glowing pulse moving across the link */}
-            <motion.div
-              animate={{ x: ["-100%", "300%"] }}
-              transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-              className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/50 to-transparent blur-[2px] z-10 pointer-events-none"
-            />
+            {!reduceMotion && (
+              <motion.div
+                animate={{ x: ["-100%", "300%"] }}
+                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/50 to-transparent blur-[2px] z-10 pointer-events-none"
+              />
+            )}
           </div>
 
           {/* Progress Gadget / Switch Thumb */}
           <motion.div
-            className={`absolute w-6 h-6 bg-white shadow-md rounded-full border border-pink-100 flex items-center justify-center z-20 pointer-events-none ${isToggleMode ? "group-hover/track:scale-110" : ""} transition-transform`}
+            className={`absolute w-6 h-6 bg-white shadow-md rounded-full border border-pink-100 flex items-center justify-center z-20 pointer-events-none ${isToggleMode && !reduceMotion ? "group-hover/track:scale-110" : ""} transition-transform`}
             animate={{
                left: `calc(${fillPercentage}% - 6px - (${fillPercentage} / 100 * 12px))`, // Center the thumb on the edge
             }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            transition={{ type: "spring", stiffness: reduceMotion ? 1000 : 300, damping: reduceMotion ? 40 : 30 }}
           >
              <div className="w-2 h-2 rounded-full bg-gradient-to-br from-pink-200 to-blue-300" />
           </motion.div>
@@ -292,7 +296,7 @@ export const ActionPairRow: React.FC<ActionPairRowProps> = ({
 
           {/* Special Activation Animation */}
           <AnimatePresence>
-            {isActivated && (
+            {isActivated && !reduceMotion && (
               <motion.div
                 initial={{ scale: 0.5, opacity: 0 }}
                 animate={{ scale: [1, 2, 2.5], opacity: [1, 0.8, 0] }}
@@ -305,7 +309,7 @@ export const ActionPairRow: React.FC<ActionPairRowProps> = ({
           </AnimatePresence>
 
           <AnimatePresence>
-            {isActivated && (
+            {isActivated && !reduceMotion && (
               <motion.div
                 initial={{ x: -120, opacity: 1, scale: 0.8 }}
                 animate={{ x: 0, scale: [1, 1.8, 1], opacity: [1, 1, 0] }}
@@ -320,7 +324,7 @@ export const ActionPairRow: React.FC<ActionPairRowProps> = ({
       </div>
 
       {rightActiveLabel && (
-        <span className="text-[9px] font-bold tracking-tighter text-slate-400 uppercase bg-white/50 dark:bg-black/30 px-2 py-0.5 rounded-full border border-white/40">
+        <span className="text-[9px] font-bold tracking-tighter text-slate-400 uppercase bg-white/50 dark:bg-black/40 px-2 py-0.5 rounded-full border border-white/40 dark:border-white/10">
           {rightActiveLabel}
         </span>
       )}

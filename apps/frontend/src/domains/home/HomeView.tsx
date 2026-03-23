@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { AnimatePresence, motion, useScroll, useTransform, useSpring } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useUiStore } from "../../store/uiStore";
 import { LiquidCard } from "../../components/ui/LiquidCard";
 import { MainInputCard, PREDEFINED_TAGS } from "../../components/ui/MainInputCard";
 import { ActionPairRow } from "../../components/ui/ActionPairRow";
@@ -141,6 +142,7 @@ interface HomeViewProps {
   isLocalDev?: boolean;
   topControls?: React.ReactNode;
   adminControl?: React.ReactNode;
+  theme?: "light" | "dark";
 }
 
 type DraftPayload = {
@@ -179,8 +181,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
   isLocalDev = false,
   topControls,
   adminControl,
+  theme = "light",
 }) => {
   const queryClient = useQueryClient();
+  const reduceMotion = useUiStore((state) => state.reduceMotion);
   const [draft, setDraft] = useState<DraftPayload>(readInitialDraft);
   const [showOnlyPublic, setShowOnlyPublic] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
@@ -465,8 +469,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
     <div ref={scrollContainerRef} className="relative h-full w-full overflow-y-auto overflow-x-hidden hide-scrollbar bg-[#f8fbff] dark:bg-[#0d1422] transition-all duration-700">
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         <motion.div
-          animate={{ scale: [1, 1.05, 1], x: [0, -10, 0], y: [0, 5, 0] }}
-          transition={{ duration: 40, repeat: Infinity, ease: "easeInOut" }}
+          animate={reduceMotion ? { scale: 1, x: 0, y: 0 } : { scale: [1, 1.05, 1], x: [0, -10, 0], y: [0, 5, 0] }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 40, repeat: Infinity, ease: "easeInOut" }}
           className="absolute inset-0"
         >
           <img
@@ -498,14 +502,14 @@ export const HomeView: React.FC<HomeViewProps> = ({
             <h1 className="font-elysia-title elysia-dream-title text-[4rem] sm:text-[5.4rem] font-medium tracking-tight">
               Elysia
             </h1>
-            <p className="mt-2 font-elysia-display text-base sm:text-lg text-slate-500 dark:text-slate-300">
+            <p className="mt-4 font-elysia-display text-base sm:text-lg text-slate-500 dark:text-slate-300">
               粉色天光落进往世乐土，Elysia会永远回应你的期待♪
             </p>
           </motion.div>
         </motion.div>
       </motion.div>
 
-      <div className="relative z-10 flex flex-col items-center max-w-6xl mx-auto px-4 pt-[280px] sm:pt-[310px] pb-32 gap-16">
+      <div className="relative z-10 flex flex-col items-center max-w-6xl mx-auto px-4 pt-[260px] sm:pt-[290px] pb-32 gap-16">
         {/* Section 1: Landing Header & Input */}
         <section className="w-full flex flex-col items-center gap-16 max-w-4xl">
           <div ref={composerGuideRef} className={`${guideTargetClass(0)} rounded-[2.25rem] w-full flex flex-col gap-10`}>
@@ -847,7 +851,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
         </span>
       </div>
 
-      <LiquidCard className="bg-white/50 dark:bg-black/20 backdrop-blur-xl border-white/60 dark:border-white/10 p-10 flex flex-col gap-8 shadow-xl hover:shadow-2xl transition-all duration-500">
+      <LiquidCard className="bg-white/50 dark:bg-black/30 backdrop-blur-xl border-white/60 dark:border-white/10 p-10 flex flex-col gap-8 shadow-xl hover:shadow-2xl transition-all duration-500">
         {isEditing ? (
           <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-2">
@@ -860,7 +864,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
                 value={editMoodPhrase}
                 onChange={(e) => setEditMoodPhrase(e.target.value)}
                 placeholder="嗨，今天有什么绚丽的想法，想要告诉我吗？♪"
-                className="w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-4 text-base font-bold text-slate-700 dark:text-slate-100 outline-none focus:ring-2 focus:ring-pink-200/60 shadow-inner overflow-hidden"
+                className="w-full bg-white/30 dark:bg-black/40 border-none rounded-2xl px-5 py-4 text-base font-bold text-slate-700 dark:text-slate-100 outline-none focus:ring-2 focus:ring-pink-200/60 shadow-inner overflow-hidden"
               />
             </div>
 
@@ -874,7 +878,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
                 value={editQuote}
                 onChange={(e) => setEditQuote(e.target.value)}
                 placeholder="把这份无瑕的记忆交给我保管吧♪"
-                className="w-full bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-3 text-base italic text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/60 transition-all shadow-inner"
+                className="w-full bg-white/30 dark:bg-black/40 border-none rounded-2xl px-5 py-3 text-base italic text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/60 transition-all shadow-inner"
               />
             </div>
 
@@ -887,7 +891,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
                 maxLength={1000}
                 onChange={(e) => setEditDescription(e.target.value)}
                 placeholder="遇到烦心事了吗？不如深呼吸，让思绪像飞花一样飘散吧~ 需不需要我给你一点小灵感呢？♪"
-                className="w-full min-h-[140px] resize-none bg-white/30 dark:bg-black/20 border-none rounded-2xl px-5 py-4 text-sm text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 shadow-inner"
+                className="w-full min-h-[140px] resize-none bg-white/30 dark:bg-black/40 border-none rounded-2xl px-5 py-4 text-sm text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 shadow-inner"
               />
             </div>
 
@@ -1005,8 +1009,8 @@ const EmotionSelector: React.FC<{
           onClick={() => onToggle(tag)}
           className={`px-3 py-1 rounded-full text-[10px] border-2 transition-all ${
             active
-              ? "bg-pink-100/40 dark:bg-pink-900/10 border-pink-200/30 dark:border-pink-800/20 text-pink-600 dark:text-pink-300 shadow-glow"
-              : "bg-white/20 dark:bg-black/20 border-white/30 dark:border-white/10 text-slate-500 hover:border-pink-200"
+              ? "bg-pink-100/40 dark:bg-pink-900/30 border-pink-200/30 dark:border-pink-800/40 text-pink-600 dark:text-pink-300 shadow-glow"
+              : "bg-white/20 dark:bg-black/40 border-white/30 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:border-pink-200 dark:hover:border-pink-800"
           }`}
         >
           {tag}

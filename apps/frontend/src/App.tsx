@@ -30,7 +30,10 @@ function App() {
       return "light";
     }
     const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-    return storedTheme === "dark" ? "dark" : "light";
+    if (storedTheme === "dark" || storedTheme === "light") {
+      return storedTheme;
+    }
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
   const [currentView, setCurrentView] = useState<AppView>("home");
   const [isCoarsePointer, setIsCoarsePointer] = useState(() => {
@@ -126,6 +129,23 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (!window.localStorage.getItem(THEME_STORAGE_KEY)) {
+        setTheme(e.matches ? "dark" : "light");
+      }
+    };
+    // Support for older browsers that don't have addEventListener on MediaQueryList
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", handleChange);
+      return () => mediaQuery.removeEventListener("change", handleChange);
+    } else {
+      mediaQuery.addListener(handleChange);
+      return () => mediaQuery.removeListener(handleChange);
+    }
+  }, []);
+
+  useEffect(() => {
     const media = window.matchMedia("(pointer: coarse)");
     const onChange = (event: MediaQueryListEvent) => setIsCoarsePointer(event.matches);
     media.addEventListener("change", onChange);
@@ -192,11 +212,17 @@ function App() {
         size="icon"
         onClick={toggleReduceMotion}
         className="rounded-full"
-        title={reduceMotion ? "恢复 Elysia 动态光影" : "减弱 Elysia 动态光影"}
+        title={reduceMotion ? "恢复动态" : "减弱动态"}
       >
         <Settings2 className={`h-5 w-5 ${reduceMotion ? "opacity-50" : "opacity-100"}`} />
       </CrystalButton>
-      <CrystalButton variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full">
+      <CrystalButton
+        variant="ghost"
+        size="icon"
+        onClick={toggleTheme}
+        className="rounded-full"
+        title={theme === "light" ? "天穹市" : "永恒礼堂"}
+      >
         {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
       </CrystalButton>
     </motion.div>
@@ -277,6 +303,7 @@ function App() {
                 isLocalDev={isLocalDev}
                 topControls={topControls}
                 adminControl={adminControl}
+                theme={theme}
               />
             </motion.div>
           )}
