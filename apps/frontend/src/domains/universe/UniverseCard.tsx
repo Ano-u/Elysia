@@ -76,14 +76,18 @@ export const UniverseCard = React.forwardRef<HTMLDivElement, UniverseCardProps>(
 
     // 景深模糊：基于到视口中心的距离连续计算
     const d = Math.min(Math.max(distanceRatio, 0), 1);
-    const isCenter = isActive;
-    const blur = reduceMotion ? 0 : isCenter ? 0 : Math.pow(d, 1.2) * 8; 
-    const opacity = isCenter ? 1 : Math.max(0.4, 1 - d * 0.7);
-    const scale = isCenter ? 1.05 : Math.max(0.75, 1 - d * 0.3);
-    const zIndex = isCenter ? 50 : Math.round((1 - d) * 30) + 10;
+    
+    // 扩大清晰范围：距离中心近的多个卡片都保持清晰
+    const inFocusRange = d < 0.3;
+    const isCenter = isActive || inFocusRange;
+    
+    const blur = reduceMotion ? 0 : isCenter ? 0 : Math.pow(Math.max(0, d - 0.2), 1.2) * 12; 
+    const opacity = isCenter ? 1 : Math.max(0.3, 1 - d * 0.8);
+    const scale = isActive ? 1.05 : isCenter ? 1 : Math.max(0.7, 1 - d * 0.3);
+    const zIndex = isActive ? 50 : isCenter ? 40 : Math.round((1 - d) * 30) + 10;
 
     // 远处卡片禁用交互
-    const pointerEvents = d > 0.7 ? "none" as const : "auto" as const;
+    const pointerEvents = d > 0.6 ? "none" as const : "auto" as const;
 
     // 处理表情拖入
     const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {

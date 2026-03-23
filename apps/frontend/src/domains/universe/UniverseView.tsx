@@ -73,6 +73,15 @@ export const UniverseView: React.FC = () => {
 
   const [requestCoords, setRequestCoords] = useState({ x: 0, y: 0 });
 
+  // 缩放控制
+  const scale = useMotionValue(1);
+  const [showTooltip, setShowTooltip] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowTooltip(false), 5000);
+    return () => clearTimeout(timer);
+  }, []);
+
   // 监听画布拖动，更新视口中心和 API 请求坐标
   useEffect(() => {
     let timeoutId: number | null = null;
@@ -134,9 +143,21 @@ export const UniverseView: React.FC = () => {
     placeholderData: (prev) => prev,
   });
 
-  const cards = universeData?.items || [];
+  const [cachedCards, setCachedCards] = useState<any[]>([]);
 
-  // 布局：使用后端坐标 + 碰撞推开
+  useEffect(() => {
+    if (!universeData?.items) return;
+    setCachedCards(prev => {
+      const existingIds = new Set(prev.map(p => p.id));
+      const newItems = universeData.items.filter(item => !existingIds.has(item.id));
+      if (newItems.length === 0) return prev;
+      return [...prev, ...newItems];
+    });
+  }, [universeData]);
+
+  const cards = cachedCards;
+
+  // 布局：使用后端坐标 + 情感聚类 + 碰撞推开
   const layoutCards = useMemo(() => {
     if (cards.length === 0) return [];
 
@@ -144,19 +165,33 @@ export const UniverseView: React.FC = () => {
     const cardW = 256; // w-64 = 16rem = 256px
     const cardH = 120; // 估算高度
 
-    // 用后端坐标映射到画布
-    const positions = cards.map((card) => ({
-      x: center + card.coord.x,
-      y: center + card.coord.y,
-    }));
+    // 用后端坐标映射到画布，并加入情感聚类偏移
+    const positions = cards.map((card) => {
+      let x = center + card.coord.x;
+      let y = center + card.coord.y;
+      
+      // 基于情绪标签的聚类偏移
+      const tag = card.tags?.[0] || '';
+      if (['开心', '喜悦', '治愈', '感动'].includes(tag)) {
+        x += 300; y -= 300; // 右上方
+      } else if (['难过', '悲伤', '孤独', '心碎'].includes(tag)) {
+        x -= 300; y += 300; // 左下方
+      } else if (['平静', '迷茫', '思考'].includes(tag)) {
+        x -= 300; y -= 300; // 左上方
+      } else if (['生气', '焦虑', '烦躁'].includes(tag)) {
+        x += 300; y += 300; // 右下方
+      }
+
+      return { x, y };
+    });
 
     // 碰撞推开
-    resolveCollisions(positions, cardW, cardH);
+    resolveCollisions(positions, cardW, cardH, 12); // 增加迭代次数确保散开
 
     // 为每张卡片决定是否显示金句（随机但稳定）
     return cards.map((card, i) => {
       // 用 id 的 charCode 做伪随机，保证同一卡片每次结果一致
-      const hash = card.id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+      const hash = card.id.split("").reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0);
       const showQuote = hash % 3 !== 0; // 约 2/3 的卡片显示金句
 
       return {
@@ -218,12 +253,18 @@ export const UniverseView: React.FC = () => {
     console.log(`Reaction: ${emojiType} on card ${cardId}`);
   }, []);
 
+  const handleZoom = useCallback((direction: 'in' | 'out') => {
+    const current = scale.get();
+    const next = direction === 'in' ? Math.min(current + 0.2, 2) : Math.max(current - 0.2, 0.4);
+    scale.set(next);
+  }, [scale]);
+
   return (
     <div
       className="absolute inset-0 overflow-hidden bg-[var(--universe-void-purple)] dark:bg-[var(--universe-deep-space)] z-10 transition-colors duration-1000"
       ref={containerRef}
     >
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_18%_12%,rgba(147,112,219,0.34),transparent_38%),radial-gradient(circle_at_82%_10%,rgba(255,182,193,0.25),transparent_36%),radial-gradient(circle_at_50%_100%,rgba(168,216,234,0.2),transparent_46%)] animate-nebula mix-blend-screen" />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_20%_20%,rgba(240,182,214,0.4),transparent_40%),radial-gradient(circle_at_80%_15%,rgba(200,162,232,0.3),transparent_45%),radial-gradient(circle_at_50%_90%,rgba(255,182,193,0.35),transparent_50%)] animate-nebula mix-blend-screen" />
       
       {/* 晶体飞鳐与粒子层 */}
       <StarSeaCanvas />
@@ -252,18 +293,23 @@ export const UniverseView: React.FC = () => {
         </div>
       )}
 
-      <div className="pointer-events-none absolute left-1/2 top-24 z-30 -translate-x-1/2">
+      <motion.div 
+        className="pointer-events-none absolute left-1/2 top-24 z-30 -translate-x-1/2"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: showTooltip ? 1 : 0, y: showTooltip ? 0 : -10 }}
+        transition={{ duration: 0.8, ease: "easeInOut" }}
+      >
         <div className="rounded-full border border-white/40 bg-white/20 px-4 py-1.5 text-xs tracking-[0.14em] text-slate-200 backdrop-blur-md shadow-[0_0_10px_rgba(255,255,255,0.2)] dark:border-white/18 dark:bg-black/35 dark:text-slate-200/80">
           拖动画布漫游 · 靠近中心的回响会如水晶般清晰哦♪
         </div>
-      </div>
+      </motion.div>
 
       <motion.div
         drag
         dragConstraints={dragConstraints}
         dragElastic={reduceMotion ? 0 : 0.1}
         dragMomentum={!reduceMotion}
-        style={{ x, y, width: canvasSize, height: canvasSize }}
+        style={{ x, y, scale, width: canvasSize, height: canvasSize }}
         className="relative cursor-grab active:cursor-grabbing touch-none"
       >
         {/* 蝴蝶装饰 */}
@@ -338,6 +384,24 @@ export const UniverseView: React.FC = () => {
           );
         })}
       </motion.div>
+
+      {/* 缩放控制面板 */}
+      <div className="absolute right-6 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-2">
+        <button
+          onClick={() => handleZoom('in')}
+          className="w-10 h-10 rounded-full flex items-center justify-center bg-white/20 dark:bg-black/30 backdrop-blur-md border border-white/40 dark:border-white/10 text-slate-700 dark:text-slate-200 shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:bg-white/40 dark:hover:bg-black/50 transition-colors"
+          aria-label="Zoom In"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <button
+          onClick={() => handleZoom('out')}
+          className="w-10 h-10 rounded-full flex items-center justify-center bg-white/20 dark:bg-black/30 backdrop-blur-md border border-white/40 dark:border-white/10 text-slate-700 dark:text-slate-200 shadow-[0_0_15px_rgba(255,255,255,0.2)] hover:bg-white/40 dark:hover:bg-black/50 transition-colors"
+          aria-label="Zoom Out"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+      </div>
 
       {/* 表情拖拽面板 */}
       <EmojiDock />

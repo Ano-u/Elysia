@@ -91,8 +91,8 @@
     --elysia-petal: rgba(240, 182, 214, 0.15);
     
     /* Universe Star Sea Colors */
-    --universe-deep-space: #0d1b2a;
-    --universe-void-purple: #1a0b2e;
+    --universe-deep-space: #fcfaff;
+    --universe-void-purple: #fdf5fc;
 
     /* Crystal & Liquid Textures */
     --shadow-crystal: 0 10px 35px rgba(135, 171, 214, 0.17);
@@ -146,8 +146,8 @@
     --elysia-petal: rgba(192, 122, 158, 0.12);
 
     /* Universe Star Sea Colors */
-    --universe-deep-space: #070e16;
-    --universe-void-purple: #10061e;
+    --universe-deep-space: #140d21;
+    --universe-void-purple: #1f1131;
 
     /* Crystal & Liquid Textures - Dark Mode */
     --shadow-crystal: 0 10px 35px rgba(0, 0, 0, 0.42);

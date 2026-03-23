@@ -66,37 +66,48 @@ export const StarSeaCanvas: React.FC = () => {
       ctx.translate(manta.x, manta.y);
       ctx.rotate(manta.angle);
 
-      // Create a gradient for the manta ray
-      const grad = ctx.createLinearGradient(-manta.size, 0, manta.size, 0);
-      grad.addColorStop(0, 'rgba(255, 192, 203, 0.1)');
-      grad.addColorStop(0.5, 'rgba(232, 213, 245, 0.4)');
-      grad.addColorStop(1, 'rgba(168, 216, 234, 0.1)');
+      // Create a gradient for the manta ray to look like Elysia's crystal aesthetic
+      const grad = ctx.createLinearGradient(-manta.size * 2, 0, manta.size, 0);
+      grad.addColorStop(0, 'rgba(255, 182, 193, 0.05)'); // Tail end: Soft pink/transparent
+      grad.addColorStop(0.5, 'rgba(240, 182, 214, 0.4)'); // Body: brighter pink
+      grad.addColorStop(1, 'rgba(255, 235, 240, 0.7)'); // Head: bright white-pink
 
       ctx.fillStyle = grad;
       ctx.beginPath();
       
-      // Manta ray body shape
-      ctx.moveTo(manta.size, 0); // nose
+      const wingFlap = Math.sin(manta.wingPhase) * manta.size * 0.6;
       
-      const wingFlap = Math.sin(manta.wingPhase) * manta.size * 0.4;
+      // Nose center
+      ctx.moveTo(manta.size * 0.8, 0);
       
-      // Top wing
-      ctx.quadraticCurveTo(manta.size * 0.2, -manta.size * 0.2, 0, -manta.size * 0.8 + wingFlap);
-      // Top back
-      ctx.quadraticCurveTo(-manta.size * 0.5, -manta.size * 0.2, -manta.size * 1.2, 0); // tail end
-      // Bottom back
-      ctx.quadraticCurveTo(-manta.size * 0.5, manta.size * 0.2, 0, manta.size * 0.8 - wingFlap);
-      // Bottom wing
-      ctx.quadraticCurveTo(manta.size * 0.2, manta.size * 0.2, manta.size, 0);
+      // Right Horn
+      ctx.quadraticCurveTo(manta.size * 0.9, manta.size * 0.1, manta.size, manta.size * 0.15);
+      ctx.quadraticCurveTo(manta.size * 0.8, manta.size * 0.2, manta.size * 0.6, manta.size * 0.1);
+      
+      // Right Wing (sweeping back)
+      ctx.quadraticCurveTo(0, manta.size * 0.8 + wingFlap, -manta.size * 0.2, manta.size * 0.9 + wingFlap);
+      ctx.quadraticCurveTo(-manta.size * 0.4, manta.size * 0.5, -manta.size * 0.5, manta.size * 0.1);
+
+      // Long elegant Tail
+      ctx.lineTo(-manta.size * 2.5, 0);
+
+      // Left Wing (sweeping back)
+      ctx.lineTo(-manta.size * 0.5, -manta.size * 0.1);
+      ctx.quadraticCurveTo(-manta.size * 0.4, -manta.size * 0.5, -manta.size * 0.2, -manta.size * 0.9 - wingFlap);
+      ctx.quadraticCurveTo(0, -manta.size * 0.8 - wingFlap, manta.size * 0.6, -manta.size * 0.1);
+
+      // Left Horn
+      ctx.quadraticCurveTo(manta.size * 0.8, -manta.size * 0.2, manta.size, -manta.size * 0.15);
+      ctx.quadraticCurveTo(manta.size * 0.9, -manta.size * 0.1, manta.size * 0.8, 0);
       
       ctx.fill();
       
-      // Add glowing center
-      ctx.shadowColor = 'rgba(255, 182, 193, 0.8)';
-      ctx.shadowBlur = 15;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      // Add glowing crystal core
+      ctx.shadowColor = 'rgba(255, 182, 193, 0.9)';
+      ctx.shadowBlur = 25;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
       ctx.beginPath();
-      ctx.arc(0, 0, manta.size * 0.1, 0, Math.PI * 2);
+      ctx.ellipse(manta.size * 0.3, 0, manta.size * 0.35, manta.size * 0.12, 0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.restore();
