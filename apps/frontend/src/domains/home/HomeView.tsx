@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useScroll, useTransform, useSpring } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LiquidCard } from "../../components/ui/LiquidCard";
 import { MainInputCard, PREDEFINED_TAGS } from "../../components/ui/MainInputCard";
@@ -139,6 +139,8 @@ interface HomeViewProps {
   viewerUserId?: string | null;
   authReady?: boolean;
   isLocalDev?: boolean;
+  topControls?: React.ReactNode;
+  adminControl?: React.ReactNode;
 }
 
 type DraftPayload = {
@@ -175,6 +177,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
   viewerUserId = null,
   authReady = true,
   isLocalDev = false,
+  topControls,
+  adminControl,
 }) => {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<DraftPayload>(readInitialDraft);
@@ -199,6 +203,13 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const composerGuideRef = useRef<HTMLDivElement>(null);
   const timelineSwitchGuideRef = useRef<HTMLDivElement>(null);
   const timelineListGuideRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const { scrollY } = useScroll({ container: scrollContainerRef });
+  const smoothScrollY = useSpring(scrollY, { stiffness: 80, damping: 10, bounce: 0.01, mass: 0.1, restDelta: 0.001 });
+  const parallaxY = useTransform(smoothScrollY, [0, 800], [0, 300]);
+  const headerOpacity = useTransform(smoothScrollY, [0, 200, 350], [1, 0.9, 0]);
+  const headerScale = useTransform(smoothScrollY, [0, 350], [1, 0.95]);
 
   const {
     data: feedData,
@@ -451,39 +462,52 @@ export const HomeView: React.FC<HomeViewProps> = ({
     isGuideSpotlight && guideStep === index ? "relative z-[122]" : "relative z-10";
 
   return (
-    <div className="relative h-full w-full overflow-y-auto overflow-x-hidden hide-scrollbar bg-[#f8fbff] dark:bg-[#0d1422] transition-all duration-700">
+    <div ref={scrollContainerRef} className="relative h-full w-full overflow-y-auto overflow-x-hidden hide-scrollbar bg-[#f8fbff] dark:bg-[#0d1422] transition-all duration-700">
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         <motion.div
           animate={{ scale: [1, 1.05, 1], x: [0, -10, 0], y: [0, 5, 0] }}
           transition={{ duration: 40, repeat: Infinity, ease: "easeInOut" }}
           className="absolute inset-0"
         >
-          <video
-            src="/Timeless-Grand-Hall.webm"
-            poster="/Timeless-Grand-Hall.png"
-            autoPlay muted loop playsInline
+          <img
+            src="/Timeless-Grand-Hall.png"
+            alt="Elysia Background"
             className="w-full h-full object-cover opacity-60 dark:opacity-20 mix-blend-screen dark:mix-blend-lighten"
           />
         </motion.div>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_14%,rgba(255,255,255,0.7),transparent_45%),radial-gradient(circle_at_82%_12%,rgba(255,231,242,0.52),transparent_38%),radial-gradient(circle_at_50%_90%,rgba(214,236,255,0.3),transparent_50%)]" />
       </div>
 
-      <div className="relative z-10 flex flex-col items-center max-w-6xl mx-auto px-4 pt-16 pb-32 gap-16">
-        {/* Section 1: Landing Header & Input */}
-        <section className="w-full flex flex-col items-center gap-16 max-w-4xl">
+      <motion.div
+        style={{ y: parallaxY }}
+        className="absolute top-0 left-0 right-0 z-[5] pointer-events-none"
+      >
+        <div className="pointer-events-auto">
+          {adminControl}
+          {topControls}
+        </div>
+        <motion.div
+          style={{ opacity: headerOpacity, scale: headerScale }}
+          className="flex flex-col items-center pt-[64px] pb-4 px-4 w-full origin-top"
+        >
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center"
+            className="text-center pointer-events-auto"
           >
-            <h1 className="font-elysia-title elysia-dream-title text-[4rem] sm:text-[5.4rem] tracking-tight">
+            <h1 className="font-elysia-title elysia-dream-title text-[4rem] sm:text-[5.4rem] font-medium tracking-tight">
               Elysia
             </h1>
             <p className="mt-2 font-elysia-display text-base sm:text-lg text-slate-500 dark:text-slate-300">
               粉色天光落进往世乐土，Elysia会永远回应你的期待♪
             </p>
           </motion.div>
+        </motion.div>
+      </motion.div>
 
+      <div className="relative z-10 flex flex-col items-center max-w-6xl mx-auto px-4 pt-[280px] sm:pt-[310px] pb-32 gap-16">
+        {/* Section 1: Landing Header & Input */}
+        <section className="w-full flex flex-col items-center gap-16 max-w-4xl">
           <div ref={composerGuideRef} className={`${guideTargetClass(0)} rounded-[2.25rem] w-full flex flex-col gap-10`}>
             <MainInputCard
               moodPhrase={draft.moodPhrase}

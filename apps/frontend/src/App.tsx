@@ -175,33 +175,55 @@ function App() {
     setTheme(theme === "light" ? "dark" : "light");
   };
 
+  const topControls = (
+    <motion.div
+      initial={false}
+      animate={{
+        opacity: showTopControls ? 1 : 0,
+        y: showTopControls ? 0 : -12,
+      }}
+      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+      onMouseEnter={() => setIsTopControlsHovered(true)}
+      onMouseLeave={() => setIsTopControlsHovered(false)}
+      className={`absolute right-6 top-6 z-50 flex gap-3 ${showTopControls ? "pointer-events-auto" : "pointer-events-none"}`}
+    >
+      <CrystalButton
+        variant="ghost"
+        size="icon"
+        onClick={toggleReduceMotion}
+        className="rounded-full"
+        title={reduceMotion ? "恢复 Elysia 动态光影" : "减弱 Elysia 动态光影"}
+      >
+        <Settings2 className={`h-5 w-5 ${reduceMotion ? "opacity-50" : "opacity-100"}`} />
+      </CrystalButton>
+      <CrystalButton variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full">
+        {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+      </CrystalButton>
+    </motion.div>
+  );
+
+  const adminControl = canOpenAdmin ? (
+    <motion.div
+      initial={false}
+      animate={{
+        opacity: showTopControls ? 1 : 0,
+        y: showTopControls ? 0 : -12,
+      }}
+      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+      onMouseEnter={() => setIsTopControlsHovered(true)}
+      onMouseLeave={() => setIsTopControlsHovered(false)}
+      className={`absolute left-6 top-6 z-50 flex gap-3 ${showTopControls ? "pointer-events-auto" : "pointer-events-none"}`}
+    >
+      <CrystalButton variant="ghost" size="icon" onClick={() => setCurrentView("admin")} className="rounded-full">
+        <Shield className="h-5 w-5" />
+      </CrystalButton>
+    </motion.div>
+  ) : null;
+
   return (
     <AuroraBackground>
       <div className="relative h-screen w-full overflow-hidden">
-        <motion.div
-          initial={false}
-          animate={{
-            opacity: showTopControls ? 1 : 0,
-            y: showTopControls ? 0 : -12,
-          }}
-          transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-          onMouseEnter={() => setIsTopControlsHovered(true)}
-          onMouseLeave={() => setIsTopControlsHovered(false)}
-          className={`absolute right-6 top-6 z-50 flex gap-3 ${showTopControls ? "pointer-events-auto" : "pointer-events-none"}`}
-        >
-          <CrystalButton
-            variant="ghost"
-            size="icon"
-            onClick={toggleReduceMotion}
-            className="rounded-full"
-            title={reduceMotion ? "恢复 Elysia 动态光影" : "减弱 Elysia 动态光影"}
-          >
-            <Settings2 className={`h-5 w-5 ${reduceMotion ? "opacity-50" : "opacity-100"}`} />
-          </CrystalButton>
-          <CrystalButton variant="ghost" size="icon" onClick={toggleTheme} className="rounded-full">
-            {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
-          </CrystalButton>
-        </motion.div>
+        {activeView !== "home" && topControls}
 
         {showSceneNav && (
           <motion.div
@@ -216,7 +238,7 @@ function App() {
               onClick={() => setCurrentView("home")}
               className="rounded-full px-4"
             >
-              返回往世乐土
+              往世乐土
             </CrystalButton>
             <CrystalButton
               variant={isUniverseView ? "primary" : "ghost"}
@@ -253,6 +275,8 @@ function App() {
                 viewerUserId={authQuery.data?.user?.id ?? null}
                 authReady={!authQuery.isLoading && !authQuery.isFetching}
                 isLocalDev={isLocalDev}
+                topControls={topControls}
+                adminControl={adminControl}
               />
             </motion.div>
           )}
@@ -291,7 +315,7 @@ function App() {
             >
               <div className="absolute left-6 top-6 z-[120]">
                 <CrystalButton variant="ghost" onClick={() => setCurrentView("home")} className="rounded-full">
-                  退出控制台
+                  往世乐土
                 </CrystalButton>
               </div>
               <AdminDashboard />
@@ -299,22 +323,8 @@ function App() {
           )}
         </AnimatePresence>
 
-        {canOpenAdmin && activeView === "home" && (
-          <motion.div
-            initial={false}
-            animate={{
-              opacity: showTopControls ? 1 : 0,
-              y: showTopControls ? 0 : -12,
-            }}
-            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-            onMouseEnter={() => setIsTopControlsHovered(true)}
-            onMouseLeave={() => setIsTopControlsHovered(false)}
-            className={`absolute left-6 top-6 z-50 flex gap-3 ${showTopControls ? "pointer-events-auto" : "pointer-events-none"}`}
-          >
-            <CrystalButton variant="ghost" size="icon" onClick={() => setCurrentView("admin")} className="rounded-full">
-              <Shield className="h-5 w-5" />
-            </CrystalButton>
-          </motion.div>
+        {canOpenAdmin && activeView !== "home" && activeView !== "admin" && (
+          adminControl
         )}
 
         <AccessApplicationModal />
