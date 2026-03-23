@@ -250,26 +250,30 @@ export const UniverseCard = React.forwardRef<HTMLDivElement, UniverseCardProps>(
         {/* 右上角浮动标签 (Floating Tags) */}
         {tags.length > 0 && (
           <div className="absolute -top-3 -right-3 flex flex-col items-end gap-1.5 z-30 pointer-events-none">
-            {tags.slice(0, 2).map((tag, idx) => {
-              const config = getEmotionConfig(tag);
-              return (
-                <motion.div 
-                  key={idx}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.2 + idx * 0.1 }}
-                  className={cn(
-                    "inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-full border shadow-[0_4px_10px_rgba(0,0,0,0.1)] backdrop-blur-md",
-                    config.bgClass.replace('/50', '/90').replace('/30', '/80'), // 加深一点背景使其在边缘更清晰
-                    config.textClass,
-                    config.borderClass
-                  )}
-                >
-                  <span className="text-[12px]">{config.icon}</span>
-                  {tag}
-                </motion.div>
-              );
-            })}
+            {(() => {
+              // 从标签列表中最多选出2个
+              const displayTags = tags.slice(0, 2);
+              return displayTags.map((tag, idx) => {
+                const config = getEmotionConfig(tag);
+                return (
+                  <motion.div 
+                    key={idx}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.2 + idx * 0.1 }}
+                    className={cn(
+                      "inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-full border shadow-[0_4px_10px_rgba(0,0,0,0.1)] backdrop-blur-md",
+                      config.bgClass.replace('/50', '/90').replace('/30', '/80'), // 加深一点背景使其在边缘更清晰
+                      config.textClass,
+                      config.borderClass
+                    )}
+                  >
+                    <span className="text-[12px]">{config.icon}</span>
+                    {tag}
+                  </motion.div>
+                );
+              });
+            })()}
           </div>
         )}
 
@@ -277,11 +281,13 @@ export const UniverseCard = React.forwardRef<HTMLDivElement, UniverseCardProps>(
         <div className="relative z-20 flex flex-col h-full justify-between gap-2">
           
           <div className="flex flex-col gap-2">
-            {/* Header: Time */}
-            <div className="flex items-center justify-end">
+            {/* Header: Time & Placeholder for tags */}
+            <div className="flex items-center justify-between">
               <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
                 {time}
               </span>
+              {/* 占位，防止右上角的标题文字和外部的 Tag 标签在视觉上挤在一起 */}
+              <div className="h-4 w-12 shrink-0 pointer-events-none"></div>
             </div>
 
             {/* 标题 */}
