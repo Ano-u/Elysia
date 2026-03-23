@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useUiStore } from '../../store/uiStore';
 
-interface Particle {
+interface Petal {
   x: number;
   y: number;
   vx: number;
@@ -11,18 +11,20 @@ interface Particle {
   size: number;
   angle: number;
   spin: number;
+  flipPhase: number;
+  flipSpeed: number;
   color: string;
 }
 
-interface MantaRay {
+interface CrystalFlower {
   x: number;
   y: number;
   vx: number;
   vy: number;
   angle: number;
-  targetAngle: number;
-  wingPhase: number;
+  spin: number;
   size: number;
+  petalCount: number;
 }
 
 export const StarSeaCanvas: React.FC = () => {
@@ -41,17 +43,26 @@ export const StarSeaCanvas: React.FC = () => {
     canvas.width = width;
     canvas.height = height;
 
-    const particles: Particle[] = [];
-    const mantas: MantaRay[] = Array.from({ length: reduceMotion ? 1 : 3 }).map(() => ({
+    const petals: Petal[] = [];
+    const flowers: CrystalFlower[] = Array.from({ length: reduceMotion ? 2 : 5 }).map(() => ({
       x: Math.random() * width,
       y: Math.random() * height,
-      vx: (Math.random() - 0.5) * 1.5,
-      vy: (Math.random() - 0.5) * 1.5,
+      vx: (Math.random() - 0.5) * 0.5,
+      vy: (Math.random() - 0.5) * 0.5,
       angle: Math.random() * Math.PI * 2,
-      targetAngle: 0,
-      wingPhase: Math.random() * Math.PI * 2,
-      size: 40 + Math.random() * 40,
+      spin: (Math.random() - 0.5) * 0.01,
+      size: 30 + Math.random() * 30,
+      petalCount: Math.random() > 0.5 ? 4 : 6, // Elysia often has 4-pointed or 6-pointed flowers
     }));
+
+    let mouseX = width / 2;
+    let mouseY = height / 2;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    };
+    window.addEventListener('mousemove', handleMouseMove);
 
     const resize = () => {
       width = window.innerWidth;
@@ -61,170 +72,210 @@ export const StarSeaCanvas: React.FC = () => {
     };
     window.addEventListener('resize', resize);
 
-    const drawManta = (manta: MantaRay) => {
+    const getThemeColors = () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      return {
+        isDark,
+        flowerGlow: isDark ? 'rgba(255, 182, 214, 0.8)' : 'rgba(255, 140, 190, 0.6)',
+        flowerCenter: isDark ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 1)',
+        flowerPetalBase: isDark ? 'rgba(230, 140, 190, 0.3)' : 'rgba(255, 160, 200, 0.4)',
+        flowerPetalTip: isDark ? 'rgba(255, 210, 240, 0.7)' : 'rgba(255, 230, 245, 0.8)',
+        flowerStroke: isDark ? 'rgba(255, 200, 230, 0.6)' : 'rgba(220, 140, 180, 0.7)',
+        petalColor: isDark 
+          ? `rgba(255, 182, 214, ${Math.random() * 0.5 + 0.3})`
+          : `rgba(255, 150, 190, ${Math.random() * 0.6 + 0.4})`,
+        explosionColor: isDark
+          ? `rgba(255, 182, 214, ${Math.random() * 0.6 + 0.4})`
+          : `rgba(255, 120, 180, ${Math.random() * 0.7 + 0.3})`
+      };
+    };
+
+    const drawFlower = (flower: CrystalFlower, colors: ReturnType<typeof getThemeColors>) => {
       ctx.save();
-      ctx.translate(manta.x, manta.y);
-      ctx.rotate(manta.angle);
+      ctx.translate(flower.x, flower.y);
+      ctx.rotate(flower.angle);
 
-      // Create a gradient for the manta ray to look like Elysia's crystal aesthetic
-      const grad = ctx.createLinearGradient(-manta.size * 2, 0, manta.size, 0);
-      grad.addColorStop(0, 'rgba(255, 182, 193, 0.05)'); // Tail end: Soft pink/transparent
-      grad.addColorStop(0.5, 'rgba(240, 182, 214, 0.4)'); // Body: brighter pink
-      grad.addColorStop(1, 'rgba(255, 235, 240, 0.7)'); // Head: bright white-pink
+      ctx.shadowColor = colors.flowerGlow;
+      ctx.shadowBlur = colors.isDark ? 30 : 20;
 
-      ctx.fillStyle = grad;
+      // Draw crystal petals
+      for (let i = 0; i < flower.petalCount; i++) {
+        ctx.save();
+        ctx.rotate((i * Math.PI * 2) / flower.petalCount);
+
+        // Petal gradient
+        const grad = ctx.createLinearGradient(0, 0, 0, -flower.size);
+        grad.addColorStop(0, colors.flowerPetalBase);
+        grad.addColorStop(1, colors.flowerPetalTip);
+
+        ctx.fillStyle = grad;
+        ctx.strokeStyle = colors.flowerStroke;
+        ctx.lineWidth = 1;
+
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        // Diamond/Lily shaped crystal petal
+        ctx.bezierCurveTo(flower.size * 0.3, -flower.size * 0.3, flower.size * 0.2, -flower.size * 0.8, 0, -flower.size);
+        ctx.bezierCurveTo(-flower.size * 0.2, -flower.size * 0.8, -flower.size * 0.3, -flower.size * 0.3, 0, 0);
+        ctx.fill();
+        ctx.stroke();
+
+        // Inner facet line
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, -flower.size * 0.9);
+        ctx.strokeStyle = colors.flowerCenter;
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      // Draw center crystal core (4-pointed star)
+      ctx.fillStyle = colors.flowerCenter;
+      ctx.shadowBlur = 15;
       ctx.beginPath();
-      
-      const wingFlap = Math.sin(manta.wingPhase) * manta.size * 0.6;
-      
-      // Nose center
-      ctx.moveTo(manta.size * 0.8, 0);
-      
-      // Right Horn
-      ctx.quadraticCurveTo(manta.size * 0.9, manta.size * 0.1, manta.size, manta.size * 0.15);
-      ctx.quadraticCurveTo(manta.size * 0.8, manta.size * 0.2, manta.size * 0.6, manta.size * 0.1);
-      
-      // Right Wing (sweeping back)
-      ctx.quadraticCurveTo(0, manta.size * 0.8 + wingFlap, -manta.size * 0.2, manta.size * 0.9 + wingFlap);
-      ctx.quadraticCurveTo(-manta.size * 0.4, manta.size * 0.5, -manta.size * 0.5, manta.size * 0.1);
-
-      // Long elegant Tail
-      ctx.lineTo(-manta.size * 2.5, 0);
-
-      // Left Wing (sweeping back)
-      ctx.lineTo(-manta.size * 0.5, -manta.size * 0.1);
-      ctx.quadraticCurveTo(-manta.size * 0.4, -manta.size * 0.5, -manta.size * 0.2, -manta.size * 0.9 - wingFlap);
-      ctx.quadraticCurveTo(0, -manta.size * 0.8 - wingFlap, manta.size * 0.6, -manta.size * 0.1);
-
-      // Left Horn
-      ctx.quadraticCurveTo(manta.size * 0.8, -manta.size * 0.2, manta.size, -manta.size * 0.15);
-      ctx.quadraticCurveTo(manta.size * 0.9, -manta.size * 0.1, manta.size * 0.8, 0);
-      
-      ctx.fill();
-      
-      // Add glowing crystal core
-      ctx.shadowColor = 'rgba(255, 182, 193, 0.9)';
-      ctx.shadowBlur = 25;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-      ctx.beginPath();
-      ctx.ellipse(manta.size * 0.3, 0, manta.size * 0.35, manta.size * 0.12, 0, 0, Math.PI * 2);
+      const rOuter = flower.size * 0.3;
+      const rInner = flower.size * 0.1;
+      for (let i = 0; i < 4; i++) {
+        const rot = (i * Math.PI) / 2;
+        ctx.lineTo(Math.cos(rot) * rOuter, Math.sin(rot) * rOuter);
+        const rotInner = rot + Math.PI / 4;
+        ctx.lineTo(Math.cos(rotInner) * rInner, Math.sin(rotInner) * rInner);
+      }
+      ctx.closePath();
       ctx.fill();
 
       ctx.restore();
     };
 
-    const createTrailParticle = (x: number, y: number) => {
-      if (reduceMotion && particles.length > 20) return;
-      if (!reduceMotion && particles.length > 150) return;
+    const createPetal = (x: number, y: number, colors: ReturnType<typeof getThemeColors>, isExplosion = false) => {
+      if (!isExplosion) {
+        if (reduceMotion && petals.length > 30) return;
+        if (!reduceMotion && petals.length > 200) return;
+      }
       
-      particles.push({
+      const angle = Math.random() * Math.PI * 2;
+      const speed = isExplosion ? Math.random() * 8 + 2 : Math.random() * 1.5 + 0.5;
+      
+      petals.push({
         x: x + (Math.random() - 0.5) * 20,
         y: y + (Math.random() - 0.5) * 20,
-        vx: (Math.random() - 0.5) * 0.5,
-        vy: (Math.random() - 0.5) * 0.5,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
         life: 1,
-        maxLife: 50 + Math.random() * 50,
-        size: 1 + Math.random() * 3,
+        maxLife: isExplosion ? 80 + Math.random() * 60 : 150 + Math.random() * 100,
+        size: Math.random() * 6 + 4,
         angle: Math.random() * Math.PI * 2,
-        spin: (Math.random() - 0.5) * 0.1,
-        color: `rgba(255, 182, 214, ${Math.random() * 0.5 + 0.2})`, // Pink crystal
+        spin: (Math.random() - 0.5) * 0.05,
+        flipPhase: Math.random() * Math.PI * 2,
+        flipSpeed: Math.random() * 0.05 + 0.02,
+        color: isExplosion ? colors.explosionColor : colors.petalColor,
       });
     };
 
-    const drawParticle = (p: Particle) => {
+    const drawPetal = (p: Petal) => {
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(p.angle);
+      
+      // Simulate 3D flipping by scaling Y based on sine wave
+      const scaleY = Math.sin(p.flipPhase);
+      ctx.scale(1, Math.abs(scaleY) < 0.1 ? 0.1 : scaleY); 
       
       const alpha = p.life / p.maxLife;
       ctx.globalAlpha = alpha;
       ctx.fillStyle = p.color;
       
-      // Diamond shape for crystal dust
+      // Draw organic petal shape
       ctx.beginPath();
-      ctx.moveTo(0, -p.size);
-      ctx.lineTo(p.size * 0.6, 0);
-      ctx.lineTo(0, p.size);
-      ctx.lineTo(-p.size * 0.6, 0);
-      ctx.closePath();
+      ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(p.size, p.size * 0.5, p.size, -p.size * 0.5, 0, -p.size);
+      ctx.bezierCurveTo(-p.size, -p.size * 0.5, -p.size, p.size * 0.5, 0, 0);
       ctx.fill();
       
       ctx.restore();
     };
 
-    const createExplosion = (x: number, y: number) => {
-      const count = reduceMotion ? 15 : 40;
-      for (let i = 0; i < count; i++) {
-        particles.push({
-          x,
-          y,
-          vx: (Math.random() - 0.5) * 6,
-          vy: (Math.random() - 0.5) * 6,
-          life: 1,
-          maxLife: 60 + Math.random() * 40,
-          size: 2 + Math.random() * 4,
-          angle: Math.random() * Math.PI * 2,
-          spin: (Math.random() - 0.5) * 0.4,
-          color: `rgba(255, 182, 214, ${Math.random() * 0.6 + 0.4})`, // brighter pink crystal
-        });
-      }
-    };
-
     const handleExplosion = (e: CustomEvent<{ x: number, y: number }>) => {
-      createExplosion(e.detail.x, e.detail.y);
+      const colors = getThemeColors();
+      const count = reduceMotion ? 20 : 50;
+      for (let i = 0; i < count; i++) {
+        createPetal(e.detail.x, e.detail.y, colors, true);
+      }
     };
 
     window.addEventListener('star-sea-explosion', handleExplosion as EventListener);
 
     const update = () => {
       ctx.clearRect(0, 0, width, height);
+      
+      const themeColors = getThemeColors();
 
-      // Update and draw mantas
-      mantas.forEach(manta => {
-        // Change direction randomly but smoothly
-        if (Math.random() < 0.01) {
-          manta.targetAngle = manta.angle + (Math.random() - 0.5) * Math.PI;
-        }
-        
-        manta.angle += (manta.targetAngle - manta.angle) * 0.02;
-        
-        const speed = 0.5 + Math.sin(manta.wingPhase) * 0.2;
-        manta.vx = Math.cos(manta.angle) * speed;
-        manta.vy = Math.sin(manta.angle) * speed;
-        
-        manta.x += manta.vx;
-        manta.y += manta.vy;
-        manta.wingPhase += 0.03;
+      // Mouse interaction effect for petals (gentle swirl)
+      const swirlRadius = 250;
+
+      // Update and draw flowers
+      flowers.forEach(flower => {
+        // Slowly drift
+        flower.x += flower.vx;
+        flower.y += flower.vy;
+        flower.angle += flower.spin;
 
         // Wrap around screen
-        if (manta.x > width + manta.size) manta.x = -manta.size;
-        if (manta.x < -manta.size) manta.x = width + manta.size;
-        if (manta.y > height + manta.size) manta.y = -manta.size;
-        if (manta.y < -manta.size) manta.y = height + manta.size;
+        if (flower.x > width + flower.size * 2) flower.x = -flower.size * 2;
+        if (flower.x < -flower.size * 2) flower.x = width + flower.size * 2;
+        if (flower.y > height + flower.size * 2) flower.y = -flower.size * 2;
+        if (flower.y < -flower.size * 2) flower.y = height + flower.size * 2;
 
-        drawManta(manta);
+        drawFlower(flower, themeColors);
 
-        // Emit trail particles from tail
-        if (Math.random() < (reduceMotion ? 0.1 : 0.3)) {
-          const tailX = manta.x - Math.cos(manta.angle) * manta.size * 1.2;
-          const tailY = manta.y - Math.sin(manta.angle) * manta.size * 1.2;
-          createTrailParticle(tailX, tailY);
+        // Occasionally spawn petals from flowers
+        if (Math.random() < (reduceMotion ? 0.01 : 0.03)) {
+          createPetal(flower.x, flower.y, themeColors, false);
         }
       });
 
-      // Update and draw particles
-      for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
+      // Update and draw floating petals
+      for (let i = petals.length - 1; i >= 0; i--) {
+        const p = petals[i];
+        
+        // Gentle downward drift
+        p.vy += 0.005; // gravity
+        
+        // Mouse interaction: swirl away
+        const dx = mouseX - p.x;
+        const dy = mouseY - p.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < swirlRadius) {
+          const force = (swirlRadius - dist) / swirlRadius;
+          const angleToMouse = Math.atan2(dy, dx);
+          // Swirl tangentially and slightly outward
+          p.vx += Math.cos(angleToMouse + Math.PI / 2) * force * 0.2 - Math.cos(angleToMouse) * force * 0.1;
+          p.vy += Math.sin(angleToMouse + Math.PI / 2) * force * 0.2 - Math.sin(angleToMouse) * force * 0.1;
+        }
+
+        // Apply friction
+        p.vx *= 0.98;
+        p.vy *= 0.98;
+
         p.x += p.vx;
         p.y += p.vy;
         p.angle += p.spin;
+        p.flipPhase += p.flipSpeed;
         p.life -= 1;
         
         if (p.life <= 0) {
-          particles.splice(i, 1);
+          petals.splice(i, 1);
         } else {
-          drawParticle(p);
+          drawPetal(p);
         }
+      }
+
+      // Random ambient background petals
+      if (Math.random() < (reduceMotion ? 0.02 : 0.1)) {
+        createPetal(Math.random() * width, -20, themeColors, false);
       }
 
       animationFrameId = requestAnimationFrame(update);
@@ -242,8 +293,7 @@ export const StarSeaCanvas: React.FC = () => {
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 z-[1] pointer-events-none"
-      style={{ mixBlendMode: 'screen' }}
+      className="absolute inset-0 z-[1] pointer-events-none dark:mix-blend-screen"
     />
   );
 };

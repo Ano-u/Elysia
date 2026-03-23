@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo, useCallback } from "react";
-import { motion, useMotionValue } from "framer-motion";
+import { motion, useMotionValue, animate } from "framer-motion";
 import { UniverseCard } from "./UniverseCard";
 import { ButterflyDecor } from "./ButterflyDecor";
 import { EmojiDock } from "./EmojiDock";
@@ -81,6 +81,67 @@ export const UniverseView: React.FC = () => {
     const timer = setTimeout(() => setShowTooltip(false), 5000);
     return () => clearTimeout(timer);
   }, []);
+
+  // 滑动滚轮放缩与双指捏合放缩
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      // 防止触控板双指滚动变成页面滚动或前进后退
+      e.preventDefault();
+      
+      const zoomSensitivity = 0.0015;
+      const delta = -e.deltaY * zoomSensitivity;
+      const current = scale.get();
+      const next = Math.max(0.4, Math.min(2, current + delta));
+      
+      animate(scale, next, { duration: 0.1, ease: "easeOut" });
+    };
+
+    let initialDistance: number | null = null;
+    let initialScale: number | null = null;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        initialDistance = Math.sqrt(dx * dx + dy * dy);
+        initialScale = scale.get();
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && initialDistance !== null && initialScale !== null) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        const nextScale = initialScale * (distance / initialDistance);
+        scale.set(Math.max(0.4, Math.min(2, nextScale)));
+      }
+    };
+
+    const handleTouchEnd = () => {
+      initialDistance = null;
+      initialScale = null;
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    container.addEventListener('touchstart', handleTouchStart, { passive: false });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd);
+    container.addEventListener('touchcancel', handleTouchEnd);
+
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
+      container.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, [scale]);
 
   // 监听画布拖动，更新视口中心和 API 请求坐标
   useEffect(() => {
@@ -256,7 +317,7 @@ export const UniverseView: React.FC = () => {
   const handleZoom = useCallback((direction: 'in' | 'out') => {
     const current = scale.get();
     const next = direction === 'in' ? Math.min(current + 0.2, 2) : Math.max(current - 0.2, 0.4);
-    scale.set(next);
+    animate(scale, next, { type: "spring", stiffness: 300, damping: 30 });
   }, [scale]);
 
   return (
@@ -310,7 +371,7 @@ export const UniverseView: React.FC = () => {
         dragElastic={reduceMotion ? 0 : 0.1}
         dragMomentum={!reduceMotion}
         style={{ x, y, scale, width: canvasSize, height: canvasSize }}
-        className="relative cursor-grab active:cursor-grabbing touch-none"
+        className="relative cursor-grab active:cursor-grabbing touch-none z-[5]"
       >
         {/* 蝴蝶装饰 */}
         <ButterflyDecor />

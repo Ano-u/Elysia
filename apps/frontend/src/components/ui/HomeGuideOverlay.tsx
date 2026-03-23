@@ -307,7 +307,7 @@ export const HomeGuideOverlay: React.FC<HomeGuideOverlayProps> = ({
                   transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
                   className="w-full max-w-xl rounded-[2rem] border border-white/80 bg-[linear-gradient(145deg,rgba(255,248,255,0.94),rgba(246,238,255,0.9),rgba(239,247,255,0.92))] p-6 shadow-[0_24px_56px_rgba(160,142,211,0.32),inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-3xl dark:border-white/20 dark:bg-[linear-gradient(145deg,rgba(36,26,56,0.88),rgba(42,32,66,0.86),rgba(22,35,60,0.88))]"
                 >
-                  <p className="text-[11px] tracking-[0.22em] text-slate-400/90 dark:text-slate-300/65">ELYSIA · 新人引导</p>
+                  <p className="text-[12px] elysia-glow-text">ELYSIA · 新人引导</p>
                   <h3 className="mt-2 font-elysia-title text-[2.2rem] leading-tight text-slate-700 dark:text-white">让爱莉希雅来接住你吧♪</h3>
                   <p className="mt-3 font-elysia-display text-base leading-relaxed text-slate-600 dark:text-slate-200/88">
                     第一次来到往世乐土时，爱莉会用 3 步轻轻带你熟悉这里。先写一句就很好，剩下的我们慢慢来，好吗？♪
