@@ -1,12 +1,19 @@
 import React, { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { motion, useMotionValue, animate } from "framer-motion";
-import { UniverseCard } from "./UniverseCard";
+import { UniverseCard, getEmotionConfig, REACTION_EMOJIS } from "./UniverseCard";
 import { ButterflyDecor } from "./ButterflyDecor";
 import { EmojiDock } from "./EmojiDock";
 import { useUiStore } from "../../store/uiStore";
 import { useQuery } from "@tanstack/react-query";
-import { getUniverseViewport } from "../../lib/apiClient";
+import { getUniverseViewport, toggleReaction } from "../../lib/apiClient";
 import { StarSeaCanvas } from "./StarSeaCanvas";
+import { AnimatePresence } from "framer-motion";
+import { clsx } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+function cn(...inputs: import("clsx").ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 /**
  * 简单碰撞推开：遍历所有卡片，如果两张卡片中心距离 < minDist，就互相推开。
@@ -76,6 +83,8 @@ export const UniverseView: React.FC = () => {
   // 缩放控制
   const scale = useMotionValue(1);
   const [showTooltip, setShowTooltip] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [selectedCard, setSelectedCard] = useState<any | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowTooltip(false), 5000);
@@ -204,6 +213,7 @@ export const UniverseView: React.FC = () => {
     placeholderData: (prev) => prev,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [cachedCards, setCachedCards] = useState<any[]>([]);
 
   useEffect(() => {
@@ -309,9 +319,63 @@ export const UniverseView: React.FC = () => {
     return minIdx;
   }, [layoutCards, getDistanceRatio]);
 
+  // 反应存储
+  const [reactionsStore, setReactionsStore] = useState<Record<string, Record<string, number>>>({});
+  const [, setUserReacted] = useState<Record<string, Set<string>>>({});
+  const [elysiaToast, setElysiaToast] = useState<string | null>(null);
+
   const handleReaction = useCallback((cardId: string, emojiType: string) => {
-    // TODO: 调用 API 发送反应
-    console.log(`Reaction: ${emojiType} on card ${cardId}`);
+    let success = true;
+    setUserReacted(prev => {
+      const cardSet = prev[cardId] || new Set();
+      if (cardSet.has(emojiType)) {
+        // Already reacted with this emoji
+        setElysiaToast("哎呀，这份满满的心意爱莉已经确实地收到咯，同样的心绪不用重复施放魔法啦♪");
+        success = false;
+        return prev;
+      }
+      // Not reacted yet
+      const newSet = new Set(cardSet);
+      newSet.add(emojiType);
+
+      setReactionsStore(rStore => {
+        const currentCardReactions = rStore[cardId] || {};
+        return {
+          ...rStore,
+          [cardId]: {
+            ...currentCardReactions,
+            [emojiType]: (currentCardReactions[emojiType] || 0) + 1
+          }
+        };
+      });
+
+      // Clear toast if it was showing
+      setElysiaToast(null);
+
+      // Call API in the background
+      toggleReaction(cardId, emojiType).catch((err) => {
+        console.error("Failed to save reaction", err);
+      });
+
+      return { ...prev, [cardId]: newSet };
+    });
+
+    return success;
+  }, []);
+
+  // 自动清除 Toast
+  useEffect(() => {
+    if (elysiaToast) {
+      const timer = setTimeout(() => setElysiaToast(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [elysiaToast]);
+
+  const [currentNow, setCurrentNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentNow(Date.now()), 60000);
+    return () => clearInterval(timer);
   }, []);
 
   const handleZoom = useCallback((direction: 'in' | 'out') => {
@@ -364,6 +428,23 @@ export const UniverseView: React.FC = () => {
           拖动画布漫游 · 靠近中心的回响会如水晶般清晰哦♪
         </div>
       </motion.div>
+
+      {/* 爱莉希雅专属 Toast */}
+      <AnimatePresence>
+        {elysiaToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: -20, x: "-50%" }}
+            className="fixed top-24 left-1/2 z-[150] whitespace-nowrap px-6 py-3 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-pink-200 dark:border-pink-800 shadow-[0_10px_30px_rgba(255,182,193,0.3)] flex items-center gap-3"
+          >
+            <span className="text-xl">🌸</span>
+            <span className="text-sm font-elysia-display text-slate-700 dark:text-slate-200 tracking-wide">
+              {elysiaToast}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <motion.div
         drag
@@ -422,10 +503,32 @@ export const UniverseView: React.FC = () => {
         {layoutCards.map(({ card, physicalX, physicalY, showQuote }, i) => {
           const rtf = new Intl.RelativeTimeFormat('zh', { numeric: 'auto' });
           const daysDiff = Math.round(
-            (new Date(card.createdAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+            (new Date(card.createdAt).getTime() - currentNow) / (1000 * 60 * 60 * 24)
           );
           const timeStr = rtf.format(daysDiff, 'day');
           const distanceRatio = getDistanceRatio(physicalX, physicalY);
+
+          const cardReactions = { ...reactionsStore[card.id] };
+          const bHearts = Number(card.hearts || 0);
+          const bHugs = Number(card.hugs || 0);
+          const bStars = Number(card.stars || 0);
+          const bButterflies = Number(card.butterflies || 0);
+          const bFlowers = Number(card.flowers || 0);
+
+          if (bHearts > 0 && !cardReactions.heart) cardReactions.heart = bHearts;
+          else if (bHearts > 0) cardReactions.heart += bHearts;
+          
+          if (bHugs > 0 && !cardReactions.hug) cardReactions.hug = bHugs;
+          else if (bHugs > 0) cardReactions.hug += bHugs;
+
+          if (bStars > 0 && !cardReactions.star) cardReactions.star = bStars;
+          else if (bStars > 0) cardReactions.star += bStars;
+
+          if (bButterflies > 0 && !cardReactions.butterfly) cardReactions.butterfly = bButterflies;
+          else if (bButterflies > 0) cardReactions.butterfly += bButterflies;
+
+          if (bFlowers > 0 && !cardReactions.flower) cardReactions.flower = bFlowers;
+          else if (bFlowers > 0) cardReactions.flower += bFlowers;
 
           return (
             <UniverseCard
@@ -434,13 +537,15 @@ export const UniverseView: React.FC = () => {
               y={physicalY}
               title={card.moodPhrase}
               quote={card.quote}
-              tags={card.tags || []}
+              tags={card.extraEmotions?.length ? card.extraEmotions : (card.tags || [])}
               showQuote={showQuote}
               time={timeStr}
               author={card.authorName || '无名星光'}
               distanceRatio={distanceRatio}
               isActive={i === activeIndex}
+              reactions={cardReactions}
               onReaction={(emojiType) => handleReaction(card.id, emojiType)}
+              onClick={() => setSelectedCard(card)}
             />
           );
         })}
@@ -466,6 +571,157 @@ export const UniverseView: React.FC = () => {
 
       {/* 表情拖拽面板 */}
       <EmojiDock />
+
+      {/* 详细查看的弹窗 (Expanded Detail View) */}
+      <AnimatePresence>
+        {selectedCard && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 dark:bg-black/60 backdrop-blur-sm"
+            onClick={() => setSelectedCard(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto hide-scrollbar rounded-[2.5rem] bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl border border-white/60 dark:border-white/10 shadow-2xl p-8"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* 装饰性背景光晕 */}
+              <div className="absolute -top-20 -right-20 w-64 h-64 bg-pink-300/30 rounded-full blur-3xl mix-blend-screen pointer-events-none" />
+              <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-purple-300/30 rounded-full blur-3xl mix-blend-screen pointer-events-none" />
+              
+              {/* Header Info */}
+              <div className="flex flex-wrap items-center gap-2 mb-6 relative z-10">
+                {(selectedCard.extraEmotions?.length ? selectedCard.extraEmotions : (selectedCard.tags || [])).map((tag: string, idx: number) => {
+                  const config = getEmotionConfig(tag);
+                  return (
+                    <span 
+                      key={idx}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border shadow-sm",
+                        config.bgClass,
+                        config.textClass,
+                        config.borderClass
+                      )}
+                    >
+                      <span>{config.icon}</span>
+                      {tag}
+                    </span>
+                  );
+                })}
+                
+                {/* 反应标签 */}
+                {(() => {
+                  const cardReactions = { ...reactionsStore[selectedCard.id] };
+                  const bHearts = Number(selectedCard.hearts || 0);
+                  const bHugs = Number(selectedCard.hugs || 0);
+                  const bStars = Number(selectedCard.stars || 0);
+                  const bButterflies = Number(selectedCard.butterflies || 0);
+                  const bFlowers = Number(selectedCard.flowers || 0);
+
+                  if (bHearts > 0 && !cardReactions.heart) cardReactions.heart = bHearts;
+                  else if (bHearts > 0) cardReactions.heart += bHearts;
+                  
+                  if (bHugs > 0 && !cardReactions.hug) cardReactions.hug = bHugs;
+                  else if (bHugs > 0) cardReactions.hug += bHugs;
+
+                  if (bStars > 0 && !cardReactions.star) cardReactions.star = bStars;
+                  else if (bStars > 0) cardReactions.star += bStars;
+
+                  if (bButterflies > 0 && !cardReactions.butterfly) cardReactions.butterfly = bButterflies;
+                  else if (bButterflies > 0) cardReactions.butterfly += bButterflies;
+
+                  if (bFlowers > 0 && !cardReactions.flower) cardReactions.flower = bFlowers;
+                  else if (bFlowers > 0) cardReactions.flower += bFlowers;
+
+                  if (Object.keys(cardReactions).length === 0) return null;
+
+                  return (
+                    <div className="flex items-center gap-1.5 ml-2 border-l border-white/20 pl-2">
+                      {Object.entries(cardReactions).map(([emojiType, count]) => (
+                        <div key={emojiType} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/40 dark:bg-black/30 text-xs text-slate-600 dark:text-slate-300 font-medium shadow-sm">
+                          <span>{REACTION_EMOJIS[emojiType] || "✨"}</span>
+                          <span>{count as number}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                <span className="ml-auto text-sm text-slate-500 dark:text-slate-400 font-medium">
+                  {new Date(selectedCard.createdAt).toLocaleString('zh-CN', {
+                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                  })}
+                </span>
+              </div>
+
+              {/* Main Content */}
+              <div className="space-y-6 relative z-10">
+                <div>
+                  <p className="text-[10px] tracking-widest text-pink-500/80 dark:text-pink-400/80 font-bold mb-1.5 uppercase">Mood Phrase</p>
+                  <h2 className="font-elysia-display text-2xl font-bold leading-relaxed text-slate-800 dark:text-slate-100">
+                    {selectedCard.moodPhrase}
+                  </h2>
+                </div>
+
+                {selectedCard.quote && (
+                  <div>
+                    <p className="text-[10px] tracking-widest text-purple-500/80 dark:text-purple-400/80 font-bold mb-1.5 uppercase">Quote</p>
+                    <p className="text-lg text-slate-600 dark:text-slate-300 italic font-serif relative whitespace-pre-wrap break-words">
+                      <span className="absolute -left-4 -top-2 text-3xl text-purple-300/50 dark:text-purple-700/50">"</span>
+                      {selectedCard.quote}
+                      <span className="text-3xl text-purple-300/50 dark:text-purple-700/50 -translate-y-2 inline-block ml-1">"</span>
+                    </p>
+                  </div>
+                )}
+
+                {selectedCard.description && (
+                  <div>
+                    <p className="text-[10px] tracking-widest text-blue-500/80 dark:text-blue-400/80 font-bold mb-1.5 uppercase">Story</p>
+                    <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed bg-white/40 dark:bg-black/20 p-4 rounded-2xl border border-white/50 dark:border-white/5 whitespace-pre-wrap break-words">
+                      {selectedCard.description}
+                    </p>
+                  </div>
+                )}
+
+                {selectedCard.occurredAt && (
+                  <div>
+                    <p className="text-[10px] tracking-widest text-orange-500/80 dark:text-orange-400/80 font-bold mb-1.5 uppercase">Occurred At</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-300">
+                      {selectedCard.occurredAt}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer Author */}
+              <div className="mt-8 pt-4 border-t border-slate-200/60 dark:border-slate-700/50 flex justify-between items-center relative z-10">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-pink-400 to-purple-400 flex items-center justify-center text-white font-bold shadow-md">
+                    {(selectedCard.authorName || '无')[0]}
+                  </div>
+                  <span className="font-elysia-display text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    {selectedCard.authorName || '无名星光'}
+                  </span>
+                </div>
+                
+                <button 
+                  onClick={() => setSelectedCard(null)}
+                  className="px-6 py-2 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium hover:scale-105 transition-transform shadow-lg"
+                >
+                  关闭
+                </button>
+              </div>
+
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 };

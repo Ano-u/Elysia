@@ -62,12 +62,17 @@ type RawUniverseItem = {
   mood_phrase: string;
   quote?: string | null;
   description?: string | null;
+  tags?: string[] | null;
+  extra_emotions?: string[] | null;
   created_at: string;
   user_id: string;
   display_name: string;
   avatar_url?: string | null;
   hearts?: string | number;
   hugs?: string | number;
+  stars?: string | number;
+  butterflies?: string | number;
+  flowers?: string | number;
   coord: { x: number; y: number };
   personalScore?: number;
 };
@@ -204,12 +209,17 @@ export const getUniverseViewport = (x: number, y: number, w: number, h: number) 
         moodPhrase: item.mood_phrase,
         quote: item.quote ?? null,
         description: item.description ?? null,
+        tags: item.tags ?? undefined,
+        extraEmotions: item.extra_emotions ?? undefined,
         createdAt: item.created_at,
         authorId: item.user_id,
         authorName: item.display_name,
         authorAvatar: item.avatar_url ?? null,
         hearts: Number(item.hearts ?? 0),
         hugs: Number(item.hugs ?? 0),
+        stars: Number(item.stars ?? 0),
+        butterflies: Number(item.butterflies ?? 0),
+        flowers: Number(item.flowers ?? 0),
         coord: item.coord,
         personalScore: item.personalScore,
       })),
@@ -223,6 +233,13 @@ export const getUniverseViewport = (x: number, y: number, w: number, h: number) 
 
 export const getUniverseFocus = () =>
   fetchApi('/api/universe/focus');
+
+// --- Reactions ---
+export const toggleReaction = (recordId: string, reactionType: string) =>
+  fetchApi<{ ok: true }>('/api/reactions', {
+    method: 'POST',
+    body: JSON.stringify({ recordId, reactionType }),
+  });
 
 // --- MindMap ---
 export const getMindMapMe = (mode: 'simple' | 'deep' = 'simple') =>

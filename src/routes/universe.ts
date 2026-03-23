@@ -6,6 +6,7 @@ type UniverseItem = {
   id: string;
   user_id: string;
   mood_phrase: string;
+  description: string | null;
   created_at: string;
   is_public: boolean;
   quote: string | null;
@@ -13,6 +14,11 @@ type UniverseItem = {
   avatar_url: string | null;
   hearts: string;
   hugs: string;
+  stars: string;
+  butterflies: string;
+  flowers: string;
+  tags: string[];
+  extra_emotions: string[];
 };
 
 function pickFocus(items: UniverseItem[]): { primary: UniverseItem | null; secondary: UniverseItem[] } {
@@ -56,13 +62,27 @@ export async function universeRoutes(app: FastifyInstance): Promise<void> {
             r.id,
             r.user_id,
             r.mood_phrase,
+            r.description,
             r.created_at,
             r.is_public,
             rq.quote,
+            COALESCE((
+              SELECT ARRAY_AGG(re.emotion ORDER BY re.created_at ASC)
+              FROM record_emotions re
+              WHERE re.record_id = r.id
+            ), ARRAY[]::text[]) AS extra_emotions,
+            COALESCE((
+              SELECT ARRAY_AGG(rt.tag ORDER BY rt.created_at ASC)
+              FROM record_tags rt
+              WHERE rt.record_id = r.id
+            ), ARRAY[]::text[]) AS tags,
             u.display_name,
             u.avatar_url,
             COALESCE(SUM(CASE WHEN re.reaction_type = 'heart' THEN 1 ELSE 0 END), 0)::text AS hearts,
             COALESCE(SUM(CASE WHEN re.reaction_type = 'hug' THEN 1 ELSE 0 END), 0)::text AS hugs,
+            COALESCE(SUM(CASE WHEN re.reaction_type = 'star' THEN 1 ELSE 0 END), 0)::text AS stars,
+            COALESCE(SUM(CASE WHEN re.reaction_type = 'butterfly' THEN 1 ELSE 0 END), 0)::text AS butterflies,
+            COALESCE(SUM(CASE WHEN re.reaction_type = 'flower' THEN 1 ELSE 0 END), 0)::text AS flowers,
             ((ABS(hashtext(r.id::text || ':x')) % 180000)::double precision / 100.0) - 900.0 AS vx,
             ((ABS(hashtext(r.id::text || ':y')) % 180000)::double precision / 100.0) - 900.0 AS vy,
             CASE
@@ -81,7 +101,7 @@ export async function universeRoutes(app: FastifyInstance): Promise<void> {
           LEFT JOIN reactions re ON re.record_id = r.id
           WHERE r.is_public = TRUE
             AND r.publication_status = 'published'
-          GROUP BY r.id, rq.quote, u.display_name, u.avatar_url
+          GROUP BY r.id, r.description, rq.quote, u.display_name, u.avatar_url
         )
         SELECT *
         FROM ranked

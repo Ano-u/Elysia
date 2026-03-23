@@ -239,14 +239,14 @@ async function trackAccess(req: FastifyRequest, reply: FastifyReply): Promise<vo
     .incr(globalMinuteKey)
     .expire(globalMinuteKey, 60 * 10)
     .exec()
-    .then((res) => [Number(res?.[0]?.[1] ?? 0)]);
+    .then((res: any) => [Number(res?.[0]?.[1] ?? 0)]);
 
   const [ipCount] = await redis
     .multi()
     .incr(ipMinuteKey)
     .expire(ipMinuteKey, 60 * 10)
     .exec()
-    .then((res) => [Number(res?.[0]?.[1] ?? 0)]);
+    .then((res: any) => [Number(res?.[0]?.[1] ?? 0)]);
 
   if (req.user?.id) {
     const userMinuteKey = `metrics:user:${req.user.id}:${nowMinute}`;
@@ -255,7 +255,7 @@ async function trackAccess(req: FastifyRequest, reply: FastifyReply): Promise<vo
       .incr(userMinuteKey)
       .expire(userMinuteKey, 60 * 10)
       .exec()
-      .then((res) => [Number(res?.[0]?.[1] ?? 0)]);
+      .then((res: any) => [Number(res?.[0]?.[1] ?? 0)]);
 
     if (userCount === 241) {
       await redis.set(`challenge:user:${req.user.id}`, "1", "EX", 60 * 10);
@@ -283,8 +283,8 @@ async function trackAccess(req: FastifyRequest, reply: FastifyReply): Promise<vo
   if (globalCount % 30 === 0 && globalCount > 100) {
     const prevKeys = [1, 2, 3, 4, 5].map((offset) => `metrics:global:${nowMinute - offset}`);
     const prevValues = await redis.mget(prevKeys);
-    const nums = prevValues.map((v) => Number(v ?? 0));
-    const prevAvg = nums.reduce((sum, val) => sum + val, 0) / nums.length;
+    const nums = prevValues.map((v: any) => Number(v ?? 0));
+    const prevAvg = nums.reduce((sum: number, val: number) => sum + val, 0) / nums.length;
     if (prevAvg > 0 && globalCount >= prevAvg * 3) {
       const dedupKey = `alerts:spike:${nowMinute}`;
       const locked = await redis.set(dedupKey, "1", "EX", 70, "NX");

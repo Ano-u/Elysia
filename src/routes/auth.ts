@@ -32,7 +32,7 @@ const switchSchema = z.object({
 
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post("/auth/dev/switch-user", async (req, reply) => {
-    if (env.NODE_ENV === "production") {
+    if (env.NODE_ENV === ("production" as any)) {
       reply.code(404).send({ message: "Not Found" });
       return;
     }
@@ -73,7 +73,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       httpOnly: true,
       sameSite: "lax",
       path: "/",
-      secure: env.NODE_ENV === "production",
+      secure: env.NODE_ENV === ("production" as any),
       signed: true,
       maxAge: 60 * 60 * 24 * 30,
     });
@@ -112,7 +112,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       httpOnly: true,
       sameSite: "lax",
       path: "/",
-      secure: env.NODE_ENV === "production",
+      secure: env.NODE_ENV === ("production" as any),
       signed: true,
       maxAge: 60 * 10,
     });
@@ -120,7 +120,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       httpOnly: true,
       sameSite: "lax",
       path: "/",
-      secure: env.NODE_ENV === "production",
+      secure: env.NODE_ENV === ("production" as any),
       signed: true,
       maxAge: 60 * 10,
     });
@@ -311,7 +311,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       httpOnly: true,
       sameSite: "lax",
       path: "/",
-      secure: env.NODE_ENV === "production",
+      secure: env.NODE_ENV === ("production" as any),
       signed: true,
       maxAge: 60 * 60 * 24 * 30,
     });

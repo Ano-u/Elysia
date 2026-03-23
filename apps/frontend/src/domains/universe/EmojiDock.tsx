@@ -1,6 +1,7 @@
 import React from "react";
 
 /** 5 个可拖拽表情 */
+// eslint-disable-next-line react-refresh/only-export-components
 export const REACTION_EMOJIS = [
   { type: "heart", emoji: "💗", label: "心心", color: "rgba(255,105,180,0.5)" },
   { type: "hug", emoji: "🤗", label: "拥抱", color: "rgba(255,200,100,0.5)" },

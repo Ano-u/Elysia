@@ -1,3 +1,4 @@
+// eslint-disable-next-line no-control-regex
 const ENGLISH_ONLY_PATTERN = /^[\x00-\x7F\s\p{P}]+$/u;
 
 function isLikelyEnglish(text: string): boolean {

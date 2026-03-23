@@ -1,5 +1,5 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import type { SocketStream } from "@fastify/websocket";
+import type { WebSocket } from "@fastify/websocket";
 
 type MessagePayload = {
   event: string;
@@ -7,12 +7,12 @@ type MessagePayload = {
   at: string;
 };
 
-const sockets = new Set<SocketStream["socket"]>();
+const sockets = new Set<WebSocket>();
 
-export function registerSocket(connection: SocketStream): void {
-  sockets.add(connection.socket);
-  connection.socket.on("close", () => {
-    sockets.delete(connection.socket);
+export function registerSocket(connection: WebSocket): void {
+  sockets.add(connection);
+  connection.on("close", () => {
+    sockets.delete(connection);
   });
 }
 

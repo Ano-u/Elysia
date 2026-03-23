@@ -104,12 +104,16 @@ export interface UniverseItem {
   quote?: string | null;
   description?: string | null;
   tags?: string[] | null;
+  extraEmotions?: string[] | null;
   createdAt: string;
   authorId: string;
   authorName: string;
   authorAvatar?: string | null;
   hearts: number;
   hugs: number;
+  stars: number;
+  butterflies: number;
+  flowers: number;
   coord: { x: number; y: number };
   personalScore?: number;
 }

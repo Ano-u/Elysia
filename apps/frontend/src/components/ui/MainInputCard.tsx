@@ -4,6 +4,7 @@ import { LiquidCard } from "./LiquidCard";
 import { ChevronDown, ChevronUp, Quote } from "lucide-react";
 import { useRotatingCopy } from "../../lib/rotatingCopy";
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const PREDEFINED_TAGS = ["温柔", "热烈", "想念", "孤独", "平静", "欢欣", "迷茫", "希望"];
 
 interface MainInputCardProps {

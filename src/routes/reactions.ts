@@ -17,7 +17,7 @@ export async function reactionsRoutes(app: FastifyInstance): Promise<void> {
     const body = z
       .object({
         recordId: z.string().uuid(),
-        reactionType: z.enum(["hug", "heart"]),
+        reactionType: z.enum(["hug", "heart", "star", "butterfly", "flower"]),
       })
       .parse(req.body);
 
@@ -45,7 +45,7 @@ export async function reactionsRoutes(app: FastifyInstance): Promise<void> {
       [body.recordId, user.id, body.reactionType],
     );
 
-    const summary = await query<{ reaction_type: "hug" | "heart"; total: string }>(
+    const summary = await query<{ reaction_type: "hug" | "heart" | "star" | "butterfly" | "flower"; total: string }>(
       `
         SELECT reaction_type, COUNT(*)::text AS total
         FROM reactions
@@ -89,7 +89,7 @@ export async function reactionsRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const recordId = deleted.rows[0].record_id;
-    const summary = await query<{ reaction_type: "hug" | "heart"; total: string }>(
+    const summary = await query<{ reaction_type: "hug" | "heart" | "star" | "butterfly" | "flower"; total: string }>(
       `
         SELECT reaction_type, COUNT(*)::text AS total
         FROM reactions
@@ -120,7 +120,7 @@ export async function reactionsRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
-    const summary = await query<{ reaction_type: "hug" | "heart"; total: string }>(
+    const summary = await query<{ reaction_type: "hug" | "heart" | "star" | "butterfly" | "flower"; total: string }>(
       `
         SELECT reaction_type, COUNT(*)::text AS total
         FROM reactions

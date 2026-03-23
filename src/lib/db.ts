@@ -1,4 +1,4 @@
-import { Pool, type PoolClient, type QueryResult } from "pg";
+import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from "pg";
 import { env } from "../config/env.js";
 
 export const db = new Pool({
@@ -23,6 +23,6 @@ export async function withTransaction<T>(handler: (client: PoolClient) => Promis
   }
 }
 
-export async function query<T>(sql: string, params: unknown[] = []): Promise<QueryResult<T>> {
+export async function query<T extends QueryResultRow = any>(sql: string, params: unknown[] = []): Promise<QueryResult<T>> {
   return db.query<T>(sql, params);
 }
