@@ -3,32 +3,48 @@ import re
 with open('apps/frontend/src/domains/universe/UniverseView.tsx', 'r', encoding='utf-8') as f:
     content = f.read()
 
-# Fix Modal Render
-content = re.sub(
-    r'\{selectedCard && \(\s*<motion\.div\s*initial=\{\{ opacity: 0 \}\}\s*animate=\{\{ opacity: 1 \}\}\s*exit=\{\{ opacity: 0 \}\}\s*className="fixed inset-0 z-\[100\] flex items-center justify-center p-4 bg-black/20 dark:bg-black/60 backdrop-blur-sm"\s*onClick=\{\(\) => \{ setSelectedCard\(null\); setIsReplying\(false\); \}\}\s*>\s*<div className="flex gap-4 items-stretch h-auto max-h-\[90vh\]" onClick=\{\(e\) => e\.stopPropagation\(\)\}>\s*<motion\.div',
-    r'''{openedCards.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center p-4 bg-black/20 dark:bg-black/60 backdrop-blur-sm overflow-x-auto hide-scrollbar"
+# Replace the modal rendering logic
+old_modal_start = """      <AnimatePresence>
+        {selectedCard && ("""
+
+new_modal_start = """      <AnimatePresence>
+        {openedCards.length > 0 && ("""
+
+content = content.replace(old_modal_start, new_modal_start)
+
+# Replace the backdrop click handler
+old_backdrop = """            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 dark:bg-black/60 backdrop-blur-sm"
+            onClick={() => { setSelectedCard(null); setIsReplying(false); }}
+          >
+            <div className="flex gap-4 items-stretch h-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <motion.div"""
+
+new_backdrop = """            className="fixed inset-0 z-[100] flex items-center p-4 bg-black/20 dark:bg-black/60 backdrop-blur-sm overflow-x-auto hide-scrollbar"
             onClick={() => { setOpenedCards([]); setIsReplying(false); setReplyingToId(null); }}
           >
-            <div className="flex gap-6 items-stretch h-[85vh] min-h-[500px] w-max mx-auto px-10" onClick={(e) => e.stopPropagation()}>
-            {openedCards.map((selectedCard, index) => (
-            <motion.div
-              key={selectedCard.id || index}''',
-    content
-)
+            <div className="flex gap-6 items-stretch h-[80vh] min-h-[500px] mx-auto px-10" onClick={(e) => e.stopPropagation()}>
+              {openedCards.map((selectedCard, index) => (
+                <motion.div
+                  key={selectedCard.id || index}"""
 
-# Fix relative w-full
-content = re.sub(
-    r'className="relative w-full max-w-lg flex flex-col rounded-\[2\.5rem\] bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl border border-white/60 dark:border-white/10 shadow-2xl overflow-hidden"',
-    r'className="relative w-[500px] flex-shrink-0 flex flex-col rounded-[2.5rem] bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl border border-white/60 dark:border-white/10 shadow-2xl overflow-hidden"',
-    content
-)
+content = content.replace(old_backdrop, new_backdrop)
 
-# Replace the Footer entirely
+# The end of the map
+# Find the end of the motion.div for the card, which is just before {/* Right Side: The Reply Panel */}
+old_panel_start = """              </div>
+            </motion.div>
+
+            {/* Right Side: The Reply Panel */}"""
+
+new_panel_start = """              </div>
+            </motion.div>
+            ))}
+
+            {/* Right Side: The Reply Panel */}"""
+
+content = content.replace(old_panel_start, new_panel_start)
+
+# In the footer, update the buttons
 old_footer = """              {/* Footer Author */}
               <div className="mt-8 pt-4 border-t border-slate-200/60 dark:border-slate-700/50 flex justify-between items-center relative z-10">
                 <div className="flex items-center gap-2">
@@ -55,11 +71,7 @@ old_footer = """              {/* Footer Author */}
                     关闭
                   </button>
                 </div>
-              </div>
-              </div>
-            </motion.div>
-
-            {/* Right Side: The Reply Panel */}"""
+              </div>"""
 
 new_footer = """              {/* Footer Author */}
               <div className="mt-auto pt-4 border-t border-slate-200/60 dark:border-slate-700/50 flex justify-between items-center relative z-10">
@@ -90,7 +102,7 @@ new_footer = """              {/* Footer Author */}
                 
                 <div className="flex gap-2">
                   {/* 查看父帖图标 */}
-                  {selectedCard.replyContext?.isReply && selectedCard.replyContext?.parentRecordId && !openedCards.find(c => c.id === selectedCard.replyContext?.parentRecordId) && (
+                  {selectedCard.replyContext?.showParentArrow && selectedCard.replyContext?.parentRecordId && !openedCards.find(c => c.id === selectedCard.replyContext?.parentRecordId) && (
                     <button
                       onClick={async () => {
                         try {
@@ -119,7 +131,7 @@ new_footer = """              {/* Footer Author */}
                   )}
                   
                   {/* 查看主帖图标 */}
-                  {selectedCard.replyContext?.isReply && selectedCard.replyContext?.rootRecordId && selectedCard.replyContext?.rootRecordId !== selectedCard.replyContext?.parentRecordId && !openedCards.find(c => c.id === selectedCard.replyContext?.rootRecordId) && (
+                  {selectedCard.replyContext?.showRootArrow && selectedCard.replyContext?.rootRecordId && !openedCards.find(c => c.id === selectedCard.replyContext?.rootRecordId) && (
                     <button
                       onClick={async () => {
                         try {
@@ -136,4 +148,6 @@ new_footer = """              {/* Footer Author */}
                             };
                             setOpenedCards(prev => [...prev, newCard]);
                           }
-      
+                        } catch (e) {
+                          console.error("Failed to fetch root record", e);
+           

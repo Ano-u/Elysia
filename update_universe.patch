@@ -1,0 +1,16 @@
+--- apps/frontend/src/domains/universe/UniverseView.tsx
++++ apps/frontend/src/domains/universe/UniverseView.tsx
+@@ -5,14 +5,14 @@
+ import { EmojiDock } from "./EmojiDock";
+ import { useUiStore } from "../../store/uiStore";
+ import { useQuery, useMutation } from "@tanstack/react-query";
+-import { getUniverseViewport, toggleReaction, createReply } from "../../lib/apiClient";
++import { getUniverseViewport, toggleReaction, createReply, getRecord } from "../../lib/apiClient";
+ import { MainInputCard, PREDEFINED_TAGS } from "../../components/ui/MainInputCard";
+ import { ActionPairRow } from "../../components/ui/ActionPairRow";
+-import { Tag as TagIcon, MessageCircle } from "lucide-react";
++import { Tag as TagIcon, MessageCircle, CornerLeftUp, ArrowUpToLine, X } from "lucide-react";
+ import { StarSeaCanvas } from "./StarSeaCanvas";
+ import { AnimatePresence } from "framer-motion";
+ import { clsx } from "clsx";
+ import { twMerge } from "tailwind-merge";

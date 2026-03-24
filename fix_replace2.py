@@ -3,65 +3,14 @@ import re
 with open('apps/frontend/src/domains/universe/UniverseView.tsx', 'r', encoding='utf-8') as f:
     content = f.read()
 
-# Fix Modal Render
-content = re.sub(
-    r'\{selectedCard && \(\s*<motion\.div\s*initial=\{\{ opacity: 0 \}\}\s*animate=\{\{ opacity: 1 \}\}\s*exit=\{\{ opacity: 0 \}\}\s*className="fixed inset-0 z-\[100\] flex items-center justify-center p-4 bg-black/20 dark:bg-black/60 backdrop-blur-sm"\s*onClick=\{\(\) => \{ setSelectedCard\(null\); setIsReplying\(false\); \}\}\s*>\s*<div className="flex gap-4 items-stretch h-auto max-h-\[90vh\]" onClick=\{\(e\) => e\.stopPropagation\(\)\}>\s*<motion\.div',
-    r'''{openedCards.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center p-4 bg-black/20 dark:bg-black/60 backdrop-blur-sm overflow-x-auto hide-scrollbar"
-            onClick={() => { setOpenedCards([]); setIsReplying(false); setReplyingToId(null); }}
-          >
-            <div className="flex gap-6 items-stretch h-[85vh] min-h-[500px] w-max mx-auto px-10" onClick={(e) => e.stopPropagation()}>
-            {openedCards.map((selectedCard, index) => (
-            <motion.div
-              key={selectedCard.id || index}''',
-    content
-)
+old_footer_start = "              {/* Footer Author */}"
+old_panel_start = "            {/* Right Side: The Reply Panel */}"
 
-# Fix relative w-full
-content = re.sub(
-    r'className="relative w-full max-w-lg flex flex-col rounded-\[2\.5rem\] bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl border border-white/60 dark:border-white/10 shadow-2xl overflow-hidden"',
-    r'className="relative w-[500px] flex-shrink-0 flex flex-col rounded-[2.5rem] bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl border border-white/60 dark:border-white/10 shadow-2xl overflow-hidden"',
-    content
-)
+start_idx = content.find(old_footer_start)
+end_idx = content.find(old_panel_start)
 
-# Replace the Footer entirely
-old_footer = """              {/* Footer Author */}
-              <div className="mt-8 pt-4 border-t border-slate-200/60 dark:border-slate-700/50 flex justify-between items-center relative z-10">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-pink-400 to-purple-400 flex items-center justify-center text-white font-bold shadow-md">
-                    {(selectedCard.authorName || '无')[0]}
-                  </div>
-                  <span className="font-elysia-display text-sm font-semibold text-slate-700 dark:text-slate-200">
-                    {selectedCard.authorName || '无名星光'}
-                  </span>
-                </div>
-                
-                <div className="flex gap-3">
-                  <button 
-                    onClick={() => setIsReplying(!isReplying)}
-                    className="flex items-center gap-1.5 px-5 py-2 rounded-full bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-300 text-sm font-medium hover:scale-105 transition-transform shadow-sm"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    {isReplying ? "收起" : "添加评论"}
-                  </button>
-                  <button 
-                    onClick={() => { setSelectedCard(null); setIsReplying(false); }}
-                    className="px-6 py-2 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-medium hover:scale-105 transition-transform shadow-lg"
-                  >
-                    关闭
-                  </button>
-                </div>
-              </div>
-              </div>
-            </motion.div>
-
-            {/* Right Side: The Reply Panel */}"""
-
-new_footer = """              {/* Footer Author */}
+if start_idx != -1 and end_idx != -1:
+    new_footer = """              {/* Footer Author */}
               <div className="mt-auto pt-4 border-t border-slate-200/60 dark:border-slate-700/50 flex justify-between items-center relative z-10">
                 <div 
                   className="group flex items-center gap-2 relative cursor-pointer"
@@ -90,7 +39,7 @@ new_footer = """              {/* Footer Author */}
                 
                 <div className="flex gap-2">
                   {/* 查看父帖图标 */}
-                  {selectedCard.replyContext?.isReply && selectedCard.replyContext?.parentRecordId && !openedCards.find(c => c.id === selectedCard.replyContext?.parentRecordId) && (
+                  {selectedCard.replyContext?.showParentArrow && selectedCard.replyContext?.parentRecordId && !openedCards.find(c => c.id === selectedCard.replyContext?.parentRecordId) && (
                     <button
                       onClick={async () => {
                         try {
@@ -119,7 +68,7 @@ new_footer = """              {/* Footer Author */}
                   )}
                   
                   {/* 查看主帖图标 */}
-                  {selectedCard.replyContext?.isReply && selectedCard.replyContext?.rootRecordId && selectedCard.replyContext?.rootRecordId !== selectedCard.replyContext?.parentRecordId && !openedCards.find(c => c.id === selectedCard.replyContext?.rootRecordId) && (
+                  {selectedCard.replyContext?.showRootArrow && selectedCard.replyContext?.rootRecordId && selectedCard.replyContext?.rootRecordId !== selectedCard.replyContext?.parentRecordId && !openedCards.find(c => c.id === selectedCard.replyContext?.rootRecordId) && (
                     <button
                       onClick={async () => {
                         try {
@@ -136,4 +85,37 @@ new_footer = """              {/* Footer Author */}
                             };
                             setOpenedCards(prev => [...prev, newCard]);
                           }
-      
+                        } catch (e) {
+                          console.error("Failed to fetch root record", e);
+                        }
+                      }}
+                      className="w-8 h-8 rounded-full bg-white/50 dark:bg-slate-800/50 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-pink-100 dark:hover:bg-pink-900/30 hover:text-pink-500 transition-colors"
+                      title="查看源头心声"
+                    >
+                      <ArrowUpToLine className="w-4 h-4" />
+                    </button>
+                  )}
+                  
+                  {index === openedCards.length - 1 && (
+                    <button 
+                      onClick={() => { setOpenedCards([]); setIsReplying(false); setReplyingToId(null); }}
+                      className="w-8 h-8 rounded-full bg-slate-900/10 dark:bg-white/10 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-900 dark:hover:bg-white hover:text-white dark:hover:text-slate-900 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              </div>
+            </motion.div>
+            ))}
+
+"""
+    new_content = content[:start_idx] + new_footer + "            {/* Right Side: The Reply Panel */}" + content[end_idx + len(old_panel_start):]
+    
+    with open('apps/frontend/src/domains/universe/UniverseView.tsx', 'w', encoding='utf-8') as f:
+        f.write(new_content)
+    print("Replaced successfully")
+else:
+    print("Could not find start or end index")
+
