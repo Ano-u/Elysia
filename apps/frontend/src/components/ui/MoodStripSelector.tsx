@@ -33,17 +33,17 @@ export const MoodStripSelector: React.FC<MoodStripSelectorProps> = ({
         const stripWidth = 36; // thinner
         const stripGap = 10;
         const step = stripWidth + stripGap;
-        
+
         // Total width calculations to ensure the background image maps nicely
         // Use a large enough width to guarantee the height covers the 260px strip (plus stagger)
-        const bgWidth = 700; 
+        const bgWidth = 700;
         const bgSize = `${bgWidth}px auto`;
-        
+
         // Center the background horizontally across all strips
         const totalStripsWidth = PREDEFINED_TAGS.length * step - stripGap;
         const startX = (bgWidth - totalStripsWidth) / 2;
         const bgPosX = `-${startX + i * step}px`;
-        
+
         // Offset the Y position to perfectly counter the stagger, keeping the image continuous
         const bgPosY = `calc(30% + ${-staggerY}px)`;
 
@@ -73,7 +73,7 @@ export const MoodStripSelector: React.FC<MoodStripSelectorProps> = ({
               style={{
                 width: stripWidth,
                 height: 260, // uniformly long, taller than before
-                backgroundImage: "url('/mood-bg.png')",
+                backgroundImage: "url('/mood-bg.webp')",
                 backgroundSize: bgSize,
                 backgroundPosition: `${bgPosX} ${bgPosY}`,
                 backgroundRepeat: "no-repeat",
