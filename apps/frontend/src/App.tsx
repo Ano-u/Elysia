@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Moon,
-  Settings2,
+  SquarePlay,
+  SquareStop,
   Shield,
   Sun,
 } from "lucide-react";
@@ -159,8 +160,7 @@ function App() {
         return;
       }
 
-      const { innerWidth } = window;
-      const nearTopRight = event.clientX >= innerWidth - 260 && event.clientY <= 180;
+      const nearTopRight = event.clientY <= 180;
 
       setIsNearTopRightZone(nearTopRight);
       lastPointerMoveAtRef.current = Date.now();
@@ -213,7 +213,7 @@ function App() {
         className="rounded-full"
         title={reduceMotion ? "恢复动态" : "减弱动态"}
       >
-        <Settings2 className={`h-5 w-5 ${reduceMotion ? "opacity-50" : "opacity-100"}`} />
+        {reduceMotion ? <SquareStop className="h-5 w-5 opacity-50" /> : <SquarePlay className="h-5 w-5 opacity-100" />}
       </CrystalButton>
       <CrystalButton
         variant="ghost"
