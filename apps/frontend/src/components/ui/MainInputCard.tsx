@@ -73,7 +73,6 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
   const isComposerExpanded = isFocused || isQuoteFocused || isDescFocused;
   const isLanding = !hasValue && !isComposerExpanded;
   const isCompact = hasValue && !isComposerExpanded;
-  const showQuoteInput = isQuoteFocused || (!hasQuote && isComposerExpanded);
   const ambientMessages = isPending ? WAITING_MESSAGES : hasValue ? GUIDANCE_MESSAGES : COMPANION_MESSAGES;
   const ambientMessage = useRotatingCopy(ambientMessages, 15000, ambientMessages.length > 1);
 
@@ -86,7 +85,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
     setIsFocused(false);
     setIsQuoteFocused(false);
     setIsDescFocused(false);
-    setShowDetails((current) => (hasDescription ? current : false));
+    setShowDetails(false);
   };
 
   const focusFieldAtEnd = (field: HTMLInputElement | HTMLTextAreaElement | null) => {
@@ -124,12 +123,12 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
   }, [isQuoteFocused]);
 
   useEffect(() => {
-    if (!showDetails || !isDescFocused) return;
+    if (!isDescFocused) return;
     const frameId = window.requestAnimationFrame(() => {
       focusFieldAtEnd(descriptionTextareaRef.current);
     });
     return () => window.cancelAnimationFrame(frameId);
-  }, [showDetails, isDescFocused]);
+  }, [isDescFocused]);
 
   return (
     <LiquidCard
@@ -187,13 +186,14 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
             >
               {/* Row 1: Quote */}
               <div className="flex flex-col gap-3">
-                <AnimatePresence>
-                  {showQuoteInput ? (
+                <AnimatePresence mode="wait">
+                  {!isCompact ? (
                     <motion.div
                       key="quote-input"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="flex flex-col gap-2"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="flex flex-col gap-2 overflow-hidden"
                     >
                       <span className="text-[10px] tracking-widest text-slate-400 uppercase font-bold flex items-center gap-1">
                         <Quote
@@ -220,10 +220,11 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                   ) : hasQuote ? (
                     <motion.div
                       key="quote-display"
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
                       onClick={activateQuoteEditor}
-                      className="relative pl-6 py-1 cursor-pointer group"
+                      className="relative pl-6 py-1 cursor-pointer group overflow-hidden"
                     >
                       <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-pink-300/60 rounded-full group-hover:bg-pink-400 transition-colors" />
                       <p className="italic text-slate-600 dark:text-slate-300 text-base leading-relaxed">
@@ -234,58 +235,81 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                 </AnimatePresence>
               </div>
 
-              {/* Row 2: Details (Unfold with bullet transformation) */}
-              <div className="flex flex-col gap-4">
-                <AnimatePresence>
-                  {!isCompact && (
-                    <motion.button
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      onClick={() => {
-                        if (showDetails) {
-                          setShowDetails(false);
-                          setIsDescFocused(false);
-                          return;
-                        }
-                        activateDescriptionEditor();
-                      }}
-                      className="flex items-center gap-2 text-[10px] tracking-widest text-slate-400 uppercase font-bold hover:text-pink-400 transition-colors w-fit overflow-hidden"
-                    >
-                      {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                      再多告诉爱莉一点吧
-                    </motion.button>
-                  )}
-                </AnimatePresence>
-
-                <AnimatePresence>
-                  {showDetails && (
+              {/* Row 2: Details */}
+              <div className="flex flex-col gap-3">
+                <AnimatePresence mode="wait">
+                  {!isCompact ? (
+                    <div className="flex flex-col gap-3">
+                      <motion.button
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        onClick={() => {
+                          if (showDetails) {
+                            setShowDetails(false);
+                            setIsDescFocused(false);
+                            return;
+                          }
+                          activateDescriptionEditor();
+                        }}
+                        className="flex items-center gap-2 text-[10px] tracking-widest text-slate-400 uppercase font-bold hover:text-pink-400 transition-colors w-fit overflow-hidden"
+                      >
+                        {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        再多告诉爱莉一点吧
+                      </motion.button>
+                      
+                      <AnimatePresence>
+                        {showDetails && (
+                          <motion.div
+                            key="desc-input-area"
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <textarea
+                              ref={descriptionTextareaRef}
+                              value={description}
+                              maxLength={1000}
+                              onChange={(e) => setDescription(e.target.value)}
+                              onFocus={() => setIsDescFocused(true)}
+                              onBlur={(e) => {
+                                if (!isTargetInsideEditor(e.relatedTarget)) {
+                                  setIsDescFocused(false);
+                                }
+                              }}
+                              onClick={activateDescriptionEditor}
+                              placeholder="遇到烦心事了吗？不如深呼吸，让思绪像飞花一样飘散吧~ 需不需要我给你一点小灵感呢？♪"
+                              className={`w-full bg-white/30 dark:bg-black/40 border-none rounded-2xl px-5 py-4 text-sm text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 resize-none shadow-inner transition-[min-height] duration-300 ${
+                                isDescFocused ? "min-h-[140px]" : "min-h-[82px]"
+                              }`}
+                            />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  ) : hasDescription ? (
                     <motion.div
+                      key="desc-display"
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
                       transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
                       className="overflow-hidden"
                     >
-                      <textarea
-                        ref={descriptionTextareaRef}
-                        value={description}
-                        maxLength={1000}
-                        onChange={(e) => setDescription(e.target.value)}
-                        onFocus={() => setIsDescFocused(true)}
-                        onBlur={(e) => {
-                          if (!isTargetInsideEditor(e.relatedTarget)) {
-                            setIsDescFocused(false);
-                          }
-                        }}
+                      <div
                         onClick={activateDescriptionEditor}
-                        placeholder="遇到烦心事了吗？不如深呼吸，让思绪像飞花一样飘散吧~ 需不需要我给你一点小灵感呢？♪"
-                        className={`w-full bg-white/30 dark:bg-black/40 border-none rounded-2xl px-5 py-4 text-sm text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 resize-none shadow-inner transition-[min-height] duration-300 ${
-                          isDescFocused ? "min-h-[140px]" : "min-h-[82px]"
-                        }`}
-                      />
+                        className="flex flex-col gap-2 pl-4 py-2 cursor-pointer group"
+                      >
+                        {description.split("\n").filter(p => p.trim()).map((p, i) => (
+                          <div key={i} className="relative text-slate-500 dark:text-slate-400 text-sm leading-relaxed break-words [overflow-wrap:anywhere]">
+                            <div className="absolute -left-4 top-2.5 w-1.5 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full group-hover:bg-pink-300 transition-colors" />
+                            {p}
+                          </div>
+                        ))}
+                      </div>
                     </motion.div>
-                  )}
+                  ) : null}
                 </AnimatePresence>
               </div>
             </motion.div>
