@@ -6,8 +6,9 @@ import { EmojiDock } from "./EmojiDock";
 import { useUiStore } from "../../store/uiStore";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getUniverseViewport, toggleReaction, createReply, getRecord } from "../../lib/apiClient";
-import { MainInputCard, PREDEFINED_TAGS } from "../../components/ui/MainInputCard";
+import { MainInputCard } from "../../components/ui/MainInputCard";
 import { ActionPairRow } from "../../components/ui/ActionPairRow";
+import { MoodStripSelector } from "../../components/ui/MoodStripSelector";
 import { Tag as TagIcon, MessageCircle, CornerLeftUp, ArrowUpToLine, X } from "lucide-react";
 import { StarSeaCanvas } from "./StarSeaCanvas";
 import { AnimatePresence } from "framer-motion";
@@ -64,27 +65,12 @@ const EmotionSelector: React.FC<{
   extraEmotions: string[];
   onToggle: (tag: string) => void;
 }> = ({ extraEmotions, onToggle }) => (
-  <div className="flex flex-wrap gap-2.5 flex-1 mb-6 mt-4">
-    <div className="flex items-center gap-2 mr-3">
+  <div className="flex flex-col gap-3 mb-6 mt-4">
+    <div className="flex items-center gap-2">
       <TagIcon className="w-4 h-4 text-slate-400" />
-      <span className="text-[10px] tracking-widest text-slate-500 dark:text-slate-400 uppercase font-black">情绪</span>
+      <span className="text-[10px] tracking-widest text-slate-500 dark:text-slate-400 uppercase font-black">情绪心境</span>
     </div>
-    {PREDEFINED_TAGS.map((tag) => {
-      const active = extraEmotions.includes(tag);
-      return (
-        <button
-          key={tag}
-          onClick={() => onToggle(tag)}
-          className={`px-3 py-1 rounded-full text-[10px] border-2 transition-all ${
-            active
-              ? "bg-pink-100/40 dark:bg-pink-900/30 border-pink-200/30 dark:border-pink-800/40 text-pink-600 dark:text-pink-300 shadow-glow"
-              : "bg-white/20 dark:bg-black/40 border-white/30 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:border-pink-200 dark:hover:border-pink-800"
-          }`}
-        >
-          {tag}
-        </button>
-      );
-    })}
+    <MoodStripSelector extraEmotions={extraEmotions} onToggle={onToggle} />
   </div>
 );
 
