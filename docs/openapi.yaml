@@ -97,6 +97,85 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PublishStatusResponse'
+  /records/{id}:
+    get:
+      summary: 查询记录详情（含回复关系）
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordDetailResponse'
+  /records/{id}/comments:
+    post:
+      summary: 创建回复卡片
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReplyRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateReplyResponse'
+        '403':
+          description: 仅可回复公开已发布卡片，或命中风控/准入限制
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /universe/viewport:
+    get:
+      summary: 查询星海视口内容
+      parameters:
+        - in: query
+          name: x
+          schema:
+            type: number
+        - in: query
+          name: y
+          schema:
+            type: number
+        - in: query
+          name: w
+          schema:
+            type: number
+        - in: query
+          name: h
+          schema:
+            type: number
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 60
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UniverseViewportResponse'
   /appeals/status:
     get:
       summary: 查询我的封禁与申诉状态
@@ -513,3 +592,343 @@ components:
         riskSummary:
           type: object
           additionalProperties: true
+    AuthorPayload:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+    ReplyTarget:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        moodPhrase:
+          type: string
+        quote:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        isPublic:
+          type: boolean
+        publicationStatus:
+          type: string
+          enum: [private, pending_auto, pending_manual, pending_second_review, risk_control_24h, published, rejected, needs_changes]
+        author:
+          $ref: '#/components/schemas/AuthorPayload'
+    ReplyContext:
+      type: object
+      properties:
+        content:
+          type: string
+        parentRecordId:
+          type: string
+          format: uuid
+        rootRecordId:
+          type: string
+          format: uuid
+        parentTarget:
+          allOf:
+            - $ref: '#/components/schemas/ReplyTarget'
+          nullable: true
+        rootTarget:
+          allOf:
+            - $ref: '#/components/schemas/ReplyTarget'
+          nullable: true
+    RecordSummaryWithReplyContext:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        mood_phrase:
+          type: string
+        quote:
+          type: string
+          nullable: true
+        extra_emotions:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+          nullable: true
+        visibility_intent:
+          type: string
+          enum: [private, public]
+        publication_status:
+          type: string
+          enum: [private, pending_auto, pending_manual, pending_second_review, risk_control_24h, published, rejected, needs_changes]
+        is_public:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        replyContext:
+          allOf:
+            - $ref: '#/components/schemas/ReplyContext'
+          nullable: true
+    CommentMeta:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        parentRecordId:
+          type: string
+          format: uuid
+        rootRecordId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+    CreateReplyRequest:
+      type: object
+      required: [content, moodPhrase]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 300
+        moodPhrase:
+          type: string
+          minLength: 1
+          maxLength: 140
+        quote:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 1000
+        extraEmotions:
+          type: array
+          maxItems: 8
+          items:
+            type: string
+            maxLength: 32
+        isPublic:
+          type: boolean
+          description: 默认 true；设为 false 时保存为私密回复卡片
+    CreateReplyResponse:
+      type: object
+      properties:
+        comment:
+          $ref: '#/components/schemas/CommentMeta'
+        record:
+          $ref: '#/components/schemas/RecordSummaryWithReplyContext'
+        publishStatus:
+          type: object
+          properties:
+            status:
+              type: string
+              enum: [private, pending_auto, pending_manual, pending_second_review, risk_control_24h, published, rejected, needs_changes]
+            label:
+              type: string
+    RecordDetailResponse:
+      type: object
+      properties:
+        record:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            user_id:
+              type: string
+              format: uuid
+            mood_phrase:
+              type: string
+            description:
+              type: string
+              nullable: true
+            is_public:
+              type: boolean
+            visibility_intent:
+              type: string
+              enum: [private, public]
+            publication_status:
+              type: string
+              enum: [private, pending_auto, pending_manual, pending_second_review, risk_control_24h, published, rejected, needs_changes]
+            publish_requested_at:
+              type: string
+              format: date-time
+              nullable: true
+            published_at:
+              type: string
+              format: date-time
+              nullable: true
+            risk_summary:
+              type: object
+              additionalProperties: true
+            review_notes:
+              type: string
+              nullable: true
+            occurred_at:
+              type: string
+              format: date-time
+              nullable: true
+            location_id:
+              type: string
+              format: uuid
+              nullable: true
+            source_record_id:
+              type: string
+              format: uuid
+              nullable: true
+            source_comment_id:
+              type: string
+              format: uuid
+              nullable: true
+            edit_deadline_at:
+              type: string
+              format: date-time
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+        quote:
+          type: string
+          nullable: true
+        extraEmotions:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        author:
+          $ref: '#/components/schemas/AuthorPayload'
+        replyContext:
+          allOf:
+            - $ref: '#/components/schemas/ReplyContext'
+          nullable: true
+    UniverseItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        mood_phrase:
+          type: string
+        quote:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        extra_emotions:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        display_name:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+        hearts:
+          type: string
+        hugs:
+          type: string
+        stars:
+          type: string
+        butterflies:
+          type: string
+        flowers:
+          type: string
+        coord:
+          type: object
+          properties:
+            x:
+              type: number
+            y:
+              type: number
+        personalScore:
+          type: number
+        replyContext:
+          type: object
+          nullable: true
+          properties:
+            isReply:
+              type: boolean
+            parentRecordId:
+              type: string
+              format: uuid
+              nullable: true
+            rootRecordId:
+              type: string
+              format: uuid
+              nullable: true
+            showParentArrow:
+              type: boolean
+            showRootArrow:
+              type: boolean
+    UniverseViewportResponse:
+      type: object
+      properties:
+        viewport:
+          type: object
+          properties:
+            x:
+              type: number
+            y:
+              type: number
+            w:
+              type: number
+            h:
+              type: number
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UniverseItem'
+        focus:
+          type: object
+          properties:
+            primary:
+              allOf:
+                - $ref: '#/components/schemas/UniverseItem'
+              nullable: true
+            secondary:
+              type: array
+              items:
+                $ref: '#/components/schemas/UniverseItem'
+        renderHint:
+          type: object
+          properties:
+            blurFirst:
+              type: boolean
+            focusRefreshSeconds:
+              type: integer

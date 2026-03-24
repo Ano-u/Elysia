@@ -97,6 +97,38 @@ export interface PublishStatusResponse {
   riskSummary?: Record<string, unknown>;
 }
 
+export interface AuthorSummary {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+export interface ReplyTarget {
+  id: string;
+  moodPhrase: string;
+  quote: string | null;
+  createdAt: string;
+  isPublic: boolean;
+  publicationStatus: PublicationStatus;
+  author: AuthorSummary;
+}
+
+export interface ReplyContext {
+  content: string;
+  parentRecordId: string;
+  rootRecordId: string;
+  parentTarget: ReplyTarget | null;
+  rootTarget: ReplyTarget | null;
+}
+
+export interface UniverseReplyContext {
+  isReply: boolean;
+  parentRecordId: string | null;
+  rootRecordId: string | null;
+  showParentArrow: boolean;
+  showRootArrow: boolean;
+}
+
 // Universe Types
 export interface UniverseItem {
   id: string;
@@ -116,6 +148,7 @@ export interface UniverseItem {
   flowers: number;
   coord: { x: number; y: number };
   personalScore?: number;
+  replyContext?: UniverseReplyContext | null;
 }
 
 export interface UniverseResponse {
@@ -128,6 +161,7 @@ export interface UniverseResponse {
 // MindMap Types
 export interface MindMapNode {
   id: string;
+  recordId?: string;
   type: string;
   label: string;
   isFocus?: boolean;
@@ -184,6 +218,28 @@ export interface RecordSummary {
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
+  replyContext?: ReplyContext | null;
+}
+
+export interface RecordDetail {
+  id: string;
+  userId: string;
+  moodPhrase: string;
+  description: string | null;
+  isPublic: boolean;
+  visibilityIntent: VisibilityIntent;
+  publicationStatus: PublicationStatus;
+  publishRequestedAt: string | null;
+  publishedAt: string | null;
+  riskSummary: Record<string, unknown>;
+  reviewNotes: string | null;
+  occurredAt: string | null;
+  locationId: string | null;
+  sourceRecordId: string | null;
+  sourceCommentId: string | null;
+  editDeadlineAt: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateRecordResponse {
@@ -196,6 +252,39 @@ export interface CreateRecordResponse {
 
 export interface UpdateRecordResponse extends CreateRecordResponse {
   ok: boolean;
+}
+
+export interface RecordDetailResponse {
+  record: RecordDetail;
+  quote: string | null;
+  extraEmotions: string[];
+  tags: string[];
+  author: AuthorSummary;
+  replyContext: ReplyContext | null;
+}
+
+export interface CreateReplyRequest {
+  content: string;
+  moodPhrase: string;
+  quote?: string;
+  description?: string;
+  extraEmotions?: string[];
+  isPublic?: boolean;
+}
+
+export interface CreateReplyResponse {
+  comment: {
+    id: string;
+    content: string;
+    parentRecordId: string;
+    rootRecordId: string;
+    createdAt: string;
+  };
+  record: RecordSummary;
+  publishStatus: {
+    status: PublicationStatus;
+    label: string;
+  };
 }
 
 export interface HomeFeedResponse {

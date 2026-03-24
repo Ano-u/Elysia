@@ -10,6 +10,31 @@ Elysia 后端基础工程，按以下技术栈实现：
 
 ## 快速开始
 
+### 推荐方式：Windows 一键启动/停止
+
+如果你在 Windows 本地开发，优先使用仓库根目录的脚本：
+
+```bat
+deploy.bat
+```
+
+- 会自动启动 `postgres`、`redis`
+- 会自动补依赖、执行迁移
+- 会启动 backend、frontend、worker
+- 如果提示 Docker 权限不足，请以管理员身份运行脚本，或确认当前账号具备 Docker Desktop 访问权限
+
+停止时使用：
+
+```bat
+stop.bat
+```
+
+- 会关闭本地 backend、frontend、worker 窗口
+- 会释放常用开发端口
+- 会停止 `docker compose` 服务
+
+### 手动方式
+
 1. 复制环境变量：
 
 ```bash

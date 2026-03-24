@@ -1,6 +1,9 @@
 import { fetchApi } from './api';
 import type {
   AuthMeResponse,
+  AuthorSummary,
+  CreateReplyRequest,
+  CreateReplyResponse,
   CreateRecordResponse,
   DevSwitchUserRequest,
   DevSwitchUserResponse,
@@ -18,7 +21,10 @@ import type {
   OnboardingProgressResponse,
   PublicationStatus,
   PublishStatusResponse,
+  RecordDetailResponse,
   RecordSummary,
+  ReplyContext,
+  ReplyTarget,
   UpdateRecordRequest,
   UpdateRecordResponse,
   UniverseResponse
@@ -38,6 +44,7 @@ type RawRecordSummary = {
   is_public: boolean;
   created_at: string;
   updated_at: string;
+  replyContext?: RawReplyContext | null;
 };
 
 type RawCreateRecordResponse = {
@@ -75,6 +82,13 @@ type RawUniverseItem = {
   flowers?: string | number;
   coord: { x: number; y: number };
   personalScore?: number;
+  replyContext?: {
+    isReply: boolean;
+    parentRecordId: string | null;
+    rootRecordId: string | null;
+    showParentArrow: boolean;
+    showRootArrow: boolean;
+  } | null;
 };
 
 type RawUniverseViewportResponse = {
@@ -90,6 +104,7 @@ type RawUniverseViewportResponse = {
 type RawMindMapResponse = {
   nodes: Array<{
     id: string;
+    record_id: string;
     node_type: string;
     label: string;
     payload?: unknown;
@@ -121,6 +136,107 @@ type RawAppealsStatus = {
   }>;
 };
 
+type RawAuthorSummary = {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+};
+
+type RawReplyTarget = {
+  id: string;
+  moodPhrase: string;
+  quote: string | null;
+  createdAt: string;
+  isPublic: boolean;
+  publicationStatus: PublicationStatus;
+  author: RawAuthorSummary;
+};
+
+type RawReplyContext = {
+  content: string;
+  parentRecordId: string;
+  rootRecordId: string;
+  parentTarget: RawReplyTarget | null;
+  rootTarget: RawReplyTarget | null;
+};
+
+type RawRecordDetailResponse = {
+  record: {
+    id: string;
+    user_id: string;
+    mood_phrase: string;
+    description: string | null;
+    is_public: boolean;
+    visibility_intent: 'private' | 'public';
+    publication_status: PublicationStatus;
+    publish_requested_at: string | null;
+    published_at: string | null;
+    risk_summary: Record<string, unknown>;
+    review_notes: string | null;
+    occurred_at: string | null;
+    location_id: string | null;
+    source_record_id: string | null;
+    source_comment_id: string | null;
+    edit_deadline_at: string;
+    created_at: string;
+    updated_at: string;
+  };
+  quote: string | null;
+  extraEmotions: string[];
+  tags: string[];
+  author: RawAuthorSummary;
+  replyContext: RawReplyContext | null;
+};
+
+type RawCreateReplyResponse = {
+  comment: {
+    id: string;
+    content: string;
+    parentRecordId: string;
+    rootRecordId: string;
+    createdAt: string;
+  };
+  record: RawRecordSummary;
+  publishStatus: {
+    status: PublicationStatus;
+    label: string;
+  };
+};
+
+function mapAuthorSummary(raw: RawAuthorSummary): AuthorSummary {
+  return {
+    id: raw.id,
+    displayName: raw.displayName,
+    avatarUrl: raw.avatarUrl,
+  };
+}
+
+function mapReplyTarget(raw: RawReplyTarget): ReplyTarget {
+  return {
+    id: raw.id,
+    moodPhrase: raw.moodPhrase,
+    quote: raw.quote,
+    createdAt: raw.createdAt,
+    isPublic: raw.isPublic,
+    publicationStatus: raw.publicationStatus,
+    author: mapAuthorSummary(raw.author),
+  };
+}
+
+function mapReplyContext(raw?: RawReplyContext | null): ReplyContext | null {
+  if (!raw) {
+    return null;
+  }
+
+  return {
+    content: raw.content,
+    parentRecordId: raw.parentRecordId,
+    rootRecordId: raw.rootRecordId,
+    parentTarget: raw.parentTarget ? mapReplyTarget(raw.parentTarget) : null,
+    rootTarget: raw.rootTarget ? mapReplyTarget(raw.rootTarget) : null,
+  };
+}
+
 function mapRecordSummary(raw: RawRecordSummary): RecordSummary {
   return {
     id: raw.id,
@@ -136,6 +252,7 @@ function mapRecordSummary(raw: RawRecordSummary): RecordSummary {
     isPublic: raw.is_public,
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
+    replyContext: mapReplyContext(raw.replyContext),
   };
 }
 
@@ -186,6 +303,47 @@ export const updateRecord = (id: string, data: UpdateRecordRequest) =>
     publishStatus: raw.publishStatus,
   }));
 
+export const getRecord = (id: string) =>
+  fetchApi<RawRecordDetailResponse>(`/api/records/${id}`).then(
+    (raw): RecordDetailResponse => ({
+      record: {
+        id: raw.record.id,
+        userId: raw.record.user_id,
+        moodPhrase: raw.record.mood_phrase,
+        description: raw.record.description,
+        isPublic: raw.record.is_public,
+        visibilityIntent: raw.record.visibility_intent,
+        publicationStatus: raw.record.publication_status,
+        publishRequestedAt: raw.record.publish_requested_at,
+        publishedAt: raw.record.published_at,
+        riskSummary: raw.record.risk_summary,
+        reviewNotes: raw.record.review_notes,
+        occurredAt: raw.record.occurred_at,
+        locationId: raw.record.location_id,
+        sourceRecordId: raw.record.source_record_id,
+        sourceCommentId: raw.record.source_comment_id,
+        editDeadlineAt: raw.record.edit_deadline_at,
+        createdAt: raw.record.created_at,
+        updatedAt: raw.record.updated_at,
+      },
+      quote: raw.quote,
+      extraEmotions: raw.extraEmotions,
+      tags: raw.tags,
+      author: mapAuthorSummary(raw.author),
+      replyContext: mapReplyContext(raw.replyContext),
+    }),
+  );
+
+export const createReply = (recordId: string, data: CreateReplyRequest) =>
+  fetchApi<RawCreateReplyResponse>(`/api/records/${recordId}/comments`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }).then((raw): CreateReplyResponse => ({
+    comment: raw.comment,
+    record: mapRecordSummary(raw.record),
+    publishStatus: raw.publishStatus,
+  }));
+
 export const getHomeFeed = (limit = 20, cursor?: string) => {
   const params = new URLSearchParams({ limit: String(limit) });
   if (cursor) {
@@ -222,6 +380,7 @@ export const getUniverseViewport = (x: number, y: number, w: number, h: number) 
         flowers: Number(item.flowers ?? 0),
         coord: item.coord,
         personalScore: item.personalScore,
+        replyContext: item.replyContext ?? null,
       })),
       focus: {
         primary: raw.focus?.primary?.id ?? null,
@@ -247,6 +406,7 @@ export const getMindMapMe = (mode: 'simple' | 'deep' = 'simple') =>
     (raw): MindMapResponse => ({
       nodes: raw.nodes.map((node) => ({
         id: node.id,
+        recordId: node.record_id,
         type: node.node_type,
         label: node.label,
       })),

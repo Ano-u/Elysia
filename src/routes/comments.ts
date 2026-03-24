@@ -3,47 +3,70 @@ import { z } from "zod";
 import { requireAccessApproved, requireNotInRiskControl } from "../lib/auth.js";
 import { query, withTransaction } from "../lib/db.js";
 import { broadcast } from "../lib/realtime.js";
-import { hashIp, validateQuoteLength } from "../lib/utils.js";
+import { hashIp, validateMoodPhraseLength, validateQuoteLength } from "../lib/utils.js";
 import { writeAuditLog } from "../lib/audit.js";
 import { assessModeration } from "../lib/moderation.js";
 import { decidePublication } from "../lib/publication-workflow.js";
-import { activateRiskControl, enqueueModerationQueue } from "../lib/risk-control.js";
+import {
+  applyPublicationDecision,
+  buildRiskSummary,
+  createRecordRevision,
+  parseRecordVisibilityIntent,
+  publicationLabel,
+} from "../lib/record-publication.js";
+import { buildRecordSummaryPayload, loadRecordSummary, loadReplyContext } from "../lib/record-views.js";
 
 type CommentRow = {
   id: string;
   record_id: string;
   user_id: string;
   content: string;
+  parent_record_id: string;
+  root_record_id: string;
   created_at: string;
 };
 
-type RecordRow = {
+type ReplyTargetRow = {
   id: string;
   user_id: string;
   mood_phrase: string;
   is_public: boolean;
   publication_status: string;
+  root_record_id: string;
 };
 
 const createCommentSchema = z.object({
-  content: z.string().min(1).max(300),
+  content: z.string().trim().min(1).max(300),
+  moodPhrase: z.string().min(1).max(140),
   quote: z.string().trim().min(1).max(200).optional(),
   description: z.string().max(1000).optional(),
   extraEmotions: z.array(z.string().min(1).max(32)).max(8).optional(),
+  isPublic: z.boolean().optional(),
 });
 
 export async function commentsRoutes(app: FastifyInstance): Promise<void> {
   app.post("/records/:id/comments", async (req, reply) => {
-    const accessUser = await requireAccessApproved(req, reply);
-    if (!accessUser) {
+    const approvedUser = await requireAccessApproved(req, reply);
+    if (!approvedUser) {
       return;
     }
-    const user = await requireNotInRiskControl(req, reply);
+
+    const params = z.object({ id: z.string().uuid() }).parse(req.params);
+    const body = createCommentSchema.parse(req.body);
+    const visibilityIntent = parseRecordVisibilityIntent(body.isPublic ?? true);
+    const user =
+      visibilityIntent === "public"
+        ? await requireNotInRiskControl(req, reply)
+        : approvedUser;
     if (!user) {
       return;
     }
-    const params = z.object({ id: z.string().uuid() }).parse(req.params);
-    const body = createCommentSchema.parse(req.body);
+
+    const moodPhraseCheck = validateMoodPhraseLength(body.moodPhrase);
+    if (!moodPhraseCheck.ok) {
+      reply.code(400).send({ message: moodPhraseCheck.reason });
+      return;
+    }
 
     if (body.quote) {
       const quoteCheck = validateQuoteLength(body.quote);
@@ -53,59 +76,60 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
-    const record = await query<RecordRow>(
-      "SELECT id, user_id, mood_phrase, is_public, publication_status FROM records WHERE id = $1",
+    const record = await query<ReplyTargetRow>(
+      `
+        SELECT
+          r.id,
+          r.user_id,
+          r.mood_phrase,
+          r.is_public,
+          r.publication_status,
+          COALESCE(c.root_record_id, r.id) AS root_record_id
+        FROM records r
+        LEFT JOIN comments c ON c.derived_record_id = r.id
+        WHERE r.id = $1
+        LIMIT 1
+      `,
       [params.id],
     );
     if (record.rowCount !== 1) {
       reply.code(404).send({ message: "目标记录不存在" });
       return;
     }
+
     const target = record.rows[0];
     const isPublished = target.is_public && target.publication_status === "published";
     if (!isPublished) {
-      reply.code(403).send({ message: "仅可评论已公开内容" });
+      reply.code(403).send({ message: "仅可回复已公开内容" });
       return;
     }
 
     const textAssessment = assessModeration({
-      moodPhrase: body.content.slice(0, 140),
+      moodPhrase: `${body.moodPhrase}\n${body.content}`,
       quote: body.quote ?? undefined,
       description: body.description ?? undefined,
       extraEmotions: body.extraEmotions ?? [],
       tags: [],
     });
     const decision = decidePublication({
-      visibilityIntent: "private",
+      visibilityIntent,
       hasImages: false,
       textAssessment,
     });
-    const riskSummary = {
-      source: "comment_derived",
-      textAssessment: {
-        level: textAssessment.level,
-        decision: textAssessment.decision,
-        confidence: textAssessment.confidence,
-        riskScore: textAssessment.riskScore,
-        riskLabels: textAssessment.riskLabels,
-        reason: textAssessment.reason,
-        violationType: textAssessment.violationType,
-      },
-      effectiveRiskLevel: decision.effectiveRiskLevel,
-    };
+    const triggerIpHash = hashIp(req.ip);
 
     const result = await withTransaction(async (client) => {
       const insertedComment = await client.query<CommentRow>(
         `
-          INSERT INTO comments (record_id, user_id, content)
-          VALUES ($1, $2, $3)
-          RETURNING *
+          INSERT INTO comments (record_id, user_id, content, parent_record_id, root_record_id)
+          VALUES ($1, $2, $3, $4, $5)
+          RETURNING id, record_id, user_id, content, parent_record_id, root_record_id, created_at
         `,
-        [params.id, user.id, body.content],
+        [params.id, user.id, body.content, params.id, target.root_record_id],
       );
       const comment = insertedComment.rows[0];
 
-      const derivedRecord = await client.query<{ id: string }>(
+      const insertedRecord = await client.query<{ id: string }>(
         `
           INSERT INTO records (
             user_id,
@@ -120,22 +144,32 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
             review_notes,
             source_record_id,
             source_comment_id
-          ) VALUES ($1, $2, $3, $4, 'private', $5, NULL, NULL, $6::jsonb, $7, $8, $9)
+          ) VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $5 = 'public' THEN NOW() ELSE NULL END, CASE WHEN $4 THEN NOW() ELSE NULL END, $7::jsonb, $8, $9, $10)
           RETURNING id
         `,
         [
           user.id,
-          body.content.slice(0, 140),
+          body.moodPhrase,
           body.description ?? null,
           decision.isPublic,
+          visibilityIntent,
           decision.publicationStatus,
-          JSON.stringify(riskSummary),
+          JSON.stringify(buildRiskSummary({ assessment: textAssessment, decision })),
           decision.reason,
           params.id,
           comment.id,
         ],
       );
-      const derivedId = derivedRecord.rows[0].id;
+      const replyRecordId = insertedRecord.rows[0].id;
+
+      await client.query(
+        `
+          UPDATE comments
+          SET derived_record_id = $2, updated_at = NOW()
+          WHERE id = $1
+        `,
+        [comment.id, replyRecordId],
+      );
 
       if (body.quote) {
         await client.query(
@@ -143,7 +177,7 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
             INSERT INTO record_quotes (record_id, quote)
             VALUES ($1, $2)
           `,
-          [derivedId, body.quote],
+          [replyRecordId, body.quote],
         );
       }
 
@@ -153,100 +187,170 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
             INSERT INTO record_emotions (record_id, emotion)
             VALUES ($1, $2)
           `,
-          [derivedId, emotion],
+          [replyRecordId, emotion],
         );
       }
 
-      // 双向关联：派生和共鸣
       await client.query(
         `
           INSERT INTO record_links (source_record_id, target_record_id, link_type, strength, created_by)
-          VALUES ($1, $2, 'derived', 0.9, $3),
-                 ($2, $1, 'resonance', 0.7, $3)
+          VALUES ($1, $2, 'reply', 0.45, $3)
           ON CONFLICT DO NOTHING
         `,
-        [derivedId, params.id, user.id],
+        [replyRecordId, params.id, user.id],
       );
 
-      const sourceNode = await client.query<{ id: string }>(
+      if (target.root_record_id !== params.id) {
+        await client.query(
+          `
+            INSERT INTO record_links (source_record_id, target_record_id, link_type, strength, created_by)
+            VALUES ($1, $2, 'reply', 0.25, $3)
+            ON CONFLICT DO NOTHING
+          `,
+          [replyRecordId, target.root_record_id, user.id],
+        );
+      }
+
+      const relatedNodeRows = await client.query<{ id: string; record_id: string }>(
         `
-          SELECT id
+          SELECT id, record_id
           FROM mindmap_nodes
-          WHERE record_id = $1 AND node_type = 'record'
+          WHERE record_id = ANY($1::uuid[])
+            AND node_type = 'record'
           ORDER BY created_at ASC
-          LIMIT 1
         `,
-        [params.id],
+        [Array.from(new Set([params.id, target.root_record_id]))],
       );
-      const derivedNode = await client.query<{ id: string }>(
+      const nodeMap = new Map<string, string>();
+      for (const row of relatedNodeRows.rows) {
+        if (!nodeMap.has(row.record_id)) {
+          nodeMap.set(row.record_id, row.id);
+        }
+      }
+
+      const replyNode = await client.query<{ id: string }>(
         `
           INSERT INTO mindmap_nodes (user_id, record_id, node_type, label, payload)
           VALUES ($1, $2, 'record', $3, $4::jsonb)
           RETURNING id
         `,
-        [user.id, derivedId, body.content.slice(0, 140), JSON.stringify({ derivedFrom: params.id })],
+        [
+          user.id,
+          replyRecordId,
+          body.moodPhrase,
+          JSON.stringify({
+            visibilityIntent,
+            publicationStatus: decision.publicationStatus,
+            replyTo: params.id,
+            rootRecordId: target.root_record_id,
+          }),
+        ],
       );
 
-      if (sourceNode.rowCount === 1) {
+      const parentNodeId = nodeMap.get(params.id);
+      if (parentNodeId) {
         await client.query(
           `
             INSERT INTO mindmap_edges (source_node_id, target_node_id, edge_type, weight)
-            VALUES ($1, $2, 'resonance', 0.7)
+            VALUES ($1, $2, 'reply', 0.45)
           `,
-          [derivedNode.rows[0].id, sourceNode.rows[0].id],
+          [replyNode.rows[0].id, parentNodeId],
         );
       }
 
-      if (decision.queueType) {
-        await enqueueModerationQueue(client, {
-          targetType: "record",
-          targetId: derivedId,
-          queueType: decision.queueType,
-          reason: decision.reason,
-          priority: decision.queuePriority ?? 5,
-          payload: {
-            from: "comment_derived",
-            sourceRecordId: params.id,
-            riskLabels: textAssessment.riskLabels,
-            violationType: textAssessment.violationType,
-          },
-        });
+      const rootNodeId = nodeMap.get(target.root_record_id);
+      if (rootNodeId && target.root_record_id !== params.id) {
+        await client.query(
+          `
+            INSERT INTO mindmap_edges (source_node_id, target_node_id, edge_type, weight)
+            VALUES ($1, $2, 'reply', 0.25)
+          `,
+          [replyNode.rows[0].id, rootNodeId],
+        );
       }
 
-      if (decision.triggerRiskControl) {
-        await activateRiskControl(client, {
-          userId: user.id,
-          recordId: derivedId,
-          reason: decision.reason,
-          riskLevel: decision.effectiveRiskLevel === "very_high" ? "very_high" : "high",
-          triggerSource: "auto_text",
-          triggerIpHash: hashIp(req.ip),
-          payload: {
-            source: "comment_derived",
-            sourceRecordId: params.id,
-            riskLabels: textAssessment.riskLabels,
-            violationType: textAssessment.violationType,
-          },
-        });
+      const revisionNo = await createRecordRevision({
+        client,
+        recordId: replyRecordId,
+        editedBy: user.id,
+        snapshot: {
+          content: body.content,
+          moodPhrase: body.moodPhrase,
+          description: body.description ?? null,
+          quote: body.quote ?? null,
+          extraEmotions: body.extraEmotions ?? [],
+          visibilityIntent,
+          parentRecordId: params.id,
+          rootRecordId: target.root_record_id,
+          sourceCommentId: comment.id,
+        },
+      });
+
+      await applyPublicationDecision({
+        client,
+        recordId: replyRecordId,
+        userId: user.id,
+        triggerIpHash,
+        visibilityIntent,
+        assessment: textAssessment,
+        decision,
+        revisionNo,
+        reviewStage: "auto",
+        modelMeta: {
+          source: "reply_comment",
+          parentRecordId: params.id,
+          rootRecordId: target.root_record_id,
+        },
+      });
+
+      const summary = await loadRecordSummary(client, replyRecordId);
+      if (!summary) {
+        throw new Error("回复记录创建后读取失败");
       }
+      const replyContext = await loadReplyContext(client, {
+        sourceCommentId: summary.source_comment_id,
+        requesterUserId: user.id,
+      });
 
       return {
-        comment,
-        derivedRecordId: derivedId,
+        comment: {
+          id: comment.id,
+          content: comment.content,
+          parentRecordId: comment.parent_record_id,
+          rootRecordId: comment.root_record_id,
+          createdAt: comment.created_at,
+        },
+        record: buildRecordSummaryPayload({
+          summary,
+          replyContext,
+        }),
+        publishStatus: {
+          status: summary.publication_status,
+          label: publicationLabel(summary.publication_status),
+        },
       };
     });
 
     broadcast("record.created", {
-      recordId: result.derivedRecordId,
-      sourceRecordId: params.id,
-      event: "derived_by_comment",
+      recordId: result.record.id,
+      userId: user.id,
+      parentRecordId: result.comment.parentRecordId,
+      rootRecordId: result.comment.rootRecordId,
+      isPublic: result.record.is_public,
+      publicationStatus: result.record.publication_status,
+      event: "reply_created",
     });
     await writeAuditLog({
       actorUserId: user.id,
-      action: "comment.create_and_derive",
+      action: "comment.create_reply_record",
       targetType: "record",
-      targetId: result.derivedRecordId,
-      payload: { sourceRecordId: params.id, commentId: result.comment.id },
+      targetId: result.record.id,
+      payload: {
+        commentId: result.comment.id,
+        parentRecordId: result.comment.parentRecordId,
+        rootRecordId: result.comment.rootRecordId,
+        visibilityIntent,
+      },
     });
 
     return result;

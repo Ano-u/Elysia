@@ -18,7 +18,7 @@ type EdgeRow = {
   id: string;
   source_node_id: string;
   target_node_id: string;
-  edge_type: "keyword" | "semantic" | "time" | "manual" | "resonance";
+  edge_type: "keyword" | "semantic" | "time" | "manual" | "resonance" | "reply";
   weight: string;
   created_at: string;
 };

@@ -63,6 +63,14 @@
 - 不再是演示型漂浮卡片，必须接入真实数据并具备沉浸探索感。
 - 保留“1 主焦点 + 2 副焦点”节奏，并强化“愿意探索他人共鸣”的氛围设计。
 - 明确公开状态门禁：仅展示符合公开条件的内容。
+- 卡片详情必须支持“回复卡片”链路：
+  - 打开卡片详情后可提交回复
+  - 回复提交调用 `POST /api/records/:id/comments`
+  - 回复本身会生成一张新的卡片，而不是挂成传统评论列表
+  - 主帖详情不展示子回复正文；回复卡片自身通过 `replyContext` 展示“回复了谁 / 根帖是谁”
+- 回复卡片在星海中应靠近被回复卡片，并通过箭头或轻量关系提示表现：
+  - `replyContext.showParentArrow = true` 时展示指向直接父卡片的关系
+  - `replyContext.showRootArrow = true` 时额外展示指向主帖的关系
 
 3. 发布主链路打通
 - Home 发布必须真实调用后端接口（不是本地 mock）。
@@ -132,11 +140,13 @@
   - `POST /api/auth/dev/switch-user`
 - Home：
   - `POST /api/records`
+  - `GET /api/records/:id`
   - `GET /api/home/feed`
   - `PATCH /api/records/:id`
 - Universe：
   - `GET /api/universe/viewport`
   - `GET /api/universe/focus`
+  - `POST /api/records/:id/comments`
 - MindMap：
   - `GET /api/mindmap/me`
   - `POST /api/mindmap/manual-link`
@@ -170,6 +180,7 @@
 5. 全程视觉感受是“被温柔接住”，不是炫技或压迫。
 6. 私密内容能即时在本人 MindMap 可见，且审核状态标识清晰。
 7. 用户可选择开启/关闭自动串联整理，交互可解释、可撤回。
+8. 用户能在星海详情里发出“回复卡片”，并且新卡片能正确表现父帖 / 主帖关系。
 
 ## 8. 交付物要求
 - 代码变更（按模块提交）。

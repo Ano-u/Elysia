@@ -20,6 +20,14 @@ for /f "delims=" %%V in ('node -v 2^>nul') do set "NODE_VERSION=%%V"
 if defined NODE_VERSION echo [Elysia] Node version: !NODE_VERSION!
 
 echo [Elysia] Starting one-click deployment...
+echo [Elysia] Cleaning previous local dev processes...
+call :stop_dev_windows
+call :kill_port 3000
+call :kill_port 5173
+call :kill_port 5174
+call :kill_port 5175
+call :kill_port 24678
+call :kill_port 24679
 
 set "CAN_START_BACKEND=1"
 set "CAN_START_WORKER=1"
@@ -60,10 +68,12 @@ if errorlevel 1 (
   echo [Elysia] WARNING: docker is not installed or not in PATH.
   echo [Elysia] WARNING: will continue startup, but backend may fail without DB/Redis.
 ) else (
+  docker compose stop api worker >nul 2>nul
   echo [Elysia] Booting PostgreSQL and Redis via docker compose...
   docker compose up -d postgres redis
   if errorlevel 1 (
     echo [Elysia] WARNING: failed to start docker services.
+    echo [Elysia] HINT: ensure Docker Desktop is running, or run deploy.bat as Administrator.
     echo [Elysia] WARNING: will continue startup, but backend may fail without DB/Redis.
   ) else (
     set "DOCKER_READY=1"
@@ -243,6 +253,19 @@ exit /b 1
 :run_node
 node %*
 exit /b !errorlevel!
+
+:stop_dev_windows
+taskkill /FI "WINDOWTITLE eq Elysia Backend*" /T /F >nul 2>nul
+taskkill /FI "WINDOWTITLE eq Elysia Frontend*" /T /F >nul 2>nul
+taskkill /FI "WINDOWTITLE eq Elysia Worker*" /T /F >nul 2>nul
+exit /b 0
+
+:kill_port
+set "CHECK_PORT=%~1"
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":%CHECK_PORT% .*LISTENING"') do (
+  taskkill /PID %%P /T /F >nul 2>nul
+)
+exit /b 0
 
 :port_in_use
 set "CHECK_PORT=%~1"

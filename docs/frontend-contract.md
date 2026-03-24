@@ -76,6 +76,7 @@
 - 编辑记录：`PATCH /api/records/:id`
 - 切换公开：`PATCH /api/records/:id/visibility`
 - 查询发布状态：`GET /api/records/:id/publish-status`
+- 查询记录详情：`GET /api/records/:id`
 
 ### 3.1 状态定义
 
@@ -127,6 +128,19 @@
 - `moodPhrase / quote / description / comment content` 支持 Markdown 基础语法（含 GFM 列表、表格、删除线等）。
 - 前端渲染默认禁用原始 HTML（`skipHtml`），防止注入风险。
 
+### 3.5 记录详情补充字段
+
+`GET /api/records/:id` 在原有 `record + quote + extraEmotions + tags` 基础上，新增：
+
+- `author`: `{ id, displayName, avatarUrl }`
+- `replyContext`: `null | { content, parentRecordId, rootRecordId, parentTarget, rootTarget }`
+
+说明：
+
+- 普通卡片 `replyContext = null`
+- 回复卡片会返回自己的回复正文，以及可跳转的父卡片 / 主帖摘要
+- `parentTarget / rootTarget` 仅在当前用户有权限读取时返回，否则为 `null`
+
 ## 4. 风控限制
 
 - 风控中返回 `403 + RISK_CONTROL_ACTIVE`
@@ -143,7 +157,7 @@
 
 ## 5. 评论与互动
 
-- 发表评论（会派生私密记录）：`POST /api/records/:id/comments`
+- 发表评论（创建回复卡片）：`POST /api/records/:id/comments`
 - 添加互动：`POST /api/reactions`
 - 取消互动：`DELETE /api/reactions/:id`
 - 互动汇总：`GET /api/records/:id/reactions-summary`
@@ -151,7 +165,66 @@
 约束：
 
 - 评论与互动仅允许目标记录为 `published` 且公开
-- 评论/互动同样受准入门禁 + 风控限制
+- `:id` 始终表示“直接被回复的卡片”；服务端自动计算 `parentRecordId` 与 `rootRecordId`
+- 回复卡片默认公开，但可传 `isPublic=false` 存成私密记录
+- 公开回复与普通公开记录走同一套审核/风控链路；私密回复不进入 Universe
+- 评论/互动同样受准入门禁限制；公开回复额外受风控限制
+
+### 5.1 创建回复卡片请求示例
+
+```json
+{
+  "content": "你的这句让我想起前几天的自己。",
+  "moodPhrase": "也想把这一刻轻轻接住",
+  "quote": "愿我们都能被温柔回应",
+  "description": "看到这张卡片时，我突然觉得自己也没有那么孤单了。",
+  "extraEmotions": ["平静", "被理解"],
+  "isPublic": true
+}
+```
+
+说明：
+
+- `content`：回复正文，独立于卡片标题
+- `moodPhrase`：回复卡片标题
+- `extraEmotions`：回复卡片的“心情 tag”
+- 本期不支持回复专用 `tags`
+
+### 5.2 创建回复卡片响应示例
+
+```json
+{
+  "comment": {
+    "id": "3c1f8d41-e08d-4cb1-bc11-3c8b82fd1c51",
+    "content": "你的这句让我想起前几天的自己。",
+    "parentRecordId": "4fcb8f3b-1c28-4694-b28a-c4ef8f663999",
+    "rootRecordId": "4fcb8f3b-1c28-4694-b28a-c4ef8f663999",
+    "createdAt": "2026-03-24T08:10:00.000Z"
+  },
+  "record": {
+    "id": "0f93b7a7-95ad-412f-99f6-d3d6b3b1b9cb",
+    "user_id": "4b30e94b-bb4b-4d62-88bb-dad14a6fb3b1",
+    "mood_phrase": "也想把这一刻轻轻接住",
+    "description": "看到这张卡片时，我突然觉得自己也没有那么孤单了。",
+    "visibility_intent": "public",
+    "publication_status": "published",
+    "is_public": true,
+    "created_at": "2026-03-24T08:10:00.000Z",
+    "updated_at": "2026-03-24T08:10:00.000Z",
+    "replyContext": {
+      "content": "你的这句让我想起前几天的自己。",
+      "parentRecordId": "4fcb8f3b-1c28-4694-b28a-c4ef8f663999",
+      "rootRecordId": "4fcb8f3b-1c28-4694-b28a-c4ef8f663999",
+      "parentTarget": null,
+      "rootTarget": null
+    }
+  },
+  "publishStatus": {
+    "status": "published",
+    "label": "已公开"
+  }
+}
+```
 
 ## 6. Universe 与 MindMap 可见性边界
 
@@ -160,6 +233,16 @@
   - `GET /api/universe/focus`
   - `GET /api/universe/hot`
   - `GET /api/universe/recent`
+
+Universe 返回的每条记录会额外带：
+
+- `replyContext: null | { isReply, parentRecordId, rootRecordId, showParentArrow, showRootArrow }`
+
+说明：
+
+- 普通卡片 `replyContext = null`
+- 回复卡片会在星海里稳定聚集到父卡片附近
+- 本期不返回“主帖下所有回复内容”，也不在主帖详情里反查子回复
 
 - MindMap：
   - 我的图谱：`GET /api/mindmap/me?mode=simple|deep`

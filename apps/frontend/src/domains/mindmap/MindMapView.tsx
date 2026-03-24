@@ -5,6 +5,7 @@ import * as d3 from "d3-force";
 import { useUiStore } from "../../store/uiStore";
 import { getMindMapMe } from "../../lib/apiClient";
 import type { MindMapNode, MindMapEdge } from "../../types/api";
+import { MindMapDetailModal } from "./MindMapDetailModal";
 
 type SimulationNode = MindMapNode & d3.SimulationNodeDatum;
 type SimulationLink = MindMapEdge & d3.SimulationLinkDatum<SimulationNode>;
@@ -30,6 +31,7 @@ export const MindMapView: React.FC = () => {
   const [nodes, setNodes] = useState<SimulationNode[]>([]);
   const [links, setLinks] = useState<SimulationLink[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [detailRecordId, setDetailRecordId] = useState<string | null>(null);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const simulationRef = useRef<d3.Simulation<SimulationNode, SimulationLink> | null>(null);
@@ -288,7 +290,12 @@ export const MindMapView: React.FC = () => {
                 onDragStart={(e: unknown) => dragEvents.onDragStart(e, node)}
                 onDrag={(e: unknown, info: unknown) => dragEvents.onDrag(e, info, node)}
                 onDragEnd={(e: unknown) => dragEvents.onDragEnd(e, node)}
-                onClick={() => setSelectedNodeId(isSelected ? null : node.id)}
+                onClick={() => {
+                  setSelectedNodeId(isSelected ? null : node.id);
+                  if (node.recordId && !isSelected) {
+                    setDetailRecordId(node.recordId);
+                  }
+                }}
                 whileHover={{ scale: 1.08 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -360,6 +367,11 @@ export const MindMapView: React.FC = () => {
           })}
         </AnimatePresence>
       </div>
+
+      <MindMapDetailModal 
+        recordId={detailRecordId} 
+        onClose={() => setDetailRecordId(null)} 
+      />
 
     </div>
   );

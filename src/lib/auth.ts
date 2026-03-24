@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { query } from "./db.js";
+import { env } from "../config/env.js";
 
 export type AuthUser = {
   id: string;
@@ -36,7 +37,7 @@ function shouldBypassAccessGate(): boolean {
     return false;
   }
 
-  return process.env.NODE_ENV === "development";
+  return env.NODE_ENV === "development";
 }
 
 export async function resolveAuthUser(req: FastifyRequest): Promise<AuthUser | null> {
