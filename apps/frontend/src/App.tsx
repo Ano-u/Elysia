@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -22,7 +22,6 @@ type AppView = "home" | "universe" | "mindmap" | "admin";
 
 const FIRST_VISIT_STORAGE_KEY = "elysia-first-visit-at";
 const THEME_STORAGE_KEY = "elysia-theme";
-const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
 
 function App() {
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -36,28 +35,6 @@ function App() {
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
   const [currentView, setCurrentView] = useState<AppView>("home");
-  const [isCoarsePointer, setIsCoarsePointer] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-    return window.matchMedia("(pointer: coarse)").matches;
-  });
-  const [isPointerIdle, setIsPointerIdle] = useState(false);
-  const [isNearTopRightZone, setIsNearTopRightZone] = useState(false);
-  const [isTopControlsHovered, setIsTopControlsHovered] = useState(false);
-  const [hasVisitedOverFiveDays] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-    const saved = window.localStorage.getItem(FIRST_VISIT_STORAGE_KEY);
-    const parsed = saved ? Number(saved) : NaN;
-    if (!saved || !Number.isFinite(parsed)) {
-      return false;
-    }
-    return Date.now() - parsed >= FIVE_DAYS_MS;
-  });
-  const lastPointerMoveAtRef = useRef(0);
-  const idleTimerRef = useRef<number | null>(null);
   const { reduceMotion, toggleReduceMotion } = useUiStore();
   const queryClient = useQueryClient();
 
@@ -145,105 +122,50 @@ function App() {
     }
   }, []);
 
-  useEffect(() => {
-    const media = window.matchMedia("(pointer: coarse)");
-    const onChange = (event: MediaQueryListEvent) => setIsCoarsePointer(event.matches);
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
-  }, []);
-
-  useEffect(() => {
-    lastPointerMoveAtRef.current = Date.now();
-
-    const onPointerMove = (event: PointerEvent) => {
-      if (event.pointerType === "touch") {
-        return;
-      }
-
-      const nearTopRight = event.clientY <= 180;
-
-      setIsNearTopRightZone(nearTopRight);
-      lastPointerMoveAtRef.current = Date.now();
-      setIsPointerIdle(false);
-      if (idleTimerRef.current) {
-        window.clearTimeout(idleTimerRef.current);
-      }
-      idleTimerRef.current = window.setTimeout(() => {
-        if (Date.now() - lastPointerMoveAtRef.current >= 1150) {
-          setIsPointerIdle(true);
-        }
-      }, 1200);
-    };
-
-    window.addEventListener("pointermove", onPointerMove);
-    return () => {
-      window.removeEventListener("pointermove", onPointerMove);
-      if (idleTimerRef.current) {
-        window.clearTimeout(idleTimerRef.current);
-      }
-    };
-  }, []);
-
-  const showTopControls =
-    isCoarsePointer ||
-    !hasVisitedOverFiveDays ||
-    isTopControlsHovered ||
-    (isNearTopRightZone && !isPointerIdle);
-
   const toggleTheme = () => {
     setTheme(theme === "light" ? "dark" : "light");
   };
 
   const topControls = (
     <motion.div
-      initial={false}
-      animate={{
-        opacity: showTopControls ? 1 : 0,
-        y: showTopControls ? 0 : -12,
-      }}
+      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
+      animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
       transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-      onMouseEnter={() => setIsTopControlsHovered(true)}
-      onMouseLeave={() => setIsTopControlsHovered(false)}
-      className={`absolute right-6 top-6 z-50 flex gap-3 ${showTopControls ? "pointer-events-auto" : "pointer-events-none"}`}
+      className="absolute right-6 top-6 z-[60] flex items-center gap-2 rounded-full border border-white/50 bg-white/58 p-1.5 shadow-lg backdrop-blur-xl dark:border-white/15 dark:bg-black/28 pointer-events-auto"
     >
+      {canOpenAdmin && (
+        <CrystalButton
+          variant="ghost"
+          size="icon"
+          onClick={() => setCurrentView("admin")}
+          className="rounded-full w-9 h-9"
+          title="管理员控制台"
+        >
+          <Shield className="h-4 w-4" />
+        </CrystalButton>
+      )}
       <CrystalButton
         variant="ghost"
         size="icon"
         onClick={toggleReduceMotion}
-        className="rounded-full"
+        className="rounded-full w-9 h-9"
         title={reduceMotion ? "恢复动态" : "减弱动态"}
       >
-        {reduceMotion ? <SquareStop className="h-5 w-5 opacity-50" /> : <SquarePlay className="h-5 w-5 opacity-100" />}
+        {reduceMotion ? <SquareStop className="h-4 w-4 opacity-50" /> : <SquarePlay className="h-4 w-4 opacity-100" />}
       </CrystalButton>
       <CrystalButton
         variant="ghost"
         size="icon"
         onClick={toggleTheme}
-        className="rounded-full"
+        className="rounded-full w-9 h-9"
         title={theme === "light" ? "天穹市" : "永恒礼堂"}
       >
-        {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+        {theme === "light" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
       </CrystalButton>
     </motion.div>
   );
 
-  const adminControl = canOpenAdmin ? (
-    <motion.div
-      initial={false}
-      animate={{
-        opacity: showTopControls ? 1 : 0,
-        y: showTopControls ? 0 : -12,
-      }}
-      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-      onMouseEnter={() => setIsTopControlsHovered(true)}
-      onMouseLeave={() => setIsTopControlsHovered(false)}
-      className={`absolute left-6 top-6 z-50 flex gap-3 ${showTopControls ? "pointer-events-auto" : "pointer-events-none"}`}
-    >
-      <CrystalButton variant="ghost" size="icon" onClick={() => setCurrentView("admin")} className="rounded-full">
-        <Shield className="h-5 w-5" />
-      </CrystalButton>
-    </motion.div>
-  ) : null;
+  const adminControl = null; // Removed as it's merged into topControls
 
   return (
     <div className="relative h-screen w-full overflow-hidden">
@@ -347,10 +269,6 @@ function App() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        {canOpenAdmin && activeView !== "home" && activeView !== "admin" && (
-          adminControl
-        )}
 
         <AccessApplicationModal />
         <AppealsModal />

@@ -303,23 +303,36 @@ export const UniverseView: React.FC = () => {
       let x = center + card.coord.x;
       let y = center + card.coord.y;
       
-      // 基于情绪标签的聚类偏移
+      // 基于情绪标签的极坐标聚类偏移，使卡片更紧凑且有联系
       const tag = card.tags?.[0] || '';
+      let clusterAngle = 0;
+      let clusterRadius = 150 + Math.random() * 80;
+      
       if (['开心', '喜悦', '治愈', '感动'].includes(tag)) {
-        x += 300; y -= 300; // 右上方
+        clusterAngle = -Math.PI / 4; // 右上方
       } else if (['难过', '悲伤', '孤独', '心碎'].includes(tag)) {
-        x -= 300; y += 300; // 左下方
+        clusterAngle = (3 * Math.PI) / 4; // 左下方
       } else if (['平静', '迷茫', '思考'].includes(tag)) {
-        x -= 300; y -= 300; // 左上方
+        clusterAngle = -(3 * Math.PI) / 4; // 左上方
       } else if (['生气', '焦虑', '烦躁'].includes(tag)) {
-        x += 300; y += 300; // 右下方
+        clusterAngle = Math.PI / 4; // 右下方
+      } else {
+        // 默认混合在中心附近
+        clusterRadius = Math.random() * 100;
+        clusterAngle = Math.random() * Math.PI * 2;
       }
+
+      // 添加随机角度扰动，让不同聚类相互渗透连接，避免空荡荡
+      clusterAngle += (Math.random() - 0.5) * 1.5; 
+      
+      x += Math.cos(clusterAngle) * clusterRadius;
+      y += Math.sin(clusterAngle) * clusterRadius;
 
       return { x, y };
     });
 
-    // 碰撞推开
-    resolveCollisions(positions, cardW, cardH, 12); // 增加迭代次数确保散开
+    // 碰撞推开，增加迭代以产生更好的连结感
+    resolveCollisions(positions, cardW, cardH, 15);
 
     // 为每张卡片决定是否显示金句（随机但稳定）
     return cards.map((card, i) => {
@@ -451,30 +464,45 @@ export const UniverseView: React.FC = () => {
       className="absolute inset-0 overflow-hidden bg-[var(--universe-void-purple)] dark:bg-[var(--universe-deep-space)] z-10 transition-colors duration-1000"
       ref={containerRef}
     >
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_20%_20%,rgba(240,182,214,0.4),transparent_40%),radial-gradient(circle_at_80%_15%,rgba(200,162,232,0.3),transparent_45%),radial-gradient(circle_at_50%_90%,rgba(255,182,193,0.35),transparent_50%)] animate-nebula mix-blend-screen" />
+      {/* 梦幻水晶星云层 - 浅色模式 */}
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_15%_20%,rgba(255,160,190,0.4),transparent_50%),radial-gradient(circle_at_85%_20%,rgba(210,150,230,0.35),transparent_50%),radial-gradient(circle_at_50%_85%,rgba(255,140,180,0.3),transparent_60%),radial-gradient(circle_at_25%_75%,rgba(255,220,230,0.6),transparent_50%)] animate-nebula mix-blend-normal opacity-90 dark:hidden" />
       
+      {/* 梦幻水晶星云层 - 恢复 11:40 的暗色模式经典配置 */}
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_20%_20%,rgba(240,182,214,0.4),transparent_40%),radial-gradient(circle_at_80%_15%,rgba(200,162,232,0.3),transparent_45%),radial-gradient(circle_at_50%_90%,rgba(255,182,193,0.35),transparent_50%)] animate-nebula mix-blend-screen hidden dark:block" />
+      
+      {/* 柔和的环境辉光叠加（仅浅色模式下增加梦幻朦胧感） */}
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-white/50 via-transparent to-pink-100/40 dark:hidden mix-blend-overlay" />
+
       {/* 晶体飞鳐与粒子层 */}
       <StarSeaCanvas />
 
-      {/* 星尘背景 */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-30 dark:opacity-40"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
-        }}
-      />
+      {/* 星尘背景 - 浅色模式为粉紫色晶尘，深色模式恢复为 11:40 的纯白星光 */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div 
+          className="absolute inset-0 opacity-50 dark:hidden"
+          style={{
+            backgroundImage: "radial-gradient(circle, rgba(255,160,190,0.3) 1.5px, transparent 1.5px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
+        <div 
+          className="absolute inset-0 hidden dark:block opacity-30 dark:opacity-40"
+          style={{
+            backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
+      </div>
 
       {isLoading && cards.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-          <div className="font-elysia-poem text-[1.5rem] leading-none text-white/70 animate-pulse">正在聆听星海的回响呢...♪</div>
+          <div className="font-elysia-poem text-[1.5rem] leading-none text-pink-400/80 dark:text-white/70 animate-pulse">正在聆听星海的回响呢...♪</div>
         </div>
       )}
 
       {!isLoading && cards.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-          <div className="rounded-full border border-white/50 bg-white/20 px-5 py-2 text-sm text-slate-100 backdrop-blur-md shadow-[0_0_15px_rgba(255,182,193,0.3)] dark:border-white/20 dark:bg-black/35 dark:text-slate-100/90">
+          <div className="rounded-full border border-pink-200/60 bg-white/60 px-5 py-2 text-sm text-pink-700/80 backdrop-blur-md shadow-[0_4px_20px_rgba(255,182,193,0.4)] dark:border-white/20 dark:bg-black/35 dark:text-slate-100/90 dark:shadow-[0_0_15px_rgba(255,182,193,0.1)]">
             星海里还很安静呀，要不要成为第一个留下奇迹的人呢？♪
           </div>
         </div>
@@ -486,7 +514,7 @@ export const UniverseView: React.FC = () => {
         animate={{ opacity: showTooltip ? 1 : 0, y: showTooltip ? 0 : -10 }}
         transition={{ duration: 0.8, ease: "easeInOut" }}
       >
-        <div className="rounded-full border border-white/40 bg-white/20 px-4 py-1.5 text-xs tracking-[0.14em] text-slate-200 backdrop-blur-md shadow-[0_0_10px_rgba(255,255,255,0.2)] dark:border-white/18 dark:bg-black/35 dark:text-slate-200/80">
+        <div className="rounded-full border border-pink-200/60 bg-white/70 px-4 py-1.5 text-xs tracking-[0.14em] text-pink-700/80 backdrop-blur-md shadow-[0_4px_20px_rgba(255,182,193,0.5)] dark:border-white/18 dark:bg-black/35 dark:text-slate-200/80 dark:shadow-[0_0_10px_rgba(255,255,255,0.2)]">
           拖动画布漫游 · 靠近中心的回响会如水晶般清晰哦♪
         </div>
       </motion.div>
@@ -501,7 +529,7 @@ export const UniverseView: React.FC = () => {
             className="fixed top-24 left-1/2 z-[150] whitespace-nowrap px-6 py-3 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-pink-200 dark:border-pink-800 shadow-[0_10px_30px_rgba(255,182,193,0.3)] flex items-center gap-3"
           >
             <span className="text-xl">🌸</span>
-            <span className="text-sm font-elysia-display text-slate-700 dark:text-slate-200 tracking-wide">
+            <span className="text-sm font-elysia-display text-pink-700/90 dark:text-slate-200 tracking-wide">
               {elysiaToast}
             </span>
           </motion.div>
