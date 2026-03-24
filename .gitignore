@@ -49,3 +49,7 @@ pnpm-debug.log*
 dist/
 build/
 .vite/
+
+# 临时修补脚本
+/fix*.py
+/apps/frontend/fix*.cjs
