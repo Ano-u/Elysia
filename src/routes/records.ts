@@ -147,6 +147,7 @@ async function loadRecordModerationInput(client: Pick<PoolClient, "query">, reco
       LEFT JOIN record_quotes rq ON rq.record_id = r.id
       WHERE r.id = $1
       LIMIT 1
+      FOR UPDATE OF r
     `,
     [recordId],
   );

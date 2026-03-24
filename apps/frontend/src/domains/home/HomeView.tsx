@@ -717,6 +717,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
   const publicationMeta = getPublicationStatusMeta(currentItem.publicationStatus);
   const emotionTags = currentItem.extraEmotions && currentItem.extraEmotions.length > 0 ? currentItem.extraEmotions : currentItem.tags ?? [];
   const [isEditing, setIsEditing] = useState(false);
+  const [editIsPublic, setEditIsPublic] = useState(isPublic);
   const [editMoodPhrase, setEditMoodPhrase] = useState(currentItem.moodPhrase);
   const [editQuote, setEditQuote] = useState(currentItem.quote ?? "");
   const [editDescription, setEditDescription] = useState(currentItem.description ?? "");
@@ -757,11 +758,12 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
 
   useEffect(() => {
     if (isEditing) return;
+    setEditIsPublic(isPublic);
     setEditMoodPhrase(currentItem.moodPhrase);
     setEditQuote(currentItem.quote ?? "");
     setEditDescription(currentItem.description ?? "");
     setEditExtraEmotions(currentItem.extraEmotions ?? []);
-  }, [isEditing, currentItem.moodPhrase, currentItem.quote, currentItem.description, currentItem.extraEmotions, currentItem.updatedAt]);
+  }, [isEditing, isPublic, currentItem.moodPhrase, currentItem.quote, currentItem.description, currentItem.extraEmotions, currentItem.updatedAt]);
 
   const toggleVisibility = () => {
     if (isMockItem) {
@@ -785,6 +787,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
   };
 
   const handleEditCancel = () => {
+    setEditIsPublic(isPublic);
     setEditMoodPhrase(currentItem.moodPhrase);
     setEditQuote(currentItem.quote ?? "");
     setEditDescription(currentItem.description ?? "");
@@ -808,12 +811,17 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
         quote: editQuote.trim().length > 0 ? editQuote.trim() : null,
         description: editDescription.trim().length > 0 ? editDescription.trim() : null,
         extraEmotions: editExtraEmotions.length > 0 ? editExtraEmotions : null,
+        visibilityIntent: editIsPublic ? "public" : "private",
         publicationStatus: "pending_second_review",
         updatedAt: new Date().toISOString(),
       }));
       setIsEditing(false);
       setEditFeedback("修改已提交，正在进行二次审核呀♪");
       return;
+    }
+
+    if (editIsPublic !== isPublic) {
+      visibilityMutation.mutate({ id: currentItem.id, isPublic: editIsPublic });
     }
 
     editMutation.mutate({
@@ -908,24 +916,41 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
               }}
             />
 
-            <div className="flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={handleEditCancel}
-                className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/85 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-white dark:border-white/20 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
-              >
-                <X className="w-3.5 h-3.5" />
-                取消
-              </button>
-              <button
-                type="button"
-                onClick={handleEditSave}
-                disabled={editMutation.isPending}
-                className="inline-flex items-center gap-1 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-300/20 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/30"
-              >
-                <Check className="w-3.5 h-3.5" />
-                {editMutation.isPending ? "提交中..." : "提交修改"}
-              </button>
+            <div className="flex items-center justify-between mt-2">
+              <label className="flex items-center gap-2 cursor-pointer group/toggle">
+                <div className={`relative w-8 h-4 rounded-full transition-colors duration-300 ${editIsPublic ? 'bg-pink-400 dark:bg-pink-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
+                  <div className={`absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-300 shadow-sm ${editIsPublic ? 'translate-x-4' : 'translate-x-0'}`} />
+                </div>
+                <input
+                  type="checkbox"
+                  className="hidden"
+                  checked={editIsPublic}
+                  onChange={(e) => setEditIsPublic(e.target.checked)}
+                />
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover/toggle:text-slate-700 dark:group-hover/toggle:text-slate-200 transition-colors">
+                  {editIsPublic ? "公开日记" : "私密日记"}
+                </span>
+              </label>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleEditCancel}
+                  className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/85 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-white dark:border-white/20 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleEditSave}
+                  disabled={editMutation.isPending}
+                  className="inline-flex items-center gap-1 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-300/20 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/30"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  {editMutation.isPending ? "提交中..." : "提交修改"}
+                </button>
+              </div>
             </div>
           </div>
         ) : (
