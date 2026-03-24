@@ -7,7 +7,6 @@ import {
   Shield,
   Sun,
 } from "lucide-react";
-import { AuroraBackground } from "./components/layout/AuroraBackground";
 import { CrystalButton } from "./components/ui/CrystalButton";
 import { AccessApplicationModal } from "./components/ui/AccessApplicationModal";
 import { AppealsModal } from "./components/ui/AppealsModal";
@@ -247,9 +246,8 @@ function App() {
   ) : null;
 
   return (
-    <AuroraBackground>
-      <div className="relative h-screen w-full overflow-hidden">
-        {activeView !== "home" && topControls}
+    <div className="relative h-screen w-full overflow-hidden">
+      {activeView !== "home" && topControls}
 
         {showSceneNav && (
           <motion.div
@@ -357,7 +355,6 @@ function App() {
         <AccessApplicationModal />
         <AppealsModal />
       </div>
-    </AuroraBackground>
   );
 }
 

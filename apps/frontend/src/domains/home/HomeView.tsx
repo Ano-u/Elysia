@@ -474,12 +474,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
           className="absolute inset-0"
         >
           <img
-            src="/Timeless-Grand-Hall.png"
+            src={theme === "dark" ? "/Arc-City.webp" : "/Timeless-Grand-Hall.webp"}
             alt="Elysia Background"
             className="w-full h-full object-cover opacity-60 dark:opacity-20 mix-blend-screen dark:mix-blend-lighten"
           />
         </motion.div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_14%,rgba(255,255,255,0.7),transparent_45%),radial-gradient(circle_at_82%_12%,rgba(255,231,242,0.52),transparent_38%),radial-gradient(circle_at_50%_90%,rgba(214,236,255,0.3),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_14%,rgba(255,255,255,0.7),transparent_45%),radial-gradient(circle_at_82%_12%,rgba(255,231,242,0.52),transparent_38%),radial-gradient(circle_at_50%_90%,rgba(214,236,255,0.3),transparent_50%)] dark:hidden" />
       </div>
 
       <motion.div
