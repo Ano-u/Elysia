@@ -199,7 +199,6 @@ function App() {
     window.addEventListener("pointermove", onPointerMove);
     return () => window.removeEventListener("pointermove", onPointerMove);
   }, []);
-
   const toggleTheme = () => {
     setTheme(theme === "light" ? "dark" : "light");
   };
@@ -240,7 +239,7 @@ function App() {
       <motion.div layout transition={{ duration: reduceMotion ? 0 : 0.24 }}>
         <NavIconButton
           icon={theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
-          label={theme === "light" ? "永恒礼堂" : "天穹市"}
+          label={theme === "light" ? "天穹市" : "永恒礼堂"}
           onClick={toggleTheme}
         />
       </motion.div>

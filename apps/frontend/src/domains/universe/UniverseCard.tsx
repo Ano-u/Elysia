@@ -129,6 +129,13 @@ export const UniverseCard = React.forwardRef<HTMLDivElement, UniverseCardProps>(
     // 远处卡片禁用交互的距离也放宽
     const pointerEvents = d > 0.8 ? "none" as const : "auto" as const;
 
+    // 随机的入场延迟（只在挂载时生成一次）
+    const entranceDelay = useRef(Math.random() * 0.3).current;
+    const isFirstMount = useRef(true);
+    React.useEffect(() => {
+      isFirstMount.current = false;
+    }, []);
+
     // 处理表情拖入
     const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
@@ -173,16 +180,18 @@ export const UniverseCard = React.forwardRef<HTMLDivElement, UniverseCardProps>(
           else if (ref) ref.current = node;
           if (cardRef && node) cardRef.current = node;
         }}
+        initial={{ opacity: 0, y: y + 40, x, scale: scale * 0.9, filter: `blur(${blur + 20}px)` }}
+        animate={{ opacity, y, x, scale, filter: `blur(${blur}px)` }}
+        transition={{
+          duration: 1.2,
+          ease: [0.2, 0.8, 0.2, 1], // 更平滑的贝塞尔曲线，避免 spring 带来的生硬感
+          delay: isFirstMount.current ? entranceDelay * 1.5 : 0, // 把随机延迟的跨度拉长一点
+        }}
         style={{
-          x,
-          y,
           zIndex,
           position: "absolute",
           transformOrigin: "center center",
           pointerEvents,
-          scale,
-          opacity,
-          filter: `blur(${blur}px)`,
         }}
         className={cn(
           "w-64 rounded-3xl p-5 cursor-pointer relative flex flex-col gap-3",
@@ -193,7 +202,6 @@ export const UniverseCard = React.forwardRef<HTMLDivElement, UniverseCardProps>(
           isCenter
             ? "shadow-[0_20px_40px_rgba(0,0,0,0.1),0_0_20px_rgba(255,255,255,0.4)] dark:shadow-[0_20px_40px_rgba(0,0,0,0.3),0_0_20px_rgba(255,255,255,0.1)]"
             : "shadow-[0_8px_20px_rgba(0,0,0,0.05)] dark:shadow-[0_8px_20px_rgba(0,0,0,0.2)]",
-          "transition-all duration-500 ease-out",
           className,
         )}
         onDragOver={handleDragOver}
