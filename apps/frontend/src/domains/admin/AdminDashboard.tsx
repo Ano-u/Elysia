@@ -140,7 +140,7 @@ export const AdminDashboard: React.FC = () => {
   >("moderation");
 
   return (
-    <div className="h-full min-h-0 overflow-hidden bg-gradient-to-br from-slate-50 via-white to-slate-100 p-6 text-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:text-slate-200">
+    <div className="h-full min-h-0 overflow-hidden bg-gradient-to-br from-slate-50 via-white to-slate-100 p-6 pt-[88px] text-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:text-slate-200">
       <div className="mx-auto grid h-full min-h-0 max-w-[1360px] gap-6 lg:grid-cols-[260px_1fr]">
         <aside className="min-h-0 overflow-y-auto rounded-3xl border border-white/45 bg-white/45 p-4 shadow-[var(--shadow-crystal)] backdrop-blur-xl dark:border-white/12 dark:bg-black/20">
           <h2 className="font-elysia-display px-2 text-2xl text-slate-700 dark:text-slate-100">治理控制台</h2>

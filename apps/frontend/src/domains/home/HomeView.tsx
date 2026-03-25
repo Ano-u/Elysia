@@ -140,8 +140,6 @@ interface HomeViewProps {
   viewerUserId?: string | null;
   authReady?: boolean;
   isLocalDev?: boolean;
-  topControls?: React.ReactNode;
-  adminControl?: React.ReactNode;
   theme?: "light" | "dark";
 }
 
@@ -179,8 +177,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
   viewerUserId = null,
   authReady = true,
   isLocalDev = false,
-  topControls,
-  adminControl,
   theme = "light",
 }) => {
   const queryClient = useQueryClient();
@@ -486,10 +482,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
         style={{ y: parallaxY }}
         className="absolute top-0 left-0 right-0 z-[5] pointer-events-none"
       >
-        <div className="pointer-events-auto">
-          {adminControl}
-          {topControls}
-        </div>
         <motion.div
           style={{ opacity: headerOpacity, scale: headerScale }}
           className="flex flex-col items-center pt-[64px] pb-4 px-4 w-full origin-top"

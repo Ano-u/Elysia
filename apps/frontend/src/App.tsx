@@ -7,8 +7,11 @@ import {
   SquareStop,
   Shield,
   Sun,
+  Home,
+  Compass,
+  Network
 } from "lucide-react";
-import { CrystalButton } from "./components/ui/CrystalButton";
+import { NavIconButton } from "./components/ui/NavIconButton";
 import { AccessApplicationModal } from "./components/ui/AccessApplicationModal";
 import { AppealsModal } from "./components/ui/AppealsModal";
 import { HomeView } from "./domains/home/HomeView";
@@ -22,7 +25,6 @@ type AppView = "home" | "universe" | "mindmap" | "admin";
 
 const FIRST_VISIT_STORAGE_KEY = "elysia-first-visit-at";
 const THEME_STORAGE_KEY = "elysia-theme";
-const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
 
 function App() {
   const [theme, setTheme] = useState<"light" | "dark">(() => {
@@ -42,22 +44,13 @@ function App() {
     }
     return window.matchMedia("(pointer: coarse)").matches;
   });
-  const [isPointerIdle, setIsPointerIdle] = useState(false);
-  const [isNearTopRightZone, setIsNearTopRightZone] = useState(false);
-  const [isTopControlsHovered, setIsTopControlsHovered] = useState(false);
-  const [hasVisitedOverFiveDays] = useState(() => {
-    if (typeof window === "undefined") {
-      return false;
-    }
-    const saved = window.localStorage.getItem(FIRST_VISIT_STORAGE_KEY);
-    const parsed = saved ? Number(saved) : NaN;
-    if (!saved || !Number.isFinite(parsed)) {
-      return false;
-    }
-    return Date.now() - parsed >= FIVE_DAYS_MS;
-  });
-  const lastPointerMoveAtRef = useRef(0);
-  const idleTimerRef = useRef<number | null>(null);
+  const [navVisible, setNavVisible] = useState(true);
+  const [navExpanded, setNavExpanded] = useState(true);
+  const [hoveredLeft, setHoveredLeft] = useState(false);
+  const [hoveredRight, setHoveredRight] = useState(false);
+
+  const expandTimerRef = useRef<number | null>(null);
+  const lastActiveViewRef = useRef<AppView>("home");
   const { reduceMotion, toggleReduceMotion } = useUiStore();
   const queryClient = useQueryClient();
 
@@ -84,9 +77,6 @@ function App() {
 
   const canOpenAdmin = authQuery.data?.user?.role === "admin";
   const activeView: AppView = !canOpenAdmin && currentView === "admin" ? "home" : currentView;
-  const isUniverseView = activeView === "universe";
-  const isMindMapView = activeView === "mindmap";
-  const showSceneNav = isUniverseView || isMindMapView;
 
   useEffect(() => {
     if (
@@ -153,135 +143,159 @@ function App() {
   }, []);
 
   useEffect(() => {
-    lastPointerMoveAtRef.current = Date.now();
+    if (activeView !== lastActiveViewRef.current) {
+      lastActiveViewRef.current = activeView;
+      setNavExpanded(true);
+      setNavVisible(true);
+    }
+  }, [activeView]);
 
-    const onPointerMove = (event: PointerEvent) => {
-      if (event.pointerType === "touch") {
-        return;
-      }
-
-      const nearTopRight = event.clientY <= 180;
-
-      setIsNearTopRightZone(nearTopRight);
-      lastPointerMoveAtRef.current = Date.now();
-      setIsPointerIdle(false);
-      if (idleTimerRef.current) {
-        window.clearTimeout(idleTimerRef.current);
-      }
-      idleTimerRef.current = window.setTimeout(() => {
-        if (Date.now() - lastPointerMoveAtRef.current >= 1150) {
-          setIsPointerIdle(true);
-        }
-      }, 1200);
-    };
-
-    window.addEventListener("pointermove", onPointerMove);
+  useEffect(() => {
+    if (expandTimerRef.current) {
+      window.clearTimeout(expandTimerRef.current);
+    }
+    if (hoveredLeft || hoveredRight) {
+      setNavExpanded(true);
+      return;
+    }
+    expandTimerRef.current = window.setTimeout(() => {
+      setNavExpanded(false);
+    }, 2500);
     return () => {
-      window.removeEventListener("pointermove", onPointerMove);
-      if (idleTimerRef.current) {
-        window.clearTimeout(idleTimerRef.current);
-      }
+      if (expandTimerRef.current) window.clearTimeout(expandTimerRef.current);
     };
+  }, [activeView, hoveredLeft, hoveredRight]);
+
+  useEffect(() => {
+    const lastScrollYMap = new WeakMap<HTMLElement, number>();
+    const handleScroll = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (!target || typeof target.scrollTop !== "number") return;
+
+      const currentScrollY = target.scrollTop;
+      const lastScrollY = lastScrollYMap.get(target) || 0;
+      const diff = currentScrollY - lastScrollY;
+
+      if (currentScrollY <= 0) {
+        setNavVisible(true);
+      } else if (diff > 5) {
+        setNavVisible(false);
+        setNavExpanded(false);
+      } else if (diff < -5) {
+        setNavVisible(true);
+      }
+      lastScrollYMap.set(target, currentScrollY);
+    };
+    window.addEventListener("scroll", handleScroll, { capture: true, passive: true });
+    return () => window.removeEventListener("scroll", handleScroll, { capture: true });
   }, []);
 
-  const showTopControls =
-    isCoarsePointer ||
-    !hasVisitedOverFiveDays ||
-    isTopControlsHovered ||
-    (isNearTopRightZone && !isPointerIdle);
+  useEffect(() => {
+    const onPointerMove = (e: PointerEvent) => {
+      if (e.pointerType === "touch") return;
+      const nearTopArea = e.clientY <= 140;
+      if (nearTopArea) setNavVisible(true);
+    };
+    window.addEventListener("pointermove", onPointerMove);
+    return () => window.removeEventListener("pointermove", onPointerMove);
+  }, []);
 
   const toggleTheme = () => {
     setTheme(theme === "light" ? "dark" : "light");
   };
 
-  const topControls = (
+  const isLeftExpanded = navExpanded || hoveredLeft || isCoarsePointer;
+  const isRightExpanded = navExpanded || hoveredRight || isCoarsePointer;
+
+  const rightControls = (
     <motion.div
       initial={false}
-      animate={{
-        opacity: showTopControls ? 1 : 0,
-        y: showTopControls ? 0 : -12,
-      }}
-      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-      onMouseEnter={() => setIsTopControlsHovered(true)}
-      onMouseLeave={() => setIsTopControlsHovered(false)}
-      className={`absolute right-6 top-6 z-50 flex gap-3 ${showTopControls ? "pointer-events-auto" : "pointer-events-none"}`}
+      animate={{ opacity: navVisible ? 1 : 0, y: navVisible ? 0 : -12 }}
+      transition={{ duration: reduceMotion ? 0 : 0.24, ease: [0.22, 1, 0.36, 1] }}
+      onMouseEnter={() => setHoveredRight(true)}
+      onMouseLeave={() => setHoveredRight(false)}
+      onClick={() => { if (!navExpanded) setNavExpanded(true); }}
+      className={`absolute right-6 top-6 z-50 flex items-center pointer-events-auto ${navVisible ? "pointer-events-auto" : "pointer-events-none"}`}
     >
-      <CrystalButton
-        variant="ghost"
-        size="icon"
-        onClick={toggleReduceMotion}
-        className="rounded-full"
-        title={reduceMotion ? "恢复动态" : "减弱动态"}
-      >
-        {reduceMotion ? <SquareStop className="h-5 w-5 opacity-50" /> : <SquarePlay className="h-5 w-5 opacity-100" />}
-      </CrystalButton>
-      <CrystalButton
-        variant="ghost"
-        size="icon"
-        onClick={toggleTheme}
-        className="rounded-full"
-        title={theme === "light" ? "天穹市" : "永恒礼堂"}
-      >
-        {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
-      </CrystalButton>
+      <AnimatePresence initial={false}>
+        {isRightExpanded && (
+          <motion.div
+            key="motion-toggle"
+            initial={{ opacity: 0, width: 0, scale: 0.8 }}
+            animate={{ opacity: 1, width: 60, scale: 1 }}
+            exit={{ opacity: 0, width: 0, scale: 0.8 }}
+            transition={{ duration: reduceMotion ? 0 : 0.24, ease: "easeInOut" }}
+            style={{ overflow: "visible" }}
+          >
+            <div style={{ width: 48, marginRight: 12 }}>
+              <NavIconButton
+                icon={reduceMotion ? <SquarePlay className="h-5 w-5 opacity-50" /> : <SquareStop className="h-5 w-5 opacity-100" />}
+                label={reduceMotion ? "恢复动态" : "减弱动态"}
+                onClick={toggleReduceMotion}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <motion.div layout transition={{ duration: reduceMotion ? 0 : 0.24 }}>
+        <NavIconButton
+          icon={theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+          label={theme === "light" ? "永恒礼堂" : "天穹市"}
+          onClick={toggleTheme}
+        />
+      </motion.div>
     </motion.div>
   );
 
-  const adminControl = canOpenAdmin ? (
+  const leftControls = (
     <motion.div
       initial={false}
-      animate={{
-        opacity: showTopControls ? 1 : 0,
-        y: showTopControls ? 0 : -12,
-      }}
-      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-      onMouseEnter={() => setIsTopControlsHovered(true)}
-      onMouseLeave={() => setIsTopControlsHovered(false)}
-      className={`absolute left-6 top-6 z-50 flex gap-3 ${showTopControls ? "pointer-events-auto" : "pointer-events-none"}`}
+      animate={{ opacity: navVisible ? 1 : 0, y: navVisible ? 0 : -12 }}
+      transition={{ duration: reduceMotion ? 0 : 0.24, ease: [0.22, 1, 0.36, 1] }}
+      onMouseEnter={() => setHoveredLeft(true)}
+      onMouseLeave={() => setHoveredLeft(false)}
+      onClick={() => { if (!navExpanded) setNavExpanded(true); }}
+      className={`absolute left-6 top-6 z-[60] flex items-center pointer-events-auto ${navVisible ? "pointer-events-auto" : "pointer-events-none"}`}
     >
-      <CrystalButton variant="ghost" size="icon" onClick={() => setCurrentView("admin")} className="rounded-full">
-        <Shield className="h-5 w-5" />
-      </CrystalButton>
+      <AnimatePresence initial={false}>
+        {[
+          { id: "home", view: "home" as AppView, icon: <Home className="h-5 w-5" />, label: "往世乐土" },
+          { id: "universe", view: "universe" as AppView, icon: <Compass className="h-5 w-5" />, label: "星海回响" },
+          { id: "mindmap", view: "mindmap" as AppView, icon: <Network className="h-5 w-5" />, label: "记忆织网" },
+          ...(canOpenAdmin ? [{ id: "admin", view: "admin" as AppView, icon: <Shield className="h-5 w-5" />, label: "治理面板" }] : [])
+        ].map(item => {
+          if (!isLeftExpanded && activeView !== item.view) return null;
+          return (
+            <motion.div
+              layout
+              key={item.id}
+              initial={{ opacity: 0, width: 0, scale: 0.8 }}
+              animate={{ opacity: 1, width: 60, scale: 1 }}
+              exit={{ opacity: 0, width: 0, scale: 0.8 }}
+              transition={{ duration: reduceMotion ? 0 : 0.24, ease: "easeInOut" }}
+              style={{ overflow: "visible" }}
+            >
+              <div style={{ width: 48, marginRight: 12 }}>
+                <NavIconButton
+                  icon={item.icon}
+                  label={item.label}
+                  onClick={() => setCurrentView(item.view)}
+                  isActive={activeView === item.view}
+                />
+              </div>
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
     </motion.div>
-  ) : null;
+  );
 
   return (
     <div className="relative h-screen w-full overflow-hidden">
-      {activeView !== "home" && topControls}
+      {rightControls}
+      {leftControls}
 
-        {showSceneNav && (
-          <motion.div
-            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
-            animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
-            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute left-6 top-6 z-[60] flex flex-wrap items-center gap-2 rounded-full border border-white/50 bg-white/58 p-1.5 shadow-lg backdrop-blur-xl dark:border-white/15 dark:bg-black/28"
-          >
-            <CrystalButton
-              variant="ghost"
-              size="sm"
-              onClick={() => setCurrentView("home")}
-              className="rounded-full px-4"
-            >
-              往世乐土
-            </CrystalButton>
-            <CrystalButton
-              variant={isUniverseView ? "primary" : "ghost"}
-              size="sm"
-              onClick={() => setCurrentView("universe")}
-              className="rounded-full px-4"
-            >
-              星海回响
-            </CrystalButton>
-            <CrystalButton
-              variant={isMindMapView ? "primary" : "ghost"}
-              size="sm"
-              onClick={() => setCurrentView("mindmap")}
-              className="rounded-full px-4"
-            >
-              记忆织网
-            </CrystalButton>
-          </motion.div>
-        )}
+
 
 
         <AnimatePresence mode="wait">
@@ -299,8 +313,6 @@ function App() {
                 viewerUserId={authQuery.data?.user?.id ?? null}
                 authReady={!authQuery.isLoading && !authQuery.isFetching}
                 isLocalDev={isLocalDev}
-                topControls={topControls}
-                adminControl={adminControl}
                 theme={theme}
               />
             </motion.div>
@@ -336,21 +348,12 @@ function App() {
               animate={reduceMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
               exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 1.05 }}
               transition={{ duration: reduceMotion ? 0.28 : 0.5, ease: [0.22, 1, 0.36, 1] }}
-              className="absolute inset-0 z-[100] h-full w-full bg-slate-50 dark:bg-slate-900"
+              className="absolute inset-0 z-0 h-full w-full bg-slate-50 dark:bg-slate-900"
             >
-              <div className="absolute left-6 top-6 z-[120]">
-                <CrystalButton variant="ghost" onClick={() => setCurrentView("home")} className="rounded-full">
-                  往世乐土
-                </CrystalButton>
-              </div>
               <AdminDashboard />
             </motion.div>
           )}
         </AnimatePresence>
-
-        {canOpenAdmin && activeView !== "home" && activeView !== "admin" && (
-          adminControl
-        )}
 
         <AccessApplicationModal />
         <AppealsModal />
