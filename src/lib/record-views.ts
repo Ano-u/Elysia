@@ -94,6 +94,45 @@ function toReplyTargetPayload(row: ReplyTargetRow): ReplyTargetPayload {
   };
 }
 
+export async function loadReplyTargetMap(
+  queryable: Queryable | Pick<PoolClient, "query">,
+  args: { targetIds: string[]; requesterUserId?: string | null },
+): Promise<Map<string, ReplyTargetPayload>> {
+  const targetIds = Array.from(new Set(args.targetIds.filter(Boolean)));
+  if (targetIds.length === 0) {
+    return new Map();
+  }
+
+  const visibleTargets = await runQuery<ReplyTargetRow>(
+    queryable,
+    `
+      SELECT
+        r.id,
+        r.user_id,
+        r.mood_phrase,
+        rq.quote,
+        r.is_public,
+        r.publication_status,
+        r.created_at,
+        u.display_name,
+        u.avatar_url
+      FROM records r
+      JOIN users u ON u.id = r.user_id
+      LEFT JOIN record_quotes rq ON rq.record_id = r.id
+      WHERE r.id = ANY($1::uuid[])
+        AND (
+          (r.is_public = TRUE AND r.publication_status = 'published')
+          OR ($2::uuid IS NOT NULL AND r.user_id = $2::uuid)
+        )
+    `,
+    [targetIds, args.requesterUserId ?? null],
+  );
+
+  return new Map<string, ReplyTargetPayload>(
+    visibleTargets.rows.map((row: ReplyTargetRow) => [row.id, toReplyTargetPayload(row)]),
+  );
+}
+
 export async function loadRecordSummary(
   queryable: Queryable | Pick<PoolClient, "query">,
   recordId: string,
@@ -168,35 +207,10 @@ export async function loadReplyContext(
   }
 
   const replyMeta = meta.rows[0];
-  const targetIds = Array.from(new Set([replyMeta.parent_record_id, replyMeta.root_record_id]));
-  const visibleTargets = await runQuery<ReplyTargetRow>(
-    queryable,
-    `
-      SELECT
-        r.id,
-        r.user_id,
-        r.mood_phrase,
-        rq.quote,
-        r.is_public,
-        r.publication_status,
-        r.created_at,
-        u.display_name,
-        u.avatar_url
-      FROM records r
-      JOIN users u ON u.id = r.user_id
-      LEFT JOIN record_quotes rq ON rq.record_id = r.id
-      WHERE r.id = ANY($1::uuid[])
-        AND (
-          (r.is_public = TRUE AND r.publication_status = 'published')
-          OR ($2::uuid IS NOT NULL AND r.user_id = $2::uuid)
-        )
-    `,
-    [targetIds, args.requesterUserId ?? null],
-  );
-
-  const targetMap = new Map<string, ReplyTargetPayload>(
-    visibleTargets.rows.map((row: ReplyTargetRow) => [row.id, toReplyTargetPayload(row)]),
-  );
+  const targetMap = await loadReplyTargetMap(queryable, {
+    targetIds: [replyMeta.parent_record_id, replyMeta.root_record_id],
+    requesterUserId: args.requesterUserId ?? null,
+  });
   return {
     content: replyMeta.content,
     parentRecordId: replyMeta.parent_record_id,

@@ -104,17 +104,19 @@ type RawUniverseViewportResponse = {
 type RawMindMapResponse = {
   nodes: Array<{
     id: string;
-    record_id: string;
-    node_type: string;
+    recordId: string;
+    type: string;
     label: string;
-    payload?: unknown;
+    createdAt: string;
+    isSelfReply: boolean;
+    replyContext?: RawReplyContext | null;
   }>;
   edges: Array<{
     id: string;
-    source_node_id: string;
-    target_node_id: string;
-    edge_type: string;
-    weight: string | number;
+    source: string;
+    target: string;
+    type: string;
+    strength: string | number;
   }>;
 };
 
@@ -406,16 +408,41 @@ export const getMindMapMe = (mode: 'simple' | 'deep' = 'simple') =>
     (raw): MindMapResponse => ({
       nodes: raw.nodes.map((node) => ({
         id: node.id,
-        recordId: node.record_id,
-        type: node.node_type,
+        recordId: node.recordId,
+        type: node.type,
         label: node.label,
+        createdAt: node.createdAt,
+        isSelfReply: node.isSelfReply,
+        replyContext: mapReplyContext(node.replyContext),
       })),
       edges: raw.edges.map((edge) => ({
         id: edge.id,
-        source: edge.source_node_id,
-        target: edge.target_node_id,
-        type: edge.edge_type,
-        strength: Number(edge.weight),
+        source: edge.source,
+        target: edge.target,
+        type: edge.type,
+        strength: Number(edge.strength),
+      })),
+    }),
+  );
+
+export const getMindMapRecord = (recordId: string, mode: 'simple' | 'deep' = 'simple') =>
+  fetchApi<RawMindMapResponse>(`/api/mindmap/${recordId}?mode=${mode}`).then(
+    (raw): MindMapResponse => ({
+      nodes: raw.nodes.map((node) => ({
+        id: node.id,
+        recordId: node.recordId,
+        type: node.type,
+        label: node.label,
+        createdAt: node.createdAt,
+        isSelfReply: node.isSelfReply,
+        replyContext: mapReplyContext(node.replyContext),
+      })),
+      edges: raw.edges.map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        type: edge.type,
+        strength: Number(edge.strength),
       })),
     }),
   );

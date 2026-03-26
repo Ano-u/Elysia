@@ -165,6 +165,9 @@ export interface MindMapNode {
   type: string;
   label: string;
   isFocus?: boolean;
+  createdAt?: string; // Newly added for Spiral chronological layout
+  isSelfReply?: boolean; // Newly added for self-reply clusters
+  replyContext?: ReplyContext | null; // Newly added for Star Sea blur-to-clear
 }
 
 export interface MindMapEdge {
