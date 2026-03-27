@@ -7,7 +7,7 @@ import {
   SquareStop,
   Shield,
   Sun,
-  Home,
+  Landmark,
   Compass,
   Network
 } from "lucide-react";
@@ -258,7 +258,7 @@ function App() {
     >
       <AnimatePresence initial={false}>
         {[
-          { id: "home", view: "home" as AppView, icon: <Home className="h-5 w-5" />, label: "往世乐土" },
+          { id: "home", view: "home" as AppView, icon: <Landmark className="h-5 w-5" />, label: "往世乐土" },
           { id: "universe", view: "universe" as AppView, icon: <Compass className="h-5 w-5" />, label: "星海回响" },
           { id: "mindmap", view: "mindmap" as AppView, icon: <Network className="h-5 w-5" />, label: "记忆织网" },
           ...(canOpenAdmin ? [{ id: "admin", view: "admin" as AppView, icon: <Shield className="h-5 w-5" />, label: "治理面板" }] : [])

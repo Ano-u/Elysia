@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUiStore } from "../../store/uiStore";
 import { LiquidCard } from "../../components/ui/LiquidCard";
 import { MainInputCard } from "../../components/ui/MainInputCard";
-import { ActionPairRow } from "../../components/ui/ActionPairRow";
 import { HomeGuideOverlay, type HomeGuideStepContent } from "../../components/ui/HomeGuideOverlay";
 import {
   createRecord,
@@ -184,7 +183,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const queryClient = useQueryClient();
   const reduceMotion = useUiStore((state) => state.reduceMotion);
   const [draft, setDraft] = useState<DraftPayload>(readInitialDraft);
-  const [showOnlyPublic, setShowOnlyPublic] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [feedbackTone, setFeedbackTone] = useState<"error" | "success">("success");
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -229,6 +227,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
     queryFn: getOnboardingProgress,
   });
 
+  const mindMapProgress = onboardingData ? onboardingData.progress.completed_days.length : 0;
+  const isMindMapActive = mindMapProgress >= 7;
+
   const guideStorageKey = `${GUIDE_COMPLETED_STORAGE_PREFIX}:${viewerUserId ?? "anonymous"}`;
   const isGuideVisible = guideMode !== "hidden";
   const isGuideSpotlight = guideMode === "spotlight";
@@ -244,10 +245,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
     setGuideTargetRadius(26);
 
     const version = onboardingData?.guide.version ?? "v1";
-    const payload = skipped 
+    const payload = skipped
       ? { skippedAt: new Date().toISOString(), version }
       : { completedAt: new Date().toISOString(), version };
-    
+
     updateOnboardingGuideState(payload).catch((e) => {
       console.error("Failed to update guide state", e);
     });
@@ -311,16 +312,19 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const createMutation = useMutation({
     mutationFn: (payload: CreateRecordRequest) => createRecord(payload),
     onSuccess: (response) => {
-      emitSaveAnimationEvent("success");
       setDraft({ ...draft, moodPhrase: "", quote: "", description: "", extraEmotions: [] });
       localStorage.removeItem(DRAFT_KEY);
       setFeedbackTone("success");
       setFeedbackMessage(getCreateSuccessMessage(response.publishStatus.status));
       queryClient.invalidateQueries({ queryKey: ["home-feed"] });
       queryClient.invalidateQueries({ queryKey: ["universe"] });
+
+      // Navigate after showing the success feedback briefly
+      setTimeout(() => {
+        onNavigate(draft.visibilityIntent === "public" ? "universe" : "mindmap");
+      }, 1200);
     },
     onError: (error) => {
-      emitSaveAnimationEvent("error");
       setFeedbackTone("error");
       setFeedbackMessage(resolveCreateErrorMessage(error));
     },
@@ -340,7 +344,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
     const moodPhrase = draft.moodPhrase.trim();
     const moodCheck = validateMoodPhraseLength(moodPhrase);
     if (!moodCheck.ok) {
-      emitSaveAnimationEvent("error");
       setFeedbackTone("error");
       setFeedbackMessage(moodCheck.reason);
       return;
@@ -482,8 +485,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isGuideVisible, guideStorageKey]);
 
-  const mindMapProgress = onboardingData ? onboardingData.progress.completed_days.length : 0;
-  const isMindMapActive = mindMapProgress >= 7;
   const hasComposerValue = draft.moodPhrase.trim().length > 0;
   const loadingMessage = useRotatingCopy(FEED_LOADING_MESSAGES, 10000, isFeedLoading);
   const feedErrorMessage = isFeedError ? resolveCreateErrorMessage(feedError) : null;
@@ -492,20 +493,17 @@ export const HomeView: React.FC<HomeViewProps> = ({
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
-  const filteredItems = allItems.filter(item =>
-    !showOnlyPublic || item.visibilityIntent === "public"
-  );
   const emptyMessage = useRotatingCopy(
     FEED_EMPTY_MESSAGES,
     10000,
-    !isFeedLoading && filteredItems.length === 0,
+    !isFeedLoading && allItems.length === 0,
   );
-  
-  const activeGuideSteps = onboardingData?.guide.steps && onboardingData.guide.steps.length > 0 
-    ? onboardingData.guide.steps 
+
+  const activeGuideSteps = onboardingData?.guide.steps && onboardingData.guide.steps.length > 0
+    ? onboardingData.guide.steps
     : GUIDE_STEPS;
   const guideStepContent = activeGuideSteps[guideStep] ?? activeGuideSteps[0];
-  
+
   const guideTargetClass = (index: number): string =>
     isGuideSpotlight && guideStep === index ? "relative z-[122]" : "relative z-10";
 
@@ -556,7 +554,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             <div className="w-full px-2 sm:px-0">
               <AnimatePresence mode="popLayout">
                 {onboardingData.restartSuggestion?.shouldShow ? (
-                  <motion.div 
+                  <motion.div
                     key="restart-suggestion"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -574,7 +572,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   const currentTask = onboardingData.tasks?.find(t => t.day === onboardingData.progress.current_day);
                   if (currentTask && completingTaskDay !== currentTask.day) {
                     return (
-                      <motion.div 
+                      <motion.div
                         key={`task-day-${currentTask.day}`}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -600,10 +598,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
                             </p>
                           )}
                         </div>
-                        
+
                         <div className="flex items-center gap-3 self-start sm:self-center shrink-0">
                           {currentTask.ctaText && (
-                            <button 
+                            <button
                               className="rounded-full bg-slate-800 dark:bg-slate-200 px-4 py-2 text-xs sm:text-sm text-white dark:text-slate-900 transition-colors hover:bg-slate-700 dark:hover:bg-white"
                               onClick={() => {
                                 const target = currentTask.ctaTarget;
@@ -679,69 +677,28 @@ export const HomeView: React.FC<HomeViewProps> = ({
             />
 
             {/* Emotions & Actions */}
-            <div className="flex flex-col gap-8 px-6">
-              {/* Desktop: emotions + save-universe in one row */}
-              <div className="hidden lg:flex items-center justify-between gap-8 transition-all duration-700">
-                {hasComposerValue ? (
-                  <EmotionSelector
-                    extraEmotions={draft.extraEmotions}
-                    onToggle={handleEmotionToggle}
-                  />
-                ) : <div />}
-                <ActionPairRow
-                  type="save-universe"
-                  leftLabel="留下痕迹"
-                  rightLabel="星海回响"
-                  onLeftClick={handleSave}
-                  onRightClick={() => onNavigate("universe")}
-                  isRightActive={draft.visibilityIntent === "public"}
-                  leftActionEvent={saveAnimationEvent}
-                  rightActiveLabel={draft.visibilityIntent === "public" ? "星海已连接" : "私密存储中"}
-                  isSwitched={draft.visibilityIntent === "public"}
-                  onSwitchToggle={(isP) => {
-                    setDraft({ ...draft, visibilityIntent: isP ? "public" : "private" });
+            <div className="flex flex-col sm:flex-row items-stretch justify-between gap-6 px-6">
+              {hasComposerValue ? (
+                <EmotionSelector
+                  extraEmotions={draft.extraEmotions}
+                  onToggle={handleEmotionToggle}
+                />
+              ) : (
+                <div className="flex-1 min-w-0" />
+              )}
+
+              <div className="w-full sm:w-[260px] sm:flex-shrink-0 origin-right transition-all duration-700 h-[160px]">
+                <AsymmetricTogglePanel
+                  currentState={draft.visibilityIntent === "public" ? "universe" : "mindmap"}
+                  onStateChange={(newState) => {
+                    setDraft({ ...draft, visibilityIntent: newState === "universe" ? "public" : "private" });
                     setFeedbackMessage(null);
                   }}
+                  onSubmit={handleSave}
                   isPending={createMutation.isPending}
+                  mindMapProgress={mindMapProgress}
+                  isMindMapActive={isMindMapActive}
                 />
-              </div>
-
-              {/* Mobile: emotions above, both action pairs in one row below */}
-              <div className="flex flex-col gap-6 lg:hidden">
-                {hasComposerValue && (
-                  <EmotionSelector
-                    extraEmotions={draft.extraEmotions}
-                    onToggle={handleEmotionToggle}
-                  />
-                )}
-                <div className="flex items-start justify-center gap-2 sm:gap-4 -ml-2 -mr-2 sm:mx-0 origin-top scale-[0.78] min-[390px]:scale-[0.92] sm:scale-100">
-                  <ActionPairRow
-                    type="timeline-mindmap"
-                    leftLabel="视图切换"
-                    rightLabel="记忆织网"
-                    onLeftClick={() => setShowOnlyPublic(!showOnlyPublic)}
-                    onRightClick={() => onNavigate("mindmap")}
-                    isRightActive={isMindMapActive}
-                    rightActiveLabel={isMindMapActive ? "织网已就绪" : `激活进度 ${mindMapProgress}/7`}
-                    progress={mindMapProgress}
-                  />
-                  <ActionPairRow
-                    type="save-universe"
-                    leftLabel="留下痕迹"
-                    rightLabel="星海回响"
-                    onLeftClick={handleSave}
-                    onRightClick={() => onNavigate("universe")}
-                    isRightActive={draft.visibilityIntent === "public"}
-                    leftActionEvent={saveAnimationEvent}
-                    rightActiveLabel={draft.visibilityIntent === "public" ? "星海已连接" : "私密存储中"}
-                    isSwitched={draft.visibilityIntent === "public"}
-                    onSwitchToggle={(isP) => {
-                      setDraft({ ...draft, visibilityIntent: isP ? "public" : "private" });
-                      setFeedbackMessage(null);
-                    }}
-                    isPending={createMutation.isPending}
-                  />
-                </div>
               </div>
             </div>
 
@@ -772,19 +729,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
           <div ref={timelineSwitchGuideRef} className={`${guideTargetClass(1)} rounded-[1.35rem] flex items-center justify-between px-6`}>
             <h2 className="font-elysia-title elysia-dream-title text-[2.9rem] sm:text-[3.4rem] tracking-tight">往世乐土</h2>
-
-            <div className="hidden lg:block">
-              <ActionPairRow
-                type="timeline-mindmap"
-                leftLabel="视图切换"
-                rightLabel="记忆织网"
-                onLeftClick={() => setShowOnlyPublic(!showOnlyPublic)}
-                onRightClick={() => onNavigate("mindmap")}
-                isRightActive={isMindMapActive}
-                rightActiveLabel={isMindMapActive ? "织网已就绪" : `激活进度 ${mindMapProgress}/7`}
-                progress={mindMapProgress}
-              />
-            </div>
           </div>
 
           <div ref={timelineListGuideRef} className={`${guideTargetClass(2)} rounded-[1.75rem] grid grid-cols-1 gap-10 px-6`}>
@@ -817,7 +761,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   再试一次
                 </button>
               </div>
-            ) : filteredItems.length === 0 ? (
+            ) : allItems.length === 0 ? (
               <AnimatePresence mode="wait">
                 <motion.p
                   key={emptyMessage}
@@ -831,7 +775,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 </motion.p>
               </AnimatePresence>
             ) : (
-              filteredItems.map((item) => (
+              allItems.map((item) => (
                 <TimelineCard key={item.id} item={item} />
               ))
             )}
@@ -1172,12 +1116,13 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
 };
 
 import { MoodStripSelector } from "../../components/ui/MoodStripSelector";
+import { AsymmetricTogglePanel } from "../../components/ui/AsymmetricTogglePanel";
 
 const EmotionSelector: React.FC<{
   extraEmotions: string[];
   onToggle: (tag: string) => void;
 }> = ({ extraEmotions, onToggle }) => (
-  <div className="flex flex-col gap-3 mb-6">
+  <div className="flex flex-col gap-3 flex-1 w-full min-w-0">
     <div className="flex items-center gap-2">
       <TagIcon className="w-4 h-4 text-slate-400" />
       <span className="text-[10px] tracking-widest text-slate-500 dark:text-slate-400 uppercase font-black">情绪心境</span>

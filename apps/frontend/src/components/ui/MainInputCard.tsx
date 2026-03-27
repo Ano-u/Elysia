@@ -133,7 +133,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
   return (
     <LiquidCard
       ref={editorAreaRef}
-      className="w-full max-w-4xl mx-auto bg-white/45 dark:bg-black/30 overflow-hidden p-10 transition-all duration-700 shadow-2xl"
+      className="w-full max-w-4xl mx-auto bg-white/45 dark:bg-black/30 overflow-hidden p-8 transition-all duration-700 shadow-2xl"
     >
       <div className="flex flex-col gap-8">
         {/* Main Input Section */}
@@ -257,7 +257,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                         {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                         再多告诉爱莉一点吧
                       </motion.button>
-                      
+
                       <AnimatePresence>
                         {showDetails && (
                           <motion.div
