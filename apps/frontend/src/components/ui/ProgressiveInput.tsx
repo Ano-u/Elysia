@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createRecord, getNudgeRecommendations } from "../../lib/apiClient";
 import { readAdminInspirationTexts } from "../../lib/inspirationStore";
 import { getCreateSuccessMessage } from "../../lib/publicationCopy";
-import type { VisibilityIntent } from "../../types/api";
+import type { VisibilityIntent, NudgeScene } from "../../types/api";
 
 type DraftPayload = {
   moodPhrase: string;
@@ -201,12 +201,13 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
   };
 
   const nudgeMutation = useMutation({
-    mutationFn: async () => {
-      const result = await getNudgeRecommendations();
+    mutationFn: async (scene: NudgeScene = "home_idle") => {
+      const result = await getNudgeRecommendations(scene);
       return result.items ?? [];
     },
     onSuccess: (items) => {
-      const merged = dedupeInspirations([...(items ?? []), ...readAdminInspirationTexts(), ...FALLBACK_INSPIRATIONS]);
+      const apiTexts = items.map(item => item.text);
+      const merged = dedupeInspirations([...apiTexts, ...readAdminInspirationTexts(), ...FALLBACK_INSPIRATIONS]);
       setHintMsg(pickRandom(merged));
       setShowIdleHint(true);
     },
@@ -216,7 +217,7 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
       setShowIdleHint(true);
     },
   });
-  const requestIdleInspiration = nudgeMutation.mutate;
+  const requestInspiration = (scene: NudgeScene = "home_idle") => nudgeMutation.mutate(scene);
 
   useEffect(() => {
     if (!isGuideActive) {
@@ -290,17 +291,25 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
     extraEmotions.length > 0 ||
     occurredAt.trim().length > 0;
 
+  const prevGuideActiveRef = useRef(isGuideActive);
+  useEffect(() => {
+    if (prevGuideActiveRef.current && !isGuideActive) {
+      requestInspiration("guide_complete");
+    }
+    prevGuideActiveRef.current = isGuideActive;
+  }, [isGuideActive]);
+
   useEffect(() => {
     if (hasAnyInput) {
       return;
     }
 
     const timer = window.setTimeout(() => {
-      requestIdleInspiration();
+      requestInspiration("home_idle");
     }, 7000);
 
     return () => window.clearTimeout(timer);
-  }, [hasAnyInput, requestIdleInspiration]);
+  }, [hasAnyInput]); // Note: requestInspiration is stable but omitting from deps to avoid re-triggering
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -338,6 +347,7 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
       setShowIdleHint(false);
       setHintMsg(null);
       setSuccessMsg(getCreateSuccessMessage(response.publishStatus.status));
+      requestInspiration("first_publish_success");
       localStorage.removeItem(DRAFT_KEY);
       queryClient.invalidateQueries({ queryKey: ["home-feed"] });
       queryClient.invalidateQueries({ queryKey: ["universe"] });
@@ -355,6 +365,7 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
       const normalizedMessage = (serverMessage || fallbackMessage || "").toLowerCase();
 
       setSuccessMsg(null);
+      requestInspiration("first_publish_error");
       if (maybeErr.status === 401) {
         setErrorMsg("哎呀，爱莉刚刚没有听清这份心意，等登录稳稳回来，我们再试一次吧♪");
         return;

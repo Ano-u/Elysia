@@ -7,6 +7,122 @@ info:
 servers:
   - url: /api
 paths:
+  /onboarding/progress:
+    get:
+      summary: 查询新人引导与 7 天进度
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingProgressResponse'
+  /onboarding/complete-day:
+    post:
+      summary: 完成某一天 onboarding 任务
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [day]
+              properties:
+                day:
+                  type: integer
+                  minimum: 1
+                  maximum: 7
+                evidence:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+  /onboarding/guide-state:
+    patch:
+      summary: 更新首访导览状态
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnboardingGuideStatePatchRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingGuideStatePatchResponse'
+  /nudges/recommendations:
+    get:
+      summary: 查询场景化轻提示
+      parameters:
+        - in: query
+          name: scene
+          schema:
+            type: string
+            enum: [home_idle, first_publish_error, first_publish_success, guide_complete, mindmap_locked]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NudgeRecommendationsResponse'
+  /nudges/settings:
+    patch:
+      summary: 更新轻提示设置
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                dailyLimit:
+                  type: integer
+                  minimum: 0
+                  maximum: 10
+                personalizationEnabled:
+                  type: boolean
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+  /nudges/feedback:
+    post:
+      summary: 提交轻提示反馈
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [liked, dismissed, clicked, manual_trigger]
+                context:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
   /access/application/status:
     get:
       summary: 查询准入申请状态
@@ -532,6 +648,190 @@ components:
           $ref: '#/components/schemas/AutoLinkingPreference'
         hint:
           type: string
+    OkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+    OnboardingGuideStep:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        target:
+          type: string
+        ctaText:
+          type: string
+    OnboardingGuideSafetyCard:
+      type: object
+      properties:
+        title:
+          type: string
+        bullets:
+          type: array
+          items:
+            type: string
+        confirmText:
+          type: string
+    OnboardingGuideState:
+      type: object
+      properties:
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        skippedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastSeenStep:
+          type: integer
+        version:
+          type: string
+        canReplay:
+          type: boolean
+    OnboardingGuide:
+      type: object
+      properties:
+        version:
+          type: string
+        welcomeTitle:
+          type: string
+        welcomeDescription:
+          type: string
+        welcomePrimaryAction:
+          type: string
+        welcomeSecondaryAction:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/OnboardingGuideStep'
+        safetyCard:
+          $ref: '#/components/schemas/OnboardingGuideSafetyCard'
+        state:
+          $ref: '#/components/schemas/OnboardingGuideState'
+    OnboardingTask:
+      type: object
+      properties:
+        day:
+          type: integer
+        title:
+          type: string
+        code:
+          type: string
+        description:
+          type: string
+        ctaText:
+          type: string
+        ctaTarget:
+          type: string
+        rewardText:
+          type: string
+    OnboardingEntryContext:
+      type: object
+      properties:
+        needsAccessApplication:
+          type: boolean
+        accessStatus:
+          type: string
+          enum: [not_submitted, pending, approved, rejected]
+        estimatedReviewText:
+          type: string
+          nullable: true
+        applicationHint:
+          type: string
+          nullable: true
+    OnboardingRestartSuggestion:
+      type: object
+      properties:
+        shouldShow:
+          type: boolean
+        headline:
+          type: string
+          nullable: true
+        body:
+          type: string
+          nullable: true
+    OnboardingProgressResponse:
+      type: object
+      properties:
+        progress:
+          type: object
+          properties:
+            current_day:
+              type: integer
+            completed_days:
+              type: array
+              items:
+                type: integer
+            last_completed_at:
+              type: string
+              format: date-time
+              nullable: true
+            metadata:
+              type: object
+              additionalProperties: true
+        guide:
+          $ref: '#/components/schemas/OnboardingGuide'
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/OnboardingTask'
+        targetTimeSeconds:
+          type: integer
+        entryContext:
+          $ref: '#/components/schemas/OnboardingEntryContext'
+        restartSuggestion:
+          $ref: '#/components/schemas/OnboardingRestartSuggestion'
+    OnboardingGuideStatePatchRequest:
+      type: object
+      minProperties: 1
+      properties:
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        skippedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastSeenStep:
+          type: integer
+        version:
+          type: string
+    OnboardingGuideStatePatchResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        state:
+          $ref: '#/components/schemas/OnboardingGuideState'
+    NudgeItem:
+      type: object
+      properties:
+        id:
+          type: string
+        text:
+          type: string
+        actionLabel:
+          type: string
+        actionTarget:
+          type: string
+    NudgeRecommendationsResponse:
+      type: object
+      properties:
+        scene:
+          type: string
+          enum: [home_idle, first_publish_error, first_publish_success, guide_complete, mindmap_locked]
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/NudgeItem'
     AccessApplicationStatusResponse:
       type: object
       properties:
@@ -918,13 +1218,20 @@ components:
           type: object
           properties:
             primary:
-              allOf:
-                - $ref: '#/components/schemas/UniverseItem'
+              type: object
               nullable: true
+              properties:
+                id:
+                  type: string
+                  format: uuid
             secondary:
               type: array
               items:
-                $ref: '#/components/schemas/UniverseItem'
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
         renderHint:
           type: object
           properties:

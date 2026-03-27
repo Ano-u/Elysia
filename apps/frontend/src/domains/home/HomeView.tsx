@@ -12,6 +12,8 @@ import {
   getOnboardingProgress,
   updateRecord,
   updateRecordVisibility,
+  updateOnboardingGuideState,
+  completeOnboardingDay,
 } from "../../lib/apiClient";
 import type { RecordSummary, VisibilityIntent, CreateRecordRequest } from "../../types/api";
 import { Clock, PenLine, Loader, Check, X, Lock, Compass, Eye, AlertTriangle, Tag as TagIcon, Quote, ListChevronsUpDown, Lightbulb } from "lucide-react";
@@ -196,7 +198,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
   const saveEventTokenRef = useRef(0);
   const [saveAnimationEvent, setSaveAnimationEvent] = useState<{ token: number; status: "success" | "error" } | null>(null);
-  const [guideMode, setGuideMode] = useState<"hidden" | "welcome" | "spotlight">("hidden");
+  const [guideMode, setGuideMode] = useState<"hidden" | "welcome" | "spotlight" | "safety">("hidden");
   const [guideStep, setGuideStep] = useState(0);
   const [guideTargetRect, setGuideTargetRect] = useState<DOMRect | null>(null);
   const [guideTargetRadius, setGuideTargetRadius] = useState<number>(26);
@@ -233,40 +235,78 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const activeGuideRef =
     guideStep === 0 ? composerGuideRef : guideStep === 1 ? timelineSwitchGuideRef : timelineListGuideRef;
 
-  const closeGuide = () => {
+  const closeGuide = (skipped = false) => {
     if (typeof window !== "undefined") {
       window.localStorage.setItem(guideStorageKey, String(Date.now()));
     }
     setGuideMode("hidden");
     setGuideTargetRect(null);
     setGuideTargetRadius(26);
+
+    const version = onboardingData?.guide.version ?? "v1";
+    const payload = skipped 
+      ? { skippedAt: new Date().toISOString(), version }
+      : { completedAt: new Date().toISOString(), version };
+    
+    updateOnboardingGuideState(payload).catch((e) => {
+      console.error("Failed to update guide state", e);
+    });
   };
 
   const handleGuideStart = () => {
     setGuideStep(0);
     setGuideMode("spotlight");
+    updateOnboardingGuideState({ lastSeenStep: 0, version: onboardingData?.guide.version ?? "v1" }).catch(() => {});
   };
 
   const handleGuideBack = () => {
-    setGuideStep((current) => Math.max(0, current - 1));
+    setGuideStep((current) => {
+      const next = Math.max(0, current - 1);
+      updateOnboardingGuideState({ lastSeenStep: next, version: onboardingData?.guide.version ?? "v1" }).catch(() => {});
+      return next;
+    });
   };
 
   const handleGuideNext = () => {
-    if (guideStep >= GUIDE_STEPS.length - 1) {
-      closeGuide();
+    const stepsCount = onboardingData?.guide.steps.length ?? GUIDE_STEPS.length;
+    if (guideStep >= stepsCount - 1) {
+      if (onboardingData?.guide.safetyCard) {
+        setGuideMode("safety");
+      } else {
+        closeGuide(false);
+      }
       return;
     }
-    setGuideStep((current) => current + 1);
+    setGuideStep((current) => {
+      const next = current + 1;
+      updateOnboardingGuideState({ lastSeenStep: next, version: onboardingData?.guide.version ?? "v1" }).catch(() => {});
+      return next;
+    });
+  };
+
+  const handleSafetyConfirm = () => {
+    closeGuide(false);
   };
 
   const handleGuideSkip = () => {
-    closeGuide();
+    closeGuide(true);
   };
 
   const emitSaveAnimationEvent = (status: "success" | "error") => {
     saveEventTokenRef.current += 1;
     setSaveAnimationEvent({ token: saveEventTokenRef.current, status });
   };
+
+  const [completingTaskDay, setCompletingTaskDay] = useState<number | null>(null);
+  const completeDayMutation = useMutation({
+    mutationFn: (day: number) => completeOnboardingDay(day),
+    onSuccess: (_, day) => {
+      setCompletingTaskDay(day);
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["onboarding-progress"] });
+      }, 600); // 预留时间给退场动画
+    }
+  });
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateRecordRequest) => createRecord(payload),
@@ -323,7 +363,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   }, [draft]);
 
   useEffect(() => {
-    if (!authReady || typeof window === "undefined") {
+    if (!authReady || typeof window === "undefined" || !onboardingData) {
       return;
     }
 
@@ -333,12 +373,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     const forceByStorage = window.localStorage.getItem(GUIDE_FORCE_STORAGE_KEY) === "1";
     const shouldForceGuide = isLocalDev && (forceByQuery || forceByStorage);
 
-    if (isLocalDev) {
-      if (disableGuideByQuery) {
-        return;
-      }
-      setGuideStep(0);
-      setGuideMode("welcome");
+    if (disableGuideByQuery) {
       return;
     }
 
@@ -348,12 +383,19 @@ export const HomeView: React.FC<HomeViewProps> = ({
       return;
     }
 
-    const completedAt = window.localStorage.getItem(guideStorageKey);
-    if (!completedAt) {
-      setGuideStep(0);
-      setGuideMode("welcome");
+    const guideState = onboardingData.guide.state;
+    if (!guideState.completedAt && !guideState.skippedAt) {
+      setGuideStep(guideState.lastSeenStep || 0);
+      if (guideState.lastSeenStep > 0) {
+        setGuideMode("spotlight");
+      } else {
+        setGuideMode("welcome");
+      }
+    } else {
+      // API says completed or skipped, but check if we need to force via localStorage logic fallback? No, prefer backend.
+      setGuideMode("hidden");
     }
-  }, [authReady, guideStorageKey, isLocalDev]);
+  }, [authReady, isLocalDev, onboardingData]);
 
   useEffect(() => {
     if (!isGuideSpotlight || typeof window === "undefined") {
@@ -457,7 +499,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
     10000,
     !isFeedLoading && filteredItems.length === 0,
   );
-  const guideStepContent = GUIDE_STEPS[guideStep] ?? GUIDE_STEPS[0];
+  
+  const activeGuideSteps = onboardingData?.guide.steps && onboardingData.guide.steps.length > 0 
+    ? onboardingData.guide.steps 
+    : GUIDE_STEPS;
+  const guideStepContent = activeGuideSteps[guideStep] ?? activeGuideSteps[0];
+  
   const guideTargetClass = (index: number): string =>
     isGuideSpotlight && guideStep === index ? "relative z-[122]" : "relative z-10";
 
@@ -503,7 +550,113 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
       <div className="relative z-10 flex flex-col items-center max-w-6xl mx-auto px-4 pt-[260px] sm:pt-[290px] pb-32 gap-16">
         {/* Section 1: Landing Header & Input */}
-        <section className="w-full flex flex-col items-center gap-16 max-w-4xl">
+        <section className="w-full flex flex-col items-center gap-8 max-w-4xl">
+          {onboardingData && (
+            <div className="w-full px-2 sm:px-0">
+              <AnimatePresence mode="popLayout">
+                {onboardingData.restartSuggestion?.shouldShow ? (
+                  <motion.div 
+                    key="restart-suggestion"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="w-full flex flex-col gap-2.5 rounded-[1.5rem] bg-pink-50/60 dark:bg-pink-950/20 border border-pink-100/80 dark:border-pink-900/30 p-5 backdrop-blur-md"
+                  >
+                    <h3 className="font-elysia-display text-base text-pink-700 dark:text-pink-300 font-medium">
+                      {onboardingData.restartSuggestion.headline}
+                    </h3>
+                    <p className="text-sm text-pink-600/85 dark:text-pink-400/85 leading-relaxed">
+                      {onboardingData.restartSuggestion.body}
+                    </p>
+                  </motion.div>
+                ) : (() => {
+                  const currentTask = onboardingData.tasks?.find(t => t.day === onboardingData.progress.current_day);
+                  if (currentTask && completingTaskDay !== currentTask.day) {
+                    return (
+                      <motion.div 
+                        key={`task-day-${currentTask.day}`}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20, scale: 0.95, filter: "blur(4px)" }}
+                        transition={{ duration: 0.5, ease: "easeInOut" }}
+                        className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-[1.5rem] bg-white/50 dark:bg-black/30 border border-white/60 dark:border-white/10 p-5 backdrop-blur-xl shadow-sm"
+                      >
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold tracking-widest uppercase bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-300 px-2 py-0.5 rounded-full">
+                              Day {currentTask.day}
+                            </span>
+                            <h3 className="font-elysia-display text-base text-slate-700 dark:text-slate-200 font-medium">
+                              {currentTask.title}
+                            </h3>
+                          </div>
+                          <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                            {currentTask.description}
+                          </p>
+                          {currentTask.rewardText && (
+                            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                              ✨ {currentTask.rewardText}
+                            </p>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-3 self-start sm:self-center shrink-0">
+                          {currentTask.ctaText && (
+                            <button 
+                              className="rounded-full bg-slate-800 dark:bg-slate-200 px-4 py-2 text-xs sm:text-sm text-white dark:text-slate-900 transition-colors hover:bg-slate-700 dark:hover:bg-white"
+                              onClick={() => {
+                                const target = currentTask.ctaTarget;
+                                if (target === 'mindmap') onNavigate('mindmap');
+                                else if (target === 'universe') onNavigate('universe');
+                                else {
+                                  composerGuideRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }
+                              }}
+                            >
+                              {currentTask.ctaText}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            disabled={completeDayMutation.isPending}
+                            onClick={() => completeDayMutation.mutate(currentTask.day)}
+                            title="标记完成"
+                            className="flex items-center justify-center w-8 h-8 rounded-full border-2 border-emerald-100 bg-emerald-50 text-emerald-500 transition-all hover:bg-emerald-500 hover:text-white dark:border-emerald-900/30 dark:bg-emerald-950/20 dark:hover:bg-emerald-600 disabled:opacity-50"
+                          >
+                            <Check className="w-4 h-4 stroke-[3]" />
+                          </button>
+                        </div>
+                      </motion.div>
+                    );
+                  }
+                  return null;
+                })()}
+              </AnimatePresence>
+
+              {onboardingData.entryContext?.needsAccessApplication && onboardingData.entryContext.applicationHint && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="w-full flex items-start gap-3.5 mt-2 px-5 py-4 rounded-[1.5rem] bg-white/50 dark:bg-black/30 border border-pink-100/80 dark:border-pink-900/30 backdrop-blur-md shadow-sm"
+                >
+                  <div className="mt-0.5 flex items-center justify-center w-8 h-8 rounded-full bg-pink-50 text-pink-500 dark:bg-pink-950/30 dark:text-pink-400 shrink-0">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <p className="text-sm text-slate-700 dark:text-slate-200 font-medium leading-relaxed">
+                      {onboardingData.entryContext.applicationHint}
+                    </p>
+                    {onboardingData.entryContext.estimatedReviewText && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        ✨ {onboardingData.entryContext.estimatedReviewText}
+                      </p>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </div>
+          )}
+
           <div ref={composerGuideRef} className={`${guideTargetClass(0)} rounded-[2.25rem] w-full flex flex-col gap-10`}>
             <MainInputCard
               moodPhrase={draft.moodPhrase}
@@ -686,16 +839,24 @@ export const HomeView: React.FC<HomeViewProps> = ({
       </div>
       <HomeGuideOverlay
         open={isGuideVisible}
-        mode={guideMode === "welcome" ? "welcome" : "spotlight"}
+        mode={guideMode === "welcome" ? "welcome" : guideMode === "safety" ? "safety" : "spotlight"}
         stepIndex={guideStep}
-        stepCount={GUIDE_STEPS.length}
+        stepCount={activeGuideSteps.length}
         step={guideStepContent}
+        welcome={onboardingData?.guide ? {
+          title: onboardingData.guide.welcomeTitle,
+          description: onboardingData.guide.welcomeDescription,
+          primaryAction: onboardingData.guide.welcomePrimaryAction,
+          secondaryAction: onboardingData.guide.welcomeSecondaryAction,
+        } : null}
+        safety={onboardingData?.guide?.safetyCard ?? null}
         targetRect={guideTargetRect}
         targetRadius={guideTargetRadius}
         onStart={handleGuideStart}
         onBack={handleGuideBack}
         onNext={handleGuideNext}
         onSkip={handleGuideSkip}
+        onSafetyConfirm={handleSafetyConfirm}
       />
     </div>
   );

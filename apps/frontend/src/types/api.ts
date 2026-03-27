@@ -295,23 +295,88 @@ export interface HomeFeedResponse {
   nextCursor: string | null;
 }
 
+export interface OnboardingGuideStep {
+  id: string;
+  title: string;
+  description: string;
+  target: string;
+  ctaText: string;
+}
+
+export interface OnboardingGuideSafetyCard {
+  title: string;
+  bullets: string[];
+  confirmText: string;
+}
+
+export interface OnboardingGuideState {
+  completedAt: string | null;
+  skippedAt: string | null;
+  lastSeenStep: number;
+  version: string;
+  canReplay: boolean;
+}
+
+export interface OnboardingGuide {
+  version: string;
+  welcomeTitle: string;
+  welcomeDescription: string;
+  welcomePrimaryAction: string;
+  welcomeSecondaryAction: string;
+  steps: OnboardingGuideStep[];
+  safetyCard: OnboardingGuideSafetyCard;
+  state: OnboardingGuideState;
+}
+
 export interface OnboardingTask {
   day: number;
   title: string;
   code: string;
+  description: string;
+  ctaText: string;
+  ctaTarget: string;
+  rewardText: string;
+}
+
+export interface OnboardingEntryContext {
+  needsAccessApplication: boolean;
+  accessStatus: AccessStatus;
+  estimatedReviewText: string | null;
+  applicationHint: string | null;
+}
+
+export interface OnboardingRestartSuggestion {
+  shouldShow: boolean;
+  headline: string | null;
+  body: string | null;
 }
 
 export interface OnboardingProgressData {
   current_day: number;
   completed_days: number[];
   last_completed_at: string | null;
-  metadata: Record<string, unknown>;
+  metadata: Record<string, unknown> | null;
 }
 
 export interface OnboardingProgressResponse {
   progress: OnboardingProgressData;
+  guide: OnboardingGuide;
   tasks: OnboardingTask[];
   targetTimeSeconds: number;
+  entryContext: OnboardingEntryContext;
+  restartSuggestion: OnboardingRestartSuggestion;
+}
+
+export interface OnboardingGuideStatePatchRequest {
+  completedAt?: string | null;
+  skippedAt?: string | null;
+  lastSeenStep?: number;
+  version?: string;
+}
+
+export interface OnboardingGuideStatePatchResponse {
+  ok: boolean;
+  state: OnboardingGuideState;
 }
 
 export interface OnboardingCompleteDayResponse {
@@ -319,9 +384,18 @@ export interface OnboardingCompleteDayResponse {
 }
 
 export type NudgeFeedbackAction = "liked" | "dismissed" | "clicked" | "manual_trigger";
+export type NudgeScene = "home_idle" | "first_publish_error" | "first_publish_success" | "guide_complete" | "mindmap_locked";
+
+export interface NudgeItem {
+  id: string;
+  text: string;
+  actionLabel: string;
+  actionTarget: string;
+}
 
 export interface NudgeRecommendationsResponse {
-  items: string[];
+  scene: NudgeScene;
+  items: NudgeItem[];
 }
 
 export interface NudgeFeedbackRequest {

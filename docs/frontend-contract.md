@@ -68,7 +68,131 @@
 }
 ```
 
-## 3. 发布与审核状态机（先审后发）
+## 2.5 新人引导与温柔提示
+
+- 查询引导与 7 天进度：`GET /api/onboarding/progress`
+- 完成某一天任务：`POST /api/onboarding/complete-day`
+- 记录首访导览状态：`PATCH /api/onboarding/guide-state`
+- 查询场景化轻提示：`GET /api/nudges/recommendations?scene=...`
+- 更新提示设置：`PATCH /api/nudges/settings`
+- 提交提示反馈：`POST /api/nudges/feedback`
+
+### 2.5.1 `GET /api/onboarding/progress` 响应示例
+
+```json
+{
+  "progress": {
+    "current_day": 2,
+    "completed_days": [1],
+    "last_completed_at": "2026-03-27T08:00:00.000Z",
+    "metadata": {
+      "guide": {
+        "completedAt": null,
+        "skippedAt": null,
+        "lastSeenStep": 1,
+        "version": "home-guide-v2"
+      }
+    }
+  },
+  "guide": {
+    "version": "home-guide-v2",
+    "welcomeTitle": "让爱莉轻轻带你熟悉这里吧",
+    "welcomeDescription": "第一次来到这里时，不需要一下子懂完所有事。先写下一句、再看看去向、最后了解安全边界，就已经很好了。",
+    "welcomePrimaryAction": "我想开始",
+    "welcomeSecondaryAction": "稍后再看",
+    "steps": [
+      {
+        "id": "welcome-value",
+        "title": "先把这一刻轻轻放下来",
+        "description": "这里最重要的不是写得多完整，而是你愿意开始。哪怕只有一句，也会被认真接住。",
+        "target": "composer",
+        "ctaText": "先写一句"
+      }
+    ],
+    "safetyCard": {
+      "title": "在开始之前，先知道这些就好",
+      "bullets": [
+        "私密内容默认只对自己可见，不会进入星海。",
+        "公开内容会先经过审核，再决定是否展示给他人。",
+        "若你对结果有疑问，可以在后续流程里发起申诉。"
+      ],
+      "confirmText": "我已了解"
+    },
+    "state": {
+      "completedAt": null,
+      "skippedAt": null,
+      "lastSeenStep": 1,
+      "version": "home-guide-v2",
+      "canReplay": true
+    }
+  },
+  "tasks": [
+    {
+      "day": 1,
+      "title": "写下一句心情",
+      "code": "first_post",
+      "description": "先留下今天最想说的一句，让这里开始记住你的节奏。",
+      "ctaText": "现在去写",
+      "ctaTarget": "home.composer",
+      "rewardText": "完成第一步后，你会更快看懂后面的提示。"
+    }
+  ],
+  "targetTimeSeconds": 60,
+  "entryContext": {
+    "needsAccessApplication": true,
+    "accessStatus": "not_submitted",
+    "estimatedReviewText": "通常会在 1-3 天内完成审核。",
+    "applicationHint": "在正式开放更多互动前，会先通过一段简短申请确认你的使用意图与安全边界。"
+  },
+  "restartSuggestion": {
+    "shouldShow": false,
+    "headline": null,
+    "body": null
+  }
+}
+```
+
+### 2.5.2 `PATCH /api/onboarding/guide-state` 请求示例
+
+```json
+{
+  "completedAt": "2026-03-27T09:00:00.000Z",
+  "lastSeenStep": 2,
+  "version": "home-guide-v2"
+}
+```
+
+### 2.5.3 `GET /api/nudges/recommendations` 说明
+
+支持场景：
+
+- `home_idle`
+- `first_publish_error`
+- `first_publish_success`
+- `guide_complete`
+- `mindmap_locked`
+
+响应示例：
+
+```json
+{
+  "scene": "home_idle",
+  "items": [
+    {
+      "id": "home_idle_1",
+      "text": "慢慢来，先写下一句也很好。若还没想清楚，就把最先浮出来的那个词留下吧。",
+      "actionLabel": "我来试试",
+      "actionTarget": "home.composer"
+    }
+  ]
+}
+```
+
+说明：
+
+- `actionTarget` 为前端内部跳转/聚焦标识，不是绝对 URL。
+- 若达到当日提示上限或已关闭提示，返回 `{ "scene": "...", "items": [] }`。
+
 
 相关接口：
 
@@ -190,7 +314,7 @@
 - `extraEmotions`：回复卡片的“心情 tag”
 - 本期不支持回复专用 `tags`
 
-### 5.2 创建回复卡片响应示例
+### 5.2 创建回复卡片响应示例（服务端原始响应）
 
 ```json
 {
@@ -203,7 +327,6 @@
   },
   "record": {
     "id": "0f93b7a7-95ad-412f-99f6-d3d6b3b1b9cb",
-    "user_id": "4b30e94b-bb4b-4d62-88bb-dad14a6fb3b1",
     "mood_phrase": "也想把这一刻轻轻接住",
     "description": "看到这张卡片时，我突然觉得自己也没有那么孤单了。",
     "visibility_intent": "public",
@@ -225,6 +348,11 @@
   }
 }
 ```
+
+说明：
+
+- 服务端原始 `record` 使用 snake_case 字段。
+- 若前端通过 `apps/frontend/src/lib/apiClient.ts` 调用，会被映射成 `RecordSummary` 的 camelCase 结构再消费。
 
 ## 6. Universe 与 MindMap 可见性边界
 

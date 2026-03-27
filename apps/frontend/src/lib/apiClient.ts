@@ -15,9 +15,12 @@ import type {
   CreateRecordRequest,
   HomeFeedResponse,
   MindMapResponse,
+  NudgeScene,
   NudgeFeedbackRequest,
   NudgeRecommendationsResponse,
   OnboardingCompleteDayResponse,
+  OnboardingGuideStatePatchRequest,
+  OnboardingGuideStatePatchResponse,
   OnboardingProgressResponse,
   PublicationStatus,
   PublishStatusResponse,
@@ -512,8 +515,21 @@ export const completeOnboardingDay = (day: number) =>
     body: JSON.stringify({ day }),
   });
 
-export const getNudgeRecommendations = () =>
-  fetchApi<NudgeRecommendationsResponse>('/api/nudges/recommendations');
+export const updateOnboardingGuideState = (payload: OnboardingGuideStatePatchRequest) =>
+  fetchApi<OnboardingGuideStatePatchResponse>('/api/onboarding/guide-state', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+
+export const getNudgeRecommendations = (scene?: NudgeScene) => {
+  const params = new URLSearchParams();
+  if (scene) {
+    params.set('scene', scene);
+  }
+  const query = params.toString();
+  const url = query ? `/api/nudges/recommendations?${query}` : '/api/nudges/recommendations';
+  return fetchApi<NudgeRecommendationsResponse>(url);
+};
 
 export const submitNudgeFeedback = (payload: NudgeFeedbackRequest) =>
   fetchApi<{ ok: true }>('/api/nudges/feedback', {

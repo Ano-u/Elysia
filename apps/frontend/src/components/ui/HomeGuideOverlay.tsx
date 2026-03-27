@@ -4,20 +4,37 @@ import { AnimatePresence, motion } from "framer-motion";
 export type HomeGuideStepContent = {
   title: string;
   description: string;
+  ctaText?: string;
+};
+
+export type HomeGuideWelcomeContent = {
+  title: string;
+  description: string;
+  primaryAction: string;
+  secondaryAction: string;
+};
+
+export type HomeGuideSafetyCardContent = {
+  title: string;
+  bullets: string[];
+  confirmText: string;
 };
 
 interface HomeGuideOverlayProps {
   open: boolean;
-  mode: "welcome" | "spotlight";
+  mode: "welcome" | "spotlight" | "safety";
   stepIndex: number;
   stepCount: number;
   step?: HomeGuideStepContent | null;
+  welcome?: HomeGuideWelcomeContent | null;
+  safety?: HomeGuideSafetyCardContent | null;
   targetRect?: DOMRect | null;
   targetRadius?: number | null;
   onStart?: () => void;
   onBack?: () => void;
   onNext?: () => void;
   onSkip: () => void;
+  onSafetyConfirm?: () => void;
 }
 
 type FocusRect = {
@@ -230,12 +247,15 @@ export const HomeGuideOverlay: React.FC<HomeGuideOverlayProps> = ({
   stepIndex,
   stepCount,
   step,
+  welcome,
+  safety,
   targetRect,
   targetRadius,
   onStart,
   onBack,
   onNext,
   onSkip,
+  onSafetyConfirm,
 }) => {
   const hasTarget = mode === "spotlight" && Boolean(targetRect);
   const focusRect = hasTarget && targetRect ? toFocusRect(targetRect, targetRadius ?? null) : null;
@@ -308,9 +328,11 @@ export const HomeGuideOverlay: React.FC<HomeGuideOverlayProps> = ({
                   className="w-full max-w-xl rounded-[2rem] border border-white/80 bg-[linear-gradient(145deg,rgba(255,248,255,0.94),rgba(246,238,255,0.9),rgba(239,247,255,0.92))] p-6 shadow-[0_24px_56px_rgba(160,142,211,0.32),inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-3xl dark:border-white/20 dark:bg-[linear-gradient(145deg,rgba(36,26,56,0.88),rgba(42,32,66,0.86),rgba(22,35,60,0.88))]"
                 >
                   <p className="text-[12px] elysia-glow-text">ELYSIA · 新人引导</p>
-                  <h3 className="mt-2 font-elysia-title text-[2.2rem] leading-tight text-slate-700 dark:text-white">让爱莉希雅来接住你吧♪</h3>
-                  <p className="mt-3 font-elysia-display text-base leading-relaxed text-slate-600 dark:text-slate-200/88">
-                    第一次来到往世乐土时，爱莉会用 3 步轻轻带你熟悉这里。先写一句就很好，剩下的我们慢慢来，好吗？♪
+                  <h3 className="mt-2 font-elysia-title text-[2.2rem] leading-tight text-slate-700 dark:text-white">
+                    {welcome?.title ?? "让爱莉希雅来接住你吧♪"}
+                  </h3>
+                  <p className="mt-3 font-elysia-display text-base leading-relaxed text-slate-600 dark:text-slate-200/88 whitespace-pre-wrap">
+                    {welcome?.description ?? "第一次来到往世乐土时，爱莉会用 3 步轻轻带你熟悉这里。先写一句就很好，剩下的我们慢慢来，好吗？♪"}
                   </p>
                   <div className="mt-6 flex items-center justify-end gap-2.5">
                     <button
@@ -318,14 +340,59 @@ export const HomeGuideOverlay: React.FC<HomeGuideOverlayProps> = ({
                       onClick={onSkip}
                       className="rounded-full border border-white/70 bg-white/82 px-4 py-2 text-sm text-slate-500 transition-colors hover:bg-white dark:border-white/20 dark:bg-white/10 dark:text-slate-200"
                     >
-                      稍后再看
+                      {welcome?.secondaryAction ?? "稍后再看"}
                     </button>
                     <button
                       type="button"
                       onClick={onStart}
                       className="rounded-full bg-slate-900 px-4 py-2 text-sm text-white transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
                     >
-                      和爱莉一起看看
+                      {welcome?.primaryAction ?? "和爱莉一起看看"}
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          )}
+
+          {mode === "safety" && safety && (
+            <motion.div
+              key="guide-safety"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[118] bg-[radial-gradient(circle_at_18%_16%,rgba(255,245,252,0.72),transparent_42%),radial-gradient(circle_at_82%_12%,rgba(215,233,255,0.52),transparent_42%),linear-gradient(145deg,rgba(248,251,255,0.72),rgba(251,243,252,0.64),rgba(236,247,255,0.68))] backdrop-blur-[16px]"
+            >
+              <div className="pointer-events-none absolute inset-0 bg-white/28 dark:bg-slate-950/42" />
+              <div className="relative z-[119] flex h-full w-full items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0, y: 14, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.98 }}
+                  transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                  className="w-full max-w-xl rounded-[2rem] border border-white/80 bg-[linear-gradient(145deg,rgba(255,248,255,0.94),rgba(246,238,255,0.9),rgba(239,247,255,0.92))] p-6 shadow-[0_24px_56px_rgba(160,142,211,0.32),inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-3xl dark:border-white/20 dark:bg-[linear-gradient(145deg,rgba(36,26,56,0.88),rgba(42,32,66,0.86),rgba(22,35,60,0.88))]"
+                >
+                  <p className="text-[12px] text-amber-500/80 dark:text-amber-400/80 tracking-widest font-bold mb-2">安全须知</p>
+                  <h3 className="font-elysia-title text-[2.2rem] leading-tight text-slate-700 dark:text-white">
+                    {safety.title}
+                  </h3>
+                  <div className="mt-4 space-y-3">
+                    {safety.bullets.map((bullet, idx) => (
+                      <div key={idx} className="flex items-start gap-3">
+                        <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                        <p className="font-elysia-display text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                          {bullet}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-8 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={onSafetyConfirm}
+                      className="rounded-full bg-slate-900 px-6 py-2 text-sm text-white transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                    >
+                      {safety.confirmText}
                     </button>
                   </div>
                 </motion.div>
@@ -411,7 +478,7 @@ export const HomeGuideOverlay: React.FC<HomeGuideOverlayProps> = ({
                       onClick={onNext}
                       className="rounded-full bg-slate-900 px-3 py-1.5 text-xs text-white transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
                     >
-                      {stepIndex >= stepCount - 1 ? "我明白啦" : "继续看看"}
+                      {step?.ctaText ? step.ctaText : (stepIndex >= stepCount - 1 ? "我明白啦" : "继续看看")}
                     </button>
                   </div>
                 </div>
