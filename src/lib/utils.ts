@@ -10,6 +10,10 @@ export function countEnglishWords(text: string): number {
   return words.length;
 }
 
+export function countCjkCharacters(text: string): number {
+  return Array.from(text).filter((char) => /\p{Script=Han}/u.test(char)).length;
+}
+
 export function validateQuoteLength(quote: string): { ok: boolean; reason?: string } {
   if (quote.trim().length === 0) {
     return { ok: false, reason: "金句不能为空" };

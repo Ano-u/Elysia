@@ -68,8 +68,17 @@ export function decidePublication(args: {
   hasImages: boolean;
   textAssessment: ModerationAssessment;
   aiRiskLevel?: RiskLevel | null;
+  hasCustomMood?: boolean;
+  strictReviewRequired?: boolean;
+  hasPublicSanitizationRisk?: boolean;
 }): PublicationDecision {
   const effectiveRisk = maxRiskLevel(args.textAssessment.level, args.aiRiskLevel ?? null);
+  const hasCustomMood = args.hasCustomMood ?? args.textAssessment.customMood?.isCustom ?? false;
+  const strictReviewRequired =
+    args.strictReviewRequired ?? (hasCustomMood || (args.textAssessment.normalizedText?.flags.length ?? 0) > 0);
+  const hasPublicSanitizationRisk =
+    args.hasPublicSanitizationRisk ?? args.textAssessment.publicSanitization?.applied ?? false;
+  const hasBlockingPublicRisk = args.textAssessment.publicSanitization?.hasBlockingRisk ?? false;
 
   if (args.visibilityIntent === "private") {
     const hitPrivateBaseline = effectiveRisk === "very_high" || args.textAssessment.baselineHighRisk;
@@ -85,6 +94,18 @@ export function decidePublication(args: {
       };
     }
 
+    if (hasCustomMood || strictReviewRequired) {
+      return {
+        publicationStatus: "pending_manual",
+        isPublic: false,
+        queueType: "moderation",
+        queuePriority: queuePriorityByLevel(effectiveRisk),
+        reason: "自定义情绪需先通过系统与人工审核",
+        effectiveRiskLevel: effectiveRisk,
+        triggerRiskControl: false,
+      };
+    }
+
     return {
       publicationStatus: "private",
       isPublic: false,
@@ -96,14 +117,14 @@ export function decidePublication(args: {
     };
   }
 
-  if (effectiveRisk === "very_high") {
+  if (effectiveRisk === "very_high" || hasBlockingPublicRisk) {
     return {
       publicationStatus: "risk_control_24h",
       isPublic: false,
       queueType: "risk_control",
       queuePriority: queuePriorityByLevel("very_high"),
-      reason: "公开申请命中极高风险，进入24h风控",
-      effectiveRiskLevel: effectiveRisk,
+      reason: "公开申请命中高危内容或导流风险，进入24h风控",
+      effectiveRiskLevel: "very_high",
       triggerRiskControl: true,
     };
   }
@@ -120,6 +141,18 @@ export function decidePublication(args: {
     };
   }
 
+  if (hasCustomMood || strictReviewRequired) {
+    return {
+      publicationStatus: "pending_manual",
+      isPublic: false,
+      queueType: "moderation",
+      queuePriority: queuePriorityByLevel(effectiveRisk),
+      reason: "自定义情绪必须经过 GPT 与管理员审核",
+      effectiveRiskLevel: maxRiskLevel(effectiveRisk, "medium"),
+      triggerRiskControl: false,
+    };
+  }
+
   if (effectiveRisk === "high") {
     return {
       publicationStatus: "pending_second_review",
@@ -132,14 +165,14 @@ export function decidePublication(args: {
     };
   }
 
-  if (effectiveRisk === "medium" || effectiveRisk === "elevated") {
+  if (effectiveRisk === "medium" || effectiveRisk === "elevated" || hasPublicSanitizationRisk) {
     return {
       publicationStatus: "pending_manual",
       isPublic: false,
       queueType: "moderation",
-      queuePriority: queuePriorityByLevel(effectiveRisk),
-      reason: "中风险内容进入人工审核",
-      effectiveRiskLevel: effectiveRisk,
+      queuePriority: queuePriorityByLevel(maxRiskLevel(effectiveRisk, hasPublicSanitizationRisk ? "medium" : effectiveRisk)),
+      reason: hasPublicSanitizationRisk ? "公开内容需脱敏后由人工复核" : "中风险内容进入人工审核",
+      effectiveRiskLevel: maxRiskLevel(effectiveRisk, hasPublicSanitizationRisk ? "medium" : effectiveRisk),
       triggerRiskControl: false,
     };
   }

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getRecord, createReply } from "../../lib/apiClient";
+import { getRecord, createReply, getAuthMe } from "../../lib/apiClient";
 import { getEmotionConfig } from "../universe/UniverseCard";
 import { cn } from "../../lib/cn";
 import { MainInputCard } from "../../components/ui/MainInputCard";
@@ -23,8 +23,15 @@ const EmotionSelector: React.FC<{
 
 export const MindMapDetailModal: React.FC<{ recordId: string | null; onClose: () => void }> = ({ recordId, onClose }) => {
   const queryClient = useQueryClient();
+  const { data: authData } = useQuery({
+    queryKey: ['auth-me'],
+    queryFn: getAuthMe,
+    staleTime: Infinity,
+  });
+  const currentUserId = authData?.user?.id || 'guest';
+
   const { data, isLoading } = useQuery({
-    queryKey: ['record', recordId],
+    queryKey: ['record', recordId, currentUserId],
     queryFn: () => getRecord(recordId!),
     enabled: !!recordId,
   });
@@ -111,13 +118,30 @@ export const MindMapDetailModal: React.FC<{ recordId: string | null; onClose: ()
                         </span>
                       );
                     })}
+                    {data.record.sanitized && (
+                      <span className="inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-800/30 dark:bg-emerald-900/20 dark:text-emerald-300 shadow-sm backdrop-blur-md">
+                        🛡️ 隐私已保护
+                      </span>
+                    )}
+                    {data.rawContent && (
+                      <span className="inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-full border border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-800/30 dark:bg-amber-900/20 dark:text-amber-300 shadow-sm backdrop-blur-md">
+                        👁️ 仅自己可见的原始内容
+                      </span>
+                    )}
                   </div>
                   
-                  <span className="text-sm text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap bg-white/40 dark:bg-black/20 px-4 py-1.5 rounded-full border border-white/30 dark:border-white/5">
-                    {new Date(data.record.createdAt).toLocaleString('zh-CN', {
-                      month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                    })}
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-sm text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap bg-white/40 dark:bg-black/20 px-4 py-1.5 rounded-full border border-white/30 dark:border-white/5">
+                      {new Date(data.record.createdAt).toLocaleString('zh-CN', {
+                        month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                      })}
+                    </span>
+                    {(data.record.publicLocationLabel) && (
+                      <span className="text-xs text-slate-400 dark:text-slate-500 px-2">
+                        {data.record.publicLocationLabel}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* 核心内容区 */}

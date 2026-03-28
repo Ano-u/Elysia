@@ -1,4 +1,4 @@
-import type { PublicationStatus } from "../types/api";
+import type { PublicationStatus, RecordModerationMeta } from "../types/api";
 
 export type PublicationTone = "private" | "pending" | "review" | "caution" | "published" | "revise";
 
@@ -66,6 +66,17 @@ export function getPublicationStatusMeta(status: PublicationStatus): Publication
   return PUBLICATION_STATUS_META[status];
 }
 
-export function getCreateSuccessMessage(status: PublicationStatus): string {
-  return CREATE_SUCCESS_MESSAGES[status];
+export function getCreateSuccessMessage(status: PublicationStatus, moderation?: RecordModerationMeta): string {
+  let msg = CREATE_SUCCESS_MESSAGES[status];
+  if (moderation) {
+    if (moderation.customMood) {
+      msg += " (自定义心情需等待审核后公开)";
+    } else if (moderation.strictReviewRequired) {
+      msg += " (公开内容需要进一步审核)";
+    }
+    if (moderation.publicSanitizationApplied) {
+      msg += " (为了保护你的隐私，公开版本已自动处理敏感信息)";
+    }
+  }
+  return msg;
 }

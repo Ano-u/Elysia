@@ -1,5 +1,5 @@
 import type { PoolClient } from "pg";
-import type { ModerationAssessment, RiskLevel } from "./moderation.js";
+import type { ModerationAssessment, RiskLevel, PublicSanitizationResult } from "./moderation.js";
 import {
   publicationStateLabel,
   type PublicationDecision,
@@ -24,7 +24,9 @@ export function buildRiskSummary(args: {
   assessment: ModerationAssessment;
   decision: PublicationDecision;
   aiRiskLevel?: RiskLevel | null;
+  publicSanitization?: PublicSanitizationResult | null;
 }): Record<string, unknown> {
+  const sanitization = args.publicSanitization ?? null;
   return {
     level: args.decision.effectiveRiskLevel,
     labels: args.assessment.riskLabels,
@@ -36,6 +38,16 @@ export function buildRiskSummary(args: {
     score: args.assessment.riskScore,
     aiRiskLevel: args.aiRiskLevel ?? null,
     updatedAt: new Date().toISOString(),
+    moodCustom: args.assessment.customMood?.isCustom ?? false,
+    moodReviewStage: args.assessment.customMood?.isCustom ? "manual" : "none",
+    normalizationFlags: args.assessment.normalizedText?.flags ?? [],
+    publicSanitization: {
+      applied: sanitization?.sanitizationApplied ?? args.assessment.publicSanitization?.applied ?? false,
+      labels: sanitization?.riskLabels ?? args.assessment.publicSanitization?.labels ?? [],
+      actions: sanitization?.actions ?? args.assessment.publicSanitization?.actions ?? [],
+      hasBlockingRisk: sanitization?.hasBlockingRisk ?? args.assessment.publicSanitization?.hasBlockingRisk ?? false,
+    },
+    publicVariantReady: !!sanitization,
   };
 }
 
@@ -78,11 +90,13 @@ export async function applyPublicationDecision(args: {
   reviewerUserId?: string | null;
   modelMeta?: Record<string, unknown>;
   aiRiskLevel?: RiskLevel | null;
+  publicSanitization?: PublicSanitizationResult | null;
 }): Promise<{ riskControlEventId: string | null; riskControlEndsAt: string | null }> {
   const riskSummary = buildRiskSummary({
     assessment: args.assessment,
     decision: args.decision,
     aiRiskLevel: args.aiRiskLevel ?? null,
+    publicSanitization: args.publicSanitization ?? null,
   });
 
   const reviewDecision = args.assessment.decision;
@@ -129,6 +143,7 @@ export async function applyPublicationDecision(args: {
         ...args.modelMeta,
         effectiveRiskLevel: args.decision.effectiveRiskLevel,
         publicationDecision: args.decision.publicationStatus,
+        publicSanitization: args.publicSanitization ?? null,
       }),
       args.reviewerUserId ?? null,
     ],
@@ -147,6 +162,11 @@ export async function applyPublicationDecision(args: {
         requires_re_review = FALSE,
         risk_summary = $6::jsonb,
         review_notes = NULL,
+        display_mood_phrase = COALESCE($7, display_mood_phrase, mood_phrase),
+        public_description = $8,
+        public_quote = $9,
+        public_occurred_at = $10,
+        public_location_label = $11,
         updated_at = NOW()
       WHERE id = $1
     `,
@@ -157,6 +177,11 @@ export async function applyPublicationDecision(args: {
       args.decision.isPublic,
       review.rows[0].id,
       JSON.stringify(riskSummary),
+      args.publicSanitization?.displayMoodPhrase ?? null,
+      args.publicSanitization?.publicDescription ?? null,
+      args.publicSanitization?.publicQuote ?? null,
+      args.publicSanitization?.publicOccurredAt ?? null,
+      args.publicSanitization?.publicLocationLabel ?? null,
     ],
   );
 
@@ -173,6 +198,9 @@ export async function applyPublicationDecision(args: {
         riskLevel: args.decision.effectiveRiskLevel,
         riskLabels: args.assessment.riskLabels,
         visibilityIntent: args.visibilityIntent,
+        source: args.assessment.customMood?.isCustom ? "custom_mood_review" : "record_review",
+        normalizationFlags: args.assessment.normalizedText?.flags ?? [],
+        publicSanitization: args.publicSanitization ?? null,
       },
       slaHours: args.decision.queueType === "risk_control" ? 4 : 24,
     });
@@ -197,6 +225,8 @@ export async function applyPublicationDecision(args: {
       violationType: args.assessment.violationType,
       baselineHighRisk: args.assessment.baselineHighRisk,
       assessmentReason: args.assessment.reason,
+      normalizationFlags: args.assessment.normalizedText?.flags ?? [],
+      publicSanitization: args.publicSanitization ?? null,
     },
     durationHours: 24,
   });

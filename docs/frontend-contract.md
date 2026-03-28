@@ -216,16 +216,19 @@
 
 公开内容（`visibilityIntent=public`）：
 
-- `very_low/low` -> `published`
+- `very_low/low`（系统情绪 + 无脱敏风险）-> `published`
 - `medium/elevated` -> `pending_manual`
 - `high`（纯文本）-> `pending_second_review`
-- `very_high` -> `risk_control_24h`
+- `very_high` 或广告/导流阻断 -> `risk_control_24h`
 - 含图片公开申请：统一 `pending_manual`（人工图片审核队列）
+- **自定义情绪：一律至少 `pending_manual`**，需经 GPT + 管理员审核
+- 公开内容存在脱敏风险（URL/广告/精确地址/精确时间）：进入 `pending_manual`
 
 私密内容（`visibilityIntent=private`）：
 
 - 默认 `private`
 - 命中高危底线（含极高风险）-> `risk_control_24h`
+- 自定义情绪：进入 `pending_manual`（即使私密也需审核情绪文案安全性）
 - 私密图片：进入 `media_review` 人工审核，但本人仍可见记录
 
 ### 3.3 状态查询响应示例
@@ -258,12 +261,68 @@
 
 - `author`: `{ id, displayName, avatarUrl }`
 - `replyContext`: `null | { content, parentRecordId, rootRecordId, parentTarget, rootTarget }`
+- `rawContent`: `null | { moodPhrase, description, quote, occurredAt, locationId }`（仅作者本人可见）
 
 说明：
 
 - 普通卡片 `replyContext = null`
 - 回复卡片会返回自己的回复正文，以及可跳转的父卡片 / 主帖摘要
 - `parentTarget / rootTarget` 仅在当前用户有权限读取时返回，否则为 `null`
+- 所有文本字段（`mood_phrase`、`description`、`quote`、`occurred_at`）为"当前请求者可见版本"：
+  - 作者本人：看到原始内容
+  - 其他访客：看到脱敏后的安全版本
+- `record.sanitized`：布尔值，标识当前返回是否经过脱敏
+- `record.public_location_label`：访客可见的城市级地点标签（作者为 null）
+- `rawContent`：作者本人专属，包含原始未脱敏内容；访客为 null
+
+### 3.6 自定义情绪审核
+
+创建/回复记录时，`moodPhrase` 可以是系统预设情绪或自定义文本：
+
+- 中文自定义：最多 5 个汉字
+- 英文自定义：最多 2 个词
+- 自定义情绪**必须经过系统规则 + GPT 审查 + 管理员人工审核**才能公开展示
+
+响应中新增 `moderation` 字段：
+
+```json
+{
+  "moderation": {
+    "customMood": true,
+    "strictReviewRequired": true,
+    "publicSanitizationApplied": true,
+    "publicSanitizationPreview": {
+      "displayMoodPhrase": "此刻心情",
+      "description": "我在[某城市]见到了你",
+      "quote": "[链接已隐藏]"
+    }
+  }
+}
+```
+
+前端建议：
+
+- `customMood=true` 时显示"自定义情绪需审核后公开"提示
+- `publicSanitizationApplied=true` 时显示"公开版本已自动处理敏感信息"
+- 若有 `publicSanitizationPreview`，可展示脱敏预览供作者确认
+
+### 3.7 公开内容访客安全视图
+
+对于公开记录，访客看到的内容经过以下脱敏处理（由后端完成，前端无需自行处理）：
+
+- URL/链接：替换为 `[链接已隐藏]`
+- 广告/导流词：替换为 `[疑似推广信息已隐藏]`
+- 精确地址：模糊到城市级
+- 精确时间：模糊到月
+- `occurred_at`：精度降到月初
+
+Universe 返回的每条记录额外带：
+
+- `sanitized: boolean`：是否经过脱敏
+- `public_location_label: string | null`：城市级地点
+- `public_occurred_at: string | null`：月级时间
+
+缓存注意：同一条记录"作者视角"和"访客视角"内容不同，缓存 key 需区分。
 
 ## 4. 风控限制
 

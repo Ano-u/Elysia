@@ -371,7 +371,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
     const forceByQuery = queryGuideValue === "1";
     const disableGuideByQuery = queryGuideValue === "0";
     const forceByStorage = window.localStorage.getItem(GUIDE_FORCE_STORAGE_KEY) === "1";
-    const shouldForceGuide = isLocalDev && (forceByQuery || forceByStorage);
+    // Modified: In local dev, always force guide unless explicitly disabled by query (?guide=0)
+    const shouldForceGuide = isLocalDev ? !disableGuideByQuery : (forceByQuery || forceByStorage);
 
     if (disableGuideByQuery) {
       return;

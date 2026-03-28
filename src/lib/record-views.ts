@@ -16,7 +16,9 @@ export type RecordSummaryRow = {
   id: string;
   user_id: string;
   mood_phrase: string;
+  display_mood_phrase: string | null;
   description: string | null;
+  public_description: string | null;
   is_public: boolean;
   visibility_intent: string;
   publication_status: string;
@@ -25,13 +27,16 @@ export type RecordSummaryRow = {
   risk_summary: unknown;
   review_notes: string | null;
   occurred_at: string | null;
+  public_occurred_at: string | null;
   location_id: string | null;
+  public_location_label: string | null;
   edit_deadline_at: string;
   created_at: string;
   updated_at: string;
   source_record_id: string | null;
   source_comment_id: string | null;
   quote: string | null;
+  public_quote: string | null;
   extra_emotions: string[];
   tags: string[];
   display_name: string;
@@ -48,7 +53,9 @@ type ReplyTargetRow = {
   id: string;
   user_id: string;
   mood_phrase: string;
+  display_mood_phrase: string | null;
   quote: string | null;
+  public_quote: string | null;
   is_public: boolean;
   publication_status: string;
   created_at: string;
@@ -78,11 +85,26 @@ export type ReplyContextPayload = {
   rootTarget: ReplyTargetPayload | null;
 };
 
-function toReplyTargetPayload(row: ReplyTargetRow): ReplyTargetPayload {
+function pickVisibleText<T>(args: { requesterOwnsRecord: boolean; raw: T; publicValue: T | null }): T {
+  if (args.requesterOwnsRecord) {
+    return args.raw;
+  }
+  return args.publicValue ?? args.raw;
+}
+
+function toReplyTargetPayload(row: ReplyTargetRow, requesterOwnsRecord: boolean): ReplyTargetPayload {
   return {
     id: row.id,
-    moodPhrase: row.mood_phrase,
-    quote: row.quote,
+    moodPhrase: pickVisibleText({
+      requesterOwnsRecord,
+      raw: row.mood_phrase,
+      publicValue: row.display_mood_phrase,
+    }),
+    quote: pickVisibleText({
+      requesterOwnsRecord,
+      raw: row.quote,
+      publicValue: row.public_quote,
+    }),
     createdAt: row.created_at,
     isPublic: row.is_public,
     publicationStatus: row.publication_status,
@@ -110,7 +132,9 @@ export async function loadReplyTargetMap(
         r.id,
         r.user_id,
         r.mood_phrase,
+        r.display_mood_phrase,
         rq.quote,
+        r.public_quote,
         r.is_public,
         r.publication_status,
         r.created_at,
@@ -129,7 +153,10 @@ export async function loadReplyTargetMap(
   );
 
   return new Map<string, ReplyTargetPayload>(
-    visibleTargets.rows.map((row: ReplyTargetRow) => [row.id, toReplyTargetPayload(row)]),
+    visibleTargets.rows.map((row: ReplyTargetRow) => [
+      row.id,
+      toReplyTargetPayload(row, !!args.requesterUserId && row.user_id === args.requesterUserId),
+    ]),
   );
 }
 
@@ -144,7 +171,9 @@ export async function loadRecordSummary(
         r.id,
         r.user_id,
         r.mood_phrase,
+        r.display_mood_phrase,
         r.description,
+        r.public_description,
         r.is_public,
         r.visibility_intent,
         r.publication_status,
@@ -153,13 +182,16 @@ export async function loadRecordSummary(
         r.risk_summary,
         r.review_notes,
         r.occurred_at,
+        r.public_occurred_at,
         r.location_id,
+        r.public_location_label,
         r.edit_deadline_at,
         r.created_at,
         r.updated_at,
         r.source_record_id,
         r.source_comment_id,
         rq.quote,
+        r.public_quote,
         COALESCE((
           SELECT ARRAY_AGG(re.emotion ORDER BY re.created_at ASC)
           FROM record_emotions re
@@ -223,15 +255,36 @@ export async function loadReplyContext(
 export function buildRecordSummaryPayload(args: {
   summary: RecordSummaryRow;
   replyContext: ReplyContextPayload | null;
+  requesterUserId?: string | null;
 }) {
+  const isOwner = !!args.requesterUserId && args.requesterUserId === args.summary.user_id;
   return {
     id: args.summary.id,
     user_id: args.summary.user_id,
-    mood_phrase: args.summary.mood_phrase,
-    quote: args.summary.quote,
+    mood_phrase: pickVisibleText({
+      requesterOwnsRecord: isOwner,
+      raw: args.summary.mood_phrase,
+      publicValue: args.summary.display_mood_phrase,
+    }),
+    quote: pickVisibleText({
+      requesterOwnsRecord: isOwner,
+      raw: args.summary.quote,
+      publicValue: args.summary.public_quote,
+    }),
     extra_emotions: args.summary.extra_emotions,
     tags: args.summary.tags,
-    description: args.summary.description,
+    description: pickVisibleText({
+      requesterOwnsRecord: isOwner,
+      raw: args.summary.description,
+      publicValue: args.summary.public_description,
+    }),
+    occurred_at: pickVisibleText({
+      requesterOwnsRecord: isOwner,
+      raw: args.summary.occurred_at,
+      publicValue: args.summary.public_occurred_at,
+    }),
+    public_location_label: isOwner ? null : args.summary.public_location_label,
+    sanitized: !isOwner && !!(args.summary.display_mood_phrase || args.summary.public_description || args.summary.public_quote),
     visibility_intent: args.summary.visibility_intent,
     publication_status: args.summary.publication_status,
     is_public: args.summary.is_public,

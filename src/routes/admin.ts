@@ -260,6 +260,11 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       .object({
         decision: z.enum(["approve", "reject", "needs_changes", "second_review", "risk_control"]),
         note: z.string().trim().max(500).optional(),
+        overrideDisplayMoodPhrase: z.string().trim().min(1).max(140).optional(),
+        overridePublicDescription: z.string().max(1000).optional().nullable(),
+        overridePublicQuote: z.string().max(200).optional().nullable(),
+        overridePublicLocationLabel: z.string().max(64).optional().nullable(),
+        overridePublicOccurredAt: z.string().datetime().optional().nullable(),
       })
       .parse(req.body);
 
@@ -271,9 +276,14 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         id: string;
         user_id: string;
         visibility_intent: "private" | "public";
+        display_mood_phrase: string | null;
+        public_description: string | null;
+        public_quote: string | null;
+        public_occurred_at: string | null;
+        public_location_label: string | null;
       }>(
         `
-          SELECT id, user_id, visibility_intent
+          SELECT id, user_id, visibility_intent, display_mood_phrase, public_description, public_quote, public_occurred_at, public_location_label
           FROM records
           WHERE id = $1
           LIMIT 1
@@ -289,6 +299,14 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         decision: body.decision,
         visibilityIntent: target.visibility_intent,
       });
+      const overrideDisplayMoodPhrase = body.overrideDisplayMoodPhrase?.trim() || target.display_mood_phrase;
+      const overridePublicDescription =
+        body.overridePublicDescription === undefined ? target.public_description : body.overridePublicDescription;
+      const overridePublicQuote = body.overridePublicQuote === undefined ? target.public_quote : body.overridePublicQuote;
+      const overridePublicLocationLabel =
+        body.overridePublicLocationLabel === undefined ? target.public_location_label : body.overridePublicLocationLabel;
+      const overridePublicOccurredAt =
+        body.overridePublicOccurredAt === undefined ? target.public_occurred_at : body.overridePublicOccurredAt;
 
       await client.query(
         `
@@ -298,8 +316,13 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
             is_public = $3,
             published_at = CASE WHEN $3 THEN COALESCE(published_at, NOW()) ELSE NULL END,
             review_notes = $4,
+            display_mood_phrase = $5,
+            public_description = $6,
+            public_quote = $7,
+            public_location_label = $8,
+            public_occurred_at = $9,
             requires_re_review = FALSE,
-            risk_summary = COALESCE(risk_summary, '{}'::jsonb) || $5::jsonb,
+            risk_summary = COALESCE(risk_summary, '{}'::jsonb) || $10::jsonb,
             updated_at = NOW()
           WHERE id = $1
         `,
@@ -308,6 +331,11 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
           mapped.publicationStatus,
           mapped.isPublic,
           note,
+          overrideDisplayMoodPhrase,
+          overridePublicDescription,
+          overridePublicQuote,
+          overridePublicLocationLabel,
+          overridePublicOccurredAt,
           JSON.stringify({
             manualDecision: body.decision,
             manualDecisionBy: admin.id,
@@ -351,6 +379,11 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
           JSON.stringify({
             source: "admin_manual",
             decision: body.decision,
+            overrideDisplayMoodPhrase,
+            overridePublicDescription,
+            overridePublicQuote,
+            overridePublicLocationLabel,
+            overridePublicOccurredAt,
           }),
           admin.id,
         ],
