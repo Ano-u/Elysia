@@ -113,19 +113,6 @@ export interface ReplyTarget {
   author: AuthorSummary;
 }
 
-export interface ModerationPreview {
-  displayMoodPhrase: string;
-  description: string | null;
-  quote: string | null;
-}
-
-export interface RecordModerationMeta {
-  customMood: boolean;
-  strictReviewRequired: boolean;
-  publicSanitizationApplied: boolean;
-  publicSanitizationPreview?: ModerationPreview;
-}
-
 export interface ReplyContext {
   content: string;
   parentRecordId: string;
@@ -162,9 +149,6 @@ export interface UniverseItem {
   coord: { x: number; y: number };
   personalScore?: number;
   replyContext?: UniverseReplyContext | null;
-  sanitized?: boolean;
-  publicLocationLabel?: string | null;
-  publicOccurredAt?: string | null;
 }
 
 export interface UniverseResponse {
@@ -254,13 +238,11 @@ export interface RecordDetail {
   reviewNotes: string | null;
   occurredAt: string | null;
   locationId: string | null;
-  publicLocationLabel?: string | null;
   sourceRecordId: string | null;
   sourceCommentId: string | null;
   editDeadlineAt: string;
   createdAt: string;
   updatedAt: string;
-  sanitized?: boolean;
 }
 
 export interface CreateRecordResponse {
@@ -269,7 +251,6 @@ export interface CreateRecordResponse {
     status: PublicationStatus;
     label: string;
   };
-  moderation?: RecordModerationMeta;
 }
 
 export interface UpdateRecordResponse extends CreateRecordResponse {
@@ -283,13 +264,6 @@ export interface RecordDetailResponse {
   tags: string[];
   author: AuthorSummary;
   replyContext: ReplyContext | null;
-  rawContent?: {
-    moodPhrase: string;
-    description: string | null;
-    quote: string | null;
-    occurredAt: string | null;
-    locationId: string | null;
-  } | null;
 }
 
 export interface CreateReplyRequest {
@@ -314,7 +288,6 @@ export interface CreateReplyResponse {
     status: PublicationStatus;
     label: string;
   };
-  moderation?: RecordModerationMeta;
 }
 
 export interface HomeFeedResponse {

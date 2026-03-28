@@ -41,9 +41,6 @@ export interface UniverseCardProps extends HTMLMotionProps<"div"> {
   onReaction?: (emojiType: string) => boolean | void;
   /** 外部传入的表情反应数量记录 */
   reactions?: Record<string, number>;
-  sanitized?: boolean;
-  publicLocationLabel?: string | null;
-  publicOccurredAt?: string | null;
 }
 
 // 心情映射辅助函数
@@ -87,9 +84,6 @@ export const UniverseCard = React.forwardRef<HTMLDivElement, UniverseCardProps>(
       isActive = false,
       onReaction,
       reactions = {},
-      sanitized,
-      publicLocationLabel,
-      publicOccurredAt,
       className,
       ...props
     },
@@ -136,7 +130,7 @@ export const UniverseCard = React.forwardRef<HTMLDivElement, UniverseCardProps>(
     const pointerEvents = d > 0.8 ? "none" as const : "auto" as const;
 
     // 随机的入场延迟（只在挂载时生成一次）
-    const [entranceDelay] = useState(() => Math.random() * 0.3);
+    const entranceDelay = useRef(Math.random() * 0.3).current;
     const isFirstMount = useRef(true);
     React.useEffect(() => {
       isFirstMount.current = false;
@@ -295,23 +289,11 @@ export const UniverseCard = React.forwardRef<HTMLDivElement, UniverseCardProps>(
         <div className="relative z-20 flex flex-col h-full justify-between gap-2">
           
           <div className="flex flex-col gap-2">
-            {/* Header: Time & Location */}
+            {/* Header: Time & Placeholder for tags */}
             <div className="flex items-center justify-between">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap flex items-center gap-1">
-                  {publicOccurredAt || time}
-                  {sanitized && (
-                    <span className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400" title="隐私已保护">
-                      🛡️
-                    </span>
-                  )}
-                </span>
-                {publicLocationLabel && (
-                  <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium">
-                    📍 {publicLocationLabel}
-                  </span>
-                )}
-              </div>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">
+                {time}
+              </span>
               {/* 占位，防止右上角的标题文字和外部的 Tag 标签在视觉上挤在一起 */}
               <div className="h-4 w-12 shrink-0 pointer-events-none"></div>
             </div>

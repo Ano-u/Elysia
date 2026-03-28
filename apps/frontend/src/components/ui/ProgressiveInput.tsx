@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createRecord, getNudgeRecommendations } from "../../lib/apiClient";
-import { MoodSelector } from "./MoodSelector";
 import { readAdminInspirationTexts } from "../../lib/inspirationStore";
 import { getCreateSuccessMessage } from "../../lib/publicationCopy";
 import type { VisibilityIntent, NudgeScene } from "../../types/api";
@@ -347,7 +346,7 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
       setErrorMsg(null);
       setShowIdleHint(false);
       setHintMsg(null);
-      setSuccessMsg(getCreateSuccessMessage(response.publishStatus.status, response.moderation));
+      setSuccessMsg(getCreateSuccessMessage(response.publishStatus.status));
       requestInspiration("first_publish_success");
       localStorage.removeItem(DRAFT_KEY);
       queryClient.invalidateQueries({ queryKey: ["home-feed"] });
@@ -461,14 +460,19 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
           >
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_22%_15%,rgba(255,255,255,0.78),transparent_44%),radial-gradient(circle_at_79%_0%,rgba(255,225,242,0.56),transparent_38%)]" />
             <div className="pointer-events-none absolute -top-12 left-8 h-24 w-24 rounded-full bg-white/35 blur-3xl dark:bg-white/8" />
-            <MoodSelector
-              value={moodPhrase}
-              onChange={(val) => {
-                setMoodPhrase(val);
-                clearTransientMessages();
-              }}
-              disabled={createMutation.isPending}
-            />
+            <div className="relative z-10">
+              <p className="text-[12px] elysia-glow-text">ELYSIA · 心绪记录</p>
+              <textarea
+                className="font-elysia-display mt-2 min-h-[185px] w-full resize-none border-none bg-transparent p-0 text-[2rem] leading-[1.7] text-slate-700 outline-none placeholder:text-slate-400/58 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-300/35 sm:min-h-[210px] sm:text-[2.2rem]"
+                placeholder={"把这一刻轻轻放下吧，爱莉希雅会认真倾听呀♪"}
+                value={moodPhrase}
+                onChange={(event) => {
+                  setMoodPhrase(event.target.value);
+                  clearTransientMessages();
+                }}
+                disabled={createMutation.isPending}
+              />
+            </div>
 
             <AnimatePresence>
               {(showIdleHint || hintMsg) && !moodPhrase.trim().length && (

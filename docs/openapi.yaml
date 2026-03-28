@@ -367,25 +367,6 @@ paths:
                   enum: [approve, reject, needs_changes, second_review, risk_control]
                 note:
                   type: string
-                overrideDisplayMoodPhrase:
-                  type: string
-                  maxLength: 140
-                overridePublicDescription:
-                  type: string
-                  maxLength: 1000
-                  nullable: true
-                overridePublicQuote:
-                  type: string
-                  maxLength: 200
-                  nullable: true
-                overridePublicLocationLabel:
-                  type: string
-                  maxLength: 64
-                  nullable: true
-                overridePublicOccurredAt:
-                  type: string
-                  format: date-time
-                  nullable: true
       responses:
         '200':
           description: OK

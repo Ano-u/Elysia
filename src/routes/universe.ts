@@ -6,13 +6,10 @@ type UniverseItem = {
   id: string;
   user_id: string;
   mood_phrase: string;
-  display_mood_phrase: string | null;
   description: string | null;
-  public_description: string | null;
   created_at: string;
   is_public: boolean;
   quote: string | null;
-  public_quote: string | null;
   display_name: string;
   avatar_url: string | null;
   hearts: string;
@@ -27,10 +24,7 @@ type UniverseItem = {
   root_record_id: string | null;
   show_parent_arrow: boolean;
   show_root_arrow: boolean;
-  public_location_label: string | null;
-  public_occurred_at: string | null;
 };
-
 
 type ViewportUniverseItem = UniverseItem & {
   vx: number;
@@ -42,15 +36,10 @@ const universeSelectFields = `
   r.id,
   r.user_id,
   r.mood_phrase,
-  r.display_mood_phrase,
   r.description,
-  r.public_description,
   r.created_at,
   r.is_public,
   rq.quote,
-  r.public_quote,
-  r.public_location_label,
-  r.public_occurred_at,
   COALESCE((
     SELECT ARRAY_AGG(rem.emotion ORDER BY rem.created_at ASC)
     FROM record_emotions rem
@@ -89,11 +78,6 @@ const universeGroupBy = `
   GROUP BY
     r.id,
     r.description,
-    r.public_description,
-    r.display_mood_phrase,
-    r.public_quote,
-    r.public_location_label,
-    r.public_occurred_at,
     rq.quote,
     u.display_name,
     u.avatar_url,
@@ -117,11 +101,11 @@ function mapUniverseItem(row: UniverseItem, coord?: { x: number; y: number }, pe
   return {
     id: row.id,
     user_id: row.user_id,
-    mood_phrase: row.display_mood_phrase ?? row.mood_phrase,
-    description: row.public_description ?? row.description,
+    mood_phrase: row.mood_phrase,
+    description: row.description,
     created_at: row.created_at,
     is_public: row.is_public,
-    quote: row.public_quote ?? row.quote,
+    quote: row.quote,
     display_name: row.display_name,
     avatar_url: row.avatar_url,
     hearts: row.hearts,
@@ -131,9 +115,6 @@ function mapUniverseItem(row: UniverseItem, coord?: { x: number; y: number }, pe
     flowers: row.flowers,
     tags: row.tags,
     extra_emotions: row.extra_emotions,
-    sanitized: !!(row.display_mood_phrase || row.public_description || row.public_quote || row.public_location_label),
-    public_location_label: row.public_location_label,
-    public_occurred_at: row.public_occurred_at,
     replyContext: row.is_reply
       ? {
           isReply: true,

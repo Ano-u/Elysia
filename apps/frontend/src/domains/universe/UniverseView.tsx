@@ -636,9 +636,6 @@ export const UniverseView: React.FC = () => {
               reactions={cardReactions}
               onReaction={(emojiType) => handleReaction(card.id, emojiType)}
               onClick={() => setOpenedCards([card])}
-              sanitized={card.sanitized}
-              publicLocationLabel={card.publicLocationLabel}
-              publicOccurredAt={card.publicOccurredAt}
             />
           );
         })}
@@ -748,25 +745,11 @@ export const UniverseView: React.FC = () => {
                   );
                 })()}
 
-                <div className="flex flex-col items-end gap-1 ml-auto">
-                  <div className="flex items-center gap-2">
-                    {selectedCard.sanitized && (
-                      <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-800/30 dark:bg-emerald-900/20 dark:text-emerald-300 shadow-sm">
-                        🛡️ 隐私已保护
-                      </span>
-                    )}
-                    <span className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-                      {new Date(selectedCard.createdAt).toLocaleString('zh-CN', {
-                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                      })}
-                    </span>
-                  </div>
-                  {selectedCard.publicLocationLabel && (
-                    <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">
-                      📍 {selectedCard.publicLocationLabel}
-                    </span>
-                  )}
-                </div>
+                <span className="ml-auto text-sm text-slate-500 dark:text-slate-400 font-medium">
+                  {new Date(selectedCard.createdAt).toLocaleString('zh-CN', {
+                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                  })}
+                </span>
               </div>
 
               {/* Main Content */}
@@ -800,11 +783,11 @@ export const UniverseView: React.FC = () => {
                   </div>
                 )}
 
-                {selectedCard.publicOccurredAt && (
+                {selectedCard.occurredAt && (
                   <div>
                     <p className="text-[10px] tracking-widest text-orange-500/80 dark:text-orange-400/80 font-bold mb-1.5 uppercase">Occurred At</p>
                     <p className="text-sm text-slate-600 dark:text-slate-300">
-                      {selectedCard.publicOccurredAt}
+                      {selectedCard.occurredAt}
                     </p>
                   </div>
                 )}

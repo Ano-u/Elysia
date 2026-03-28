@@ -3,9 +3,9 @@ import { z } from "zod";
 import { requireAccessApproved, requireNotInRiskControl } from "../lib/auth.js";
 import { query, withTransaction } from "../lib/db.js";
 import { broadcast } from "../lib/realtime.js";
-import { hashIp, validateQuoteLength } from "../lib/utils.js";
+import { hashIp, validateMoodPhraseLength, validateQuoteLength } from "../lib/utils.js";
 import { writeAuditLog } from "../lib/audit.js";
-import { assessModeration, buildPublicSanitizedVariant, validateCustomMoodPhrase } from "../lib/moderation.js";
+import { assessModeration } from "../lib/moderation.js";
 import { decidePublication } from "../lib/publication-workflow.js";
 import {
   applyPublicationDecision,
@@ -54,14 +54,17 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
     const params = z.object({ id: z.string().uuid() }).parse(req.params);
     const body = createCommentSchema.parse(req.body);
     const visibilityIntent = parseRecordVisibilityIntent(body.isPublic ?? true);
-    const user = visibilityIntent === "public" ? await requireNotInRiskControl(req, reply) : approvedUser;
+    const user =
+      visibilityIntent === "public"
+        ? await requireNotInRiskControl(req, reply)
+        : approvedUser;
     if (!user) {
       return;
     }
 
-    const customMood = validateCustomMoodPhrase(body.moodPhrase);
-    if (!customMood.ok) {
-      reply.code(400).send({ message: customMood.reason });
+    const moodPhraseCheck = validateMoodPhraseLength(body.moodPhrase);
+    if (!moodPhraseCheck.ok) {
+      reply.code(400).send({ message: moodPhraseCheck.reason });
       return;
     }
 
@@ -108,18 +111,10 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
       extraEmotions: body.extraEmotions ?? [],
       tags: [],
     });
-    const publicSanitization = buildPublicSanitizedVariant({
-      moodPhrase: body.moodPhrase,
-      description: [body.content, body.description].filter(Boolean).join("\n") || null,
-      quote: body.quote ?? null,
-    });
     const decision = decidePublication({
       visibilityIntent,
       hasImages: false,
       textAssessment,
-      hasCustomMood: customMood.isCustom,
-      strictReviewRequired: customMood.isCustom || (textAssessment.normalizedText?.flags.length ?? 0) > 0,
-      hasPublicSanitizationRisk: publicSanitization.sanitizationApplied,
     });
     const triggerIpHash = hashIp(req.ip);
 
@@ -139,9 +134,7 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
           INSERT INTO records (
             user_id,
             mood_phrase,
-            display_mood_phrase,
             description,
-            public_description,
             is_public,
             visibility_intent,
             publication_status,
@@ -150,25 +143,21 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
             risk_summary,
             review_notes,
             source_record_id,
-            source_comment_id,
-            public_quote
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $7 = 'public' THEN NOW() ELSE NULL END, CASE WHEN $6 THEN NOW() ELSE NULL END, $9::jsonb, $10, $11, $12, $13)
+            source_comment_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $5 = 'public' THEN NOW() ELSE NULL END, CASE WHEN $4 THEN NOW() ELSE NULL END, $7::jsonb, $8, $9, $10)
           RETURNING id
         `,
         [
           user.id,
           body.moodPhrase,
-          publicSanitization.displayMoodPhrase,
           body.description ?? null,
-          publicSanitization.publicDescription,
           decision.isPublic,
           visibilityIntent,
           decision.publicationStatus,
-          JSON.stringify(buildRiskSummary({ assessment: textAssessment, decision, publicSanitization })),
+          JSON.stringify(buildRiskSummary({ assessment: textAssessment, decision })),
           decision.reason,
           params.id,
           comment.id,
-          publicSanitization.publicQuote,
         ],
       );
       const replyRecordId = insertedRecord.rows[0].id;
@@ -248,7 +237,7 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
         [
           user.id,
           replyRecordId,
-          publicSanitization.displayMoodPhrase,
+          body.moodPhrase,
           JSON.stringify({
             visibilityIntent,
             publicationStatus: decision.publicationStatus,
@@ -294,7 +283,6 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
           parentRecordId: params.id,
           rootRecordId: target.root_record_id,
           sourceCommentId: comment.id,
-          publicSanitization,
         },
       });
 
@@ -313,7 +301,6 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
           parentRecordId: params.id,
           rootRecordId: target.root_record_id,
         },
-        publicSanitization,
       });
 
       const summary = await loadRecordSummary(client, replyRecordId);
@@ -333,41 +320,39 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
           rootRecordId: comment.root_record_id,
           createdAt: comment.created_at,
         },
-        record: buildRecordSummaryPayload({ summary, replyContext, requesterUserId: user.id }),
-        raw: summary,
+        record: buildRecordSummaryPayload({
+          summary,
+          replyContext,
+        }),
+        publishStatus: {
+          status: summary.publication_status,
+          label: publicationLabel(summary.publication_status),
+        },
       };
     });
 
     broadcast("record.created", {
-      recordId: result.raw.id,
+      recordId: result.record.id,
       userId: user.id,
-      isPublic: result.raw.is_public,
-      publicationStatus: result.raw.publication_status,
+      parentRecordId: result.comment.parentRecordId,
+      rootRecordId: result.comment.rootRecordId,
+      isPublic: result.record.is_public,
+      publicationStatus: result.record.publication_status,
+      event: "reply_created",
     });
     await writeAuditLog({
       actorUserId: user.id,
-      action: "comment.reply_record_create",
+      action: "comment.create_reply_record",
       targetType: "record",
-      targetId: result.raw.id,
+      targetId: result.record.id,
       payload: {
         commentId: result.comment.id,
-        parentRecordId: params.id,
-        publicationStatus: result.raw.publication_status,
+        parentRecordId: result.comment.parentRecordId,
+        rootRecordId: result.comment.rootRecordId,
+        visibilityIntent,
       },
     });
 
-    return {
-      comment: result.comment,
-      record: result.record,
-      publishStatus: {
-        status: result.raw.publication_status,
-        label: publicationLabel(result.raw.publication_status),
-      },
-      moderation: {
-        customMood: customMood.isCustom,
-        strictReviewRequired: customMood.isCustom || (textAssessment.normalizedText?.flags.length ?? 0) > 0,
-        publicSanitizationApplied: publicSanitization.sanitizationApplied,
-      },
-    };
+    return result;
   });
 }

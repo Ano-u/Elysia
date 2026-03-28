@@ -28,22 +28,17 @@ describe("universeRoutes", () => {
     vi.clearAllMocks();
   });
 
-  it("viewport 返回访客脱敏后的内容字段", async () => {
+  it("returns replyContext and clustered coordinates for viewport items", async () => {
     mockedQuery.mockResolvedValueOnce(
       makeQueryResult([
         {
           id: "reply-1",
           user_id: "user-1",
-          mood_phrase: "原始情绪",
-          display_mood_phrase: "此刻心情",
-          description: "这是一张回复卡片，地点在上海市浦东新区世纪大道88号",
-          public_description: "这是一张回复卡片，地点在上海市",
+          mood_phrase: "回复卡片",
+          description: "这是一张回复卡片",
           created_at: "2026-03-24T00:00:00.000Z",
           is_public: true,
-          quote: "https://example.com/original",
-          public_quote: "[链接已隐藏]",
-          public_location_label: "上海市",
-          public_occurred_at: "2026-03-01T00:00:00.000Z",
+          quote: "一小段誓言",
           display_name: "Reply Author",
           avatar_url: null,
           hearts: "2",
@@ -79,11 +74,11 @@ describe("universeRoutes", () => {
         {
           id: "reply-1",
           user_id: "user-1",
-          mood_phrase: "此刻心情",
-          description: "这是一张回复卡片，地点在上海市",
+          mood_phrase: "回复卡片",
+          description: "这是一张回复卡片",
           created_at: "2026-03-24T00:00:00.000Z",
           is_public: true,
-          quote: "[链接已隐藏]",
+          quote: "一小段誓言",
           display_name: "Reply Author",
           avatar_url: null,
           hearts: "2",
@@ -93,9 +88,6 @@ describe("universeRoutes", () => {
           flowers: "0",
           tags: [],
           extra_emotions: ["治愈"],
-          sanitized: true,
-          public_location_label: "上海市",
-          public_occurred_at: "2026-03-01T00:00:00.000Z",
           replyContext: {
             isReply: true,
             parentRecordId: "parent-1",
@@ -111,11 +103,11 @@ describe("universeRoutes", () => {
         primary: {
           id: "reply-1",
           user_id: "user-1",
-          mood_phrase: "此刻心情",
-          description: "这是一张回复卡片，地点在上海市",
+          mood_phrase: "回复卡片",
+          description: "这是一张回复卡片",
           created_at: "2026-03-24T00:00:00.000Z",
           is_public: true,
-          quote: "[链接已隐藏]",
+          quote: "一小段誓言",
           display_name: "Reply Author",
           avatar_url: null,
           hearts: "2",
@@ -125,9 +117,6 @@ describe("universeRoutes", () => {
           flowers: "0",
           tags: [],
           extra_emotions: ["治愈"],
-          sanitized: true,
-          public_location_label: "上海市",
-          public_occurred_at: "2026-03-01T00:00:00.000Z",
           replyContext: {
             isReply: true,
             parentRecordId: "parent-1",
