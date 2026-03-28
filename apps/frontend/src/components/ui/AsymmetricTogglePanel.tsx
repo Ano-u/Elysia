@@ -97,7 +97,7 @@ export const AsymmetricTogglePanel: React.FC<AsymmetricTogglePanelProps> = ({
               key={opt.id}
               layout={!reduceMotion}
               transition={springConfig}
-              whileHover={isActive && canSend ? { scale: 1.02 } : (!isActive && canSend ? { scale: 1.05 } : {})}
+              whileHover={reduceMotion ? undefined : (isActive && canSend ? { scale: 1.02 } : (!isActive && canSend ? { scale: 1.05 } : {}))}
               onHoverStart={() => setHoveredStates(prev => ({ ...prev, [opt.id]: true }))}
               onHoverEnd={() => setHoveredStates(prev => ({ ...prev, [opt.id]: false }))}
               onClick={() => handleButtonClick(opt.id, isActive)}
@@ -111,7 +111,7 @@ export const AsymmetricTogglePanel: React.FC<AsymmetricTogglePanelProps> = ({
               )}
             >
               {/* Dynamic flow effect on the background of the active button */}
-              {isActive && canSend ? (
+              {isActive && canSend && !reduceMotion ? (
               <div className="absolute inset-0 rounded-full overflow-hidden pointer-events-none">
                 <motion.div
                   className="w-full h-full z-0"

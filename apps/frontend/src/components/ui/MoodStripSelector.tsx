@@ -73,9 +73,9 @@ export const MoodStripSelector: React.FC<MoodStripSelectorProps> = ({
         return (
           <motion.div
             key={tag}
-            initial={{ opacity: 0, y: isEven ? 100 : -100 }}
+            initial={reduceMotion ? { opacity: 1, y: staggerY } : { opacity: 0, y: isEven ? 100 : -100 }}
             animate={{ opacity: 1, y: staggerY }}
-            transition={{
+            transition={reduceMotion ? { duration: 0 } : {
               type: "spring",
               stiffness: 70,
               damping: 15,
@@ -86,8 +86,8 @@ export const MoodStripSelector: React.FC<MoodStripSelectorProps> = ({
             <motion.button
               type="button"
               onClick={() => onToggle(tag)}
-              animate={{ y: [-3, 3, -3] }}
-              transition={{
+              animate={reduceMotion ? undefined : { y: [-3, 3, -3] }}
+              transition={reduceMotion ? undefined : {
                 duration: 4,
                 ease: "easeInOut",
                 repeat: Infinity,

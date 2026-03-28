@@ -30,6 +30,7 @@ interface HomeGuideOverlayProps {
   safety?: HomeGuideSafetyCardContent | null;
   targetRect?: DOMRect | null;
   targetRadius?: number | null;
+  reduceMotion?: boolean;
   onStart?: () => void;
   onBack?: () => void;
   onNext?: () => void;
@@ -256,6 +257,7 @@ export const HomeGuideOverlay: React.FC<HomeGuideOverlayProps> = ({
   onNext,
   onSkip,
   onSafetyConfirm,
+  reduceMotion = false,
 }) => {
   const hasTarget = mode === "spotlight" && Boolean(targetRect);
   const focusRect = hasTarget && targetRect ? toFocusRect(targetRect, targetRadius ?? null) : null;
@@ -266,7 +268,7 @@ export const HomeGuideOverlay: React.FC<HomeGuideOverlayProps> = ({
       return [] as Array<{ cutout: FocusRect; blurPx: number; tintOpacity: number }>;
     }
 
-    const steps = 32;
+    const steps = 10;
     const maxDistance = Math.min(360, Math.max(180, Math.min(viewportWidth, viewportHeight) * 0.52));
     let prevTargetOpacity = 0;
     const output: Array<{ cutout: FocusRect; blurPx: number; tintOpacity: number }> = [];
@@ -313,18 +315,19 @@ export const HomeGuideOverlay: React.FC<HomeGuideOverlayProps> = ({
           {mode === "welcome" && (
             <motion.div
               key="guide-welcome"
-              initial={{ opacity: 0 }}
+              initial={reduceMotion ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={reduceMotion ? { duration: 0 } : undefined}
               className="fixed inset-0 z-[118] bg-[radial-gradient(circle_at_18%_16%,rgba(255,245,252,0.72),transparent_42%),radial-gradient(circle_at_82%_12%,rgba(215,233,255,0.52),transparent_42%),linear-gradient(145deg,rgba(248,251,255,0.72),rgba(251,243,252,0.64),rgba(236,247,255,0.68))] backdrop-blur-[16px]"
             >
               <div className="pointer-events-none absolute inset-0 bg-white/28 dark:bg-slate-950/42" />
               <div className="relative z-[119] flex h-full w-full items-center justify-center p-4">
                 <motion.div
-                  initial={{ opacity: 0, y: 14, scale: 0.98 }}
+                  initial={reduceMotion ? false : { opacity: 0, y: 14, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.98 }}
-                  transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                  exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.98 }}
+                  transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
                   className="w-full max-w-xl rounded-[2rem] border border-white/80 bg-[linear-gradient(145deg,rgba(255,248,255,0.94),rgba(246,238,255,0.9),rgba(239,247,255,0.92))] p-6 shadow-[0_24px_56px_rgba(160,142,211,0.32),inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-3xl dark:border-white/20 dark:bg-[linear-gradient(145deg,rgba(36,26,56,0.88),rgba(42,32,66,0.86),rgba(22,35,60,0.88))]"
                 >
                   <p className="text-[12px] elysia-glow-text">ELYSIA · 新人引导</p>
@@ -358,18 +361,19 @@ export const HomeGuideOverlay: React.FC<HomeGuideOverlayProps> = ({
           {mode === "safety" && safety && (
             <motion.div
               key="guide-safety"
-              initial={{ opacity: 0 }}
+              initial={reduceMotion ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={reduceMotion ? { duration: 0 } : undefined}
               className="fixed inset-0 z-[118] bg-[radial-gradient(circle_at_18%_16%,rgba(255,245,252,0.72),transparent_42%),radial-gradient(circle_at_82%_12%,rgba(215,233,255,0.52),transparent_42%),linear-gradient(145deg,rgba(248,251,255,0.72),rgba(251,243,252,0.64),rgba(236,247,255,0.68))] backdrop-blur-[16px]"
             >
               <div className="pointer-events-none absolute inset-0 bg-white/28 dark:bg-slate-950/42" />
               <div className="relative z-[119] flex h-full w-full items-center justify-center p-4">
                 <motion.div
-                  initial={{ opacity: 0, y: 14, scale: 0.98 }}
+                  initial={reduceMotion ? false : { opacity: 0, y: 14, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.98 }}
-                  transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                  exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.98 }}
+                  transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
                   className="w-full max-w-xl rounded-[2rem] border border-white/80 bg-[linear-gradient(145deg,rgba(255,248,255,0.94),rgba(246,238,255,0.9),rgba(239,247,255,0.92))] p-6 shadow-[0_24px_56px_rgba(160,142,211,0.32),inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-3xl dark:border-white/20 dark:bg-[linear-gradient(145deg,rgba(36,26,56,0.88),rgba(42,32,66,0.86),rgba(22,35,60,0.88))]"
                 >
                   <p className="text-[12px] text-amber-500/80 dark:text-amber-400/80 tracking-widest font-bold mb-2">安全须知</p>
@@ -403,23 +407,30 @@ export const HomeGuideOverlay: React.FC<HomeGuideOverlayProps> = ({
           {mode === "spotlight" && focusRect && (
             <motion.div
               key={`guide-spotlight-${stepIndex}`}
-              initial={{ opacity: 0 }}
+              initial={reduceMotion ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.22 }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.22 }}
               className="fixed inset-0 z-[118]"
             >
-              {continuousLayers.map((layer, index) => (
-                <RoundedBlurLayer
-                  key={`guide-layer-${index}-${layer.cutout.left}-${layer.cutout.top}-${layer.cutout.width}-${layer.cutout.height}`}
-                  cutout={layer.cutout}
-                  viewportWidth={viewportWidth}
-                  viewportHeight={viewportHeight}
-                  blurPx={layer.blurPx}
-                  tintOpacity={layer.tintOpacity}
-                  zIndex={119}
+              {reduceMotion ? (
+                /* Simple semi-transparent overlay instead of 80+ blur DOM elements */
+                <div
+                  className="fixed inset-0 z-[119] bg-white/40 dark:bg-slate-950/40"
                 />
-              ))}
+              ) : (
+                continuousLayers.map((layer, index) => (
+                  <RoundedBlurLayer
+                    key={`guide-layer-${index}-${layer.cutout.left}-${layer.cutout.top}-${layer.cutout.width}-${layer.cutout.height}`}
+                    cutout={layer.cutout}
+                    viewportWidth={viewportWidth}
+                    viewportHeight={viewportHeight}
+                    blurPx={layer.blurPx}
+                    tintOpacity={layer.tintOpacity}
+                    zIndex={119}
+                  />
+                ))
+              )}
 
               <div
                 className="pointer-events-none fixed z-[121] border border-white/85 shadow-[0_20px_52px_rgba(142,133,196,0.28),inset_0_0_0_1px_rgba(255,255,255,0.58)] dark:border-white/30"

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { CrystalButton } from "./CrystalButton";
+import { useUiStore } from "../../store/uiStore";
 
 interface NavIconButtonProps {
   icon?: React.ReactNode;
@@ -20,6 +21,7 @@ export const NavIconButton: React.FC<NavIconButtonProps> = ({
   activeIconColorClass = "text-blue-500",
   activeLabelColorClass = "text-blue-700 dark:text-blue-100",
 }) => {
+  const reduceMotion = useUiStore((state) => state.reduceMotion);
   const [isHovered, setIsHovered] = useState(false);
 
   return (
@@ -38,7 +40,7 @@ export const NavIconButton: React.FC<NavIconButtonProps> = ({
       <div className="relative flex items-center justify-center">
         <div
           className={`${
-            isActive ? `${activeIconColorClass} animate-pulse` : "text-slate-500 dark:text-slate-300"
+            isActive ? `${activeIconColorClass}${reduceMotion ? "" : " animate-pulse"}` : "text-slate-500 dark:text-slate-300"
           } transition-[filter,opacity,transform] duration-300 ease-out ${
             isHovered ? "blur-[1.4px] opacity-70 scale-95" : "blur-0 opacity-100 scale-100"
           }`}

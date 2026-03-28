@@ -212,10 +212,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { scrollY } = useScroll({ container: scrollContainerRef });
-  const smoothScrollY = useSpring(scrollY, { stiffness: 80, damping: 10, bounce: 0.01, mass: 0.1, restDelta: 0.001 });
-  const parallaxY = useTransform(smoothScrollY, [0, 800], [0, 300]);
-  const headerOpacity = useTransform(smoothScrollY, [0, 200, 350], [1, 0.9, 0]);
-  const headerScale = useTransform(smoothScrollY, [0, 350], [1, 0.95]);
+  const smoothScrollY = useSpring(scrollY, reduceMotion ? { stiffness: 1000, damping: 100, mass: 0.01, restDelta: 1 } : { stiffness: 80, damping: 10, bounce: 0.01, mass: 0.1, restDelta: 0.001 });
+  const scrollSource = reduceMotion ? scrollY : smoothScrollY;
+  const parallaxY = useTransform(scrollSource, [0, 800], reduceMotion ? [0, 0] : [0, 300]);
+  const headerOpacity = useTransform(scrollSource, [0, 200, 350], [1, 0.9, 0]);
+  const headerScale = useTransform(scrollSource, [0, 350], reduceMotion ? [1, 1] : [1, 0.95]);
 
   const {
     data: feedData,
@@ -566,9 +567,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 {onboardingData.restartSuggestion?.shouldShow ? (
                   <motion.div
                     key="restart-suggestion"
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={reduceMotion ? false : { opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
+                    exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.95 }}
                     className="w-full flex flex-col gap-2.5 rounded-[1.5rem] bg-pink-50/60 dark:bg-pink-950/20 border border-pink-100/80 dark:border-pink-900/30 p-5 backdrop-blur-md"
                   >
                     <h3 className="font-elysia-display text-base text-pink-700 dark:text-pink-300 font-medium">
@@ -584,10 +585,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
                     return (
                       <motion.div
                         key={`task-day-${currentTask.day}`}
-                        initial={{ opacity: 0, y: 10 }}
+                        initial={reduceMotion ? false : { opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20, scale: 0.95, filter: "blur(4px)" }}
-                        transition={{ duration: 0.5, ease: "easeInOut" }}
+                        exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -20, scale: 0.95, filter: "blur(4px)" }}
+                        transition={reduceMotion ? { duration: 0.15 } : { duration: 0.5, ease: "easeInOut" }}
                         className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-[1.5rem] bg-white/50 dark:bg-black/30 border border-white/60 dark:border-white/10 p-5 backdrop-blur-xl shadow-sm"
                       >
                         <div className="flex flex-col gap-1.5">
@@ -644,7 +645,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
               {onboardingData.entryContext?.needsAccessApplication && onboardingData.entryContext.applicationHint && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={reduceMotion ? false : { opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="w-full flex items-start gap-3.5 mt-2 px-5 py-4 rounded-[1.5rem] bg-white/50 dark:bg-black/30 border border-pink-100/80 dark:border-pink-900/30 backdrop-blur-md shadow-sm"
                 >
@@ -686,7 +687,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               />
             </div>
 
-            <motion.div className="flex-1 w-full relative z-10 px-0">
+            <div className="flex-1 w-full relative z-10 px-0">
               <MainInputCard
                 moodPhrase={draft.moodPhrase}
                 setMoodPhrase={(v) => {
@@ -705,16 +706,16 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 }}
                 isPending={createMutation.isPending}
               />
-            </motion.div>
+            </div>
 
             <div className="flex w-full items-center justify-end gap-3 mt-2 sm:mt-0 pb-3 sm:px-2 px-1">
               <AnimatePresence>
                 {draft.visibilityIntent === "public" && (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.8, x: 10 }}
+                    initial={reduceMotion ? false : { opacity: 0, scale: 0.8, x: 10 }}
                     animate={{ opacity: 1, scale: 1, x: 0 }}
-                    exit={{ opacity: 0, scale: 0.8, x: 10 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                    exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.8, x: 10 }}
+                    transition={reduceMotion ? { duration: 0.15 } : { type: "spring", stiffness: 400, damping: 25 }}
                     className="group/hint relative flex items-center justify-center w-6 h-6 rounded-full text-blue-400/80 hover:bg-blue-100 hover:text-blue-500 transition-colors cursor-help"
                   >
                     <Info className="w-3.5 h-3.5" />
@@ -839,6 +840,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
         onNext={handleGuideNext}
         onSkip={handleGuideSkip}
         onSafetyConfirm={handleSafetyConfirm}
+        reduceMotion={reduceMotion}
       />
     </div>
   );

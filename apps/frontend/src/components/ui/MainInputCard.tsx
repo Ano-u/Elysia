@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LiquidCard } from "./LiquidCard";
-import { ChevronDown, ChevronUp, Quote, Tag } from "lucide-react";
+import { ChevronDown, ChevronUp, Quote } from "lucide-react";
 import { useRotatingCopy } from "../../lib/rotatingCopy";
-import { MoodStripSelector } from "./MoodStripSelector";
 
 interface MainInputCardProps {
   moodPhrase: string;
@@ -12,8 +11,6 @@ interface MainInputCardProps {
   setQuote: (value: string) => void;
   description: string;
   setDescription: (value: string) => void;
-  extraEmotions?: string[];
-  onToggleEmotion?: (tag: string) => void;
   isPending?: boolean;
 }
 
@@ -57,8 +54,6 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
   setQuote,
   description,
   setDescription,
-  extraEmotions,
-  onToggleEmotion,
   isPending,
 }) => {
   const editorAreaRef = useRef<HTMLDivElement>(null);
@@ -179,7 +174,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
 
         {/* Quote & Details Transformation */}
         <AnimatePresence>
-          {hasValue && (!isCompact || hasQuote || hasDescription || (extraEmotions && extraEmotions.length > 0)) && (
+          {hasValue && (!isCompact || hasQuote || hasDescription) && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
@@ -319,49 +314,6 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
                 </div>
               )}
 
-              {/* Row 3: Emotions */}
-              {extraEmotions && onToggleEmotion && (!isCompact || extraEmotions.length > 0) && (
-                <div className="flex flex-col gap-3">
-                  <AnimatePresence mode="wait">
-                    {!isCompact ? (
-                      <motion.div
-                        key="emotions-selector"
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden pt-2"
-                      >
-                        <div className={`flex flex-col gap-3 flex-1 w-full min-w-0`}>
-                          <div className="flex items-center gap-2">
-                            <Tag className="w-3 h-3 text-slate-400" />
-                            <span className="text-[10px] tracking-widest text-slate-400 uppercase font-bold flex items-center gap-1">情绪心境</span>
-                          </div>
-                          <MoodStripSelector items={extraEmotions} selectedItems={extraEmotions} onToggle={onToggleEmotion} />
-                        </div>
-                      </motion.div>
-                    ) : extraEmotions.length > 0 ? (
-                      <motion.div
-                        key="emotions-display"
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden pt-2"
-                      >
-                        <div className="flex flex-wrap gap-2 pointer-events-none">
-                          {extraEmotions.map((tag) => (
-                            <span
-                              key={tag}
-                              className="px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors bg-pink-100/80 text-pink-600 dark:bg-pink-500/20 dark:text-pink-300 border border-pink-200/50 dark:border-pink-500/20 shadow-sm"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      </motion.div>
-                    ) : null}
-                  </AnimatePresence>
-                </div>
-              )}
             </motion.div>
           )}
         </AnimatePresence>

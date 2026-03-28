@@ -277,7 +277,7 @@ export const ActionPairRow: React.FC<ActionPairRowProps> = ({
           >
             <div className="relative flex items-center justify-center">
               <div
-                className={`${isRightActive ? "text-blue-500 animate-pulse" : "text-slate-400"} transition-[filter,opacity,transform] duration-300 ease-out ${
+                className={`${isRightActive ? `text-blue-500${reduceMotion ? "" : " animate-pulse"}` : "text-slate-400"} transition-[filter,opacity,transform] duration-300 ease-out ${
                   isIconLabelVisible("right") ? "blur-[1.4px] opacity-70 scale-95" : "blur-0 opacity-100 scale-100"
                 }`}
               >

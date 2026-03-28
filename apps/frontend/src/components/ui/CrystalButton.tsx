@@ -2,6 +2,7 @@ import React from "react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { motion, type HTMLMotionProps } from "framer-motion";
+import { useUiStore } from "../../store/uiStore";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -25,6 +26,7 @@ export const CrystalButton = React.forwardRef<
     { children, className, variant = "primary", size = "md", ...props },
     ref,
   ) => {
+    const reduceMotion = useUiStore((state) => state.reduceMotion);
     const baseStyles =
       "inline-flex items-center justify-center rounded-2xl font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-[var(--background)]";
 
@@ -49,9 +51,9 @@ export const CrystalButton = React.forwardRef<
     return (
       <motion.button
         ref={ref}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        transition={{
+        whileHover={reduceMotion ? undefined : { scale: 1.05 }}
+        whileTap={reduceMotion ? undefined : { scale: 0.95 }}
+        transition={reduceMotion ? undefined : {
           type: "spring",
           stiffness: 400,
           damping: 17,
@@ -67,7 +69,7 @@ export const CrystalButton = React.forwardRef<
       >
         {/* Subtle Shine Effect */}
         <span className="absolute inset-0 z-0 overflow-hidden rounded-2xl">
-          <span className="absolute top-0 left-0 w-full h-full bg-gradient-to-tr from-white/0 via-white/40 to-white/0 transform -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+          <span className={`absolute top-0 left-0 w-full h-full bg-gradient-to-tr from-white/0 via-white/40 to-white/0 transform -translate-x-full ${reduceMotion ? "" : "group-hover:animate-[shimmer_1.5s_infinite]"}`} />
         </span>
 
         {/* Button Content */}
