@@ -28,6 +28,7 @@ export async function reactionsRoutes(app: FastifyInstance): Promise<void> {
         WHERE id = $1
           AND is_public = TRUE
           AND publication_status = 'published'
+          AND deleted_at IS NULL
       `,
       [body.recordId],
     );
@@ -112,6 +113,7 @@ export async function reactionsRoutes(app: FastifyInstance): Promise<void> {
         WHERE id = $1
           AND is_public = TRUE
           AND publication_status = 'published'
+          AND deleted_at IS NULL
       `,
       [params.id],
     );

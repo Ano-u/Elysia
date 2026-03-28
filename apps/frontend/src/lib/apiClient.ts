@@ -4,6 +4,7 @@ import type {
   AuthorSummary,
   CreateReplyRequest,
   CreateReplyResponse,
+  DeleteRecordResponse,
   CreateRecordResponse,
   DevSwitchUserRequest,
   DevSwitchUserResponse,
@@ -307,6 +308,11 @@ export const updateRecord = (id: string, data: UpdateRecordRequest) =>
     record: mapRecordSummary(raw.record),
     publishStatus: raw.publishStatus,
   }));
+
+export const deleteRecord = (id: string) =>
+  fetchApi<DeleteRecordResponse>(`/api/records/${id}`, {
+    method: 'DELETE',
+  });
 
 export const getRecord = (id: string) =>
   fetchApi<RawRecordDetailResponse>(`/api/records/${id}`).then(

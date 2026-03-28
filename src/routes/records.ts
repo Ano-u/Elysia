@@ -153,6 +153,7 @@ async function loadRecordModerationInput(client: Pick<PoolClient, "query">, reco
       FROM records r
       LEFT JOIN record_quotes rq ON rq.record_id = r.id
       WHERE r.id = $1
+        AND r.deleted_at IS NULL
       LIMIT 1
       FOR UPDATE OF r
     `,
@@ -513,7 +514,7 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
       `
         SELECT *
         FROM records
-        WHERE id = $1 AND user_id = $2
+        WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL
       `,
       [params.id, user.id],
     );
@@ -554,6 +555,7 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
             requires_re_review = TRUE,
             updated_at = NOW()
           WHERE id = $9 AND user_id = $10
+            AND deleted_at IS NULL
         `,
         [
           hasMoodPhrase,
@@ -848,6 +850,52 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
+  app.delete("/records/:id", async (req, reply) => {
+    const user = await requireWriteUser(req, reply, { checkRiskControl: false });
+    if (!user) {
+      return;
+    }
+
+    const params = z.object({ id: z.string().uuid() }).parse(req.params);
+    const deleted = await query<{ id: string }>(
+      `
+        UPDATE records
+        SET
+          deleted_at = NOW(),
+          is_public = FALSE,
+          updated_at = NOW()
+        WHERE id = $1 AND user_id = $2
+          AND deleted_at IS NULL
+        RETURNING id
+      `,
+      [params.id, user.id],
+    );
+
+    if (deleted.rowCount !== 1) {
+      reply.code(404).send({ message: "记录不存在" });
+      return;
+    }
+
+    broadcast("record.deleted", {
+      recordId: params.id,
+      userId: user.id,
+    });
+    await writeAuditLog({
+      actorUserId: user.id,
+      action: "record.delete",
+      targetType: "record",
+      targetId: params.id,
+      payload: {
+        source: "self_service",
+      },
+    });
+
+    return {
+      ok: true,
+      id: params.id,
+    };
+  });
+
   app.get("/records/:id/publish-status", async (req, reply) => {
     const params = z.object({ id: z.string().uuid() }).parse(req.params);
 
@@ -856,6 +904,7 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
         SELECT *
         FROM records
         WHERE id = $1
+          AND deleted_at IS NULL
       `,
       [params.id],
     );
@@ -977,6 +1026,7 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
         FROM records r
         LEFT JOIN record_quotes rq ON rq.record_id = r.id
         WHERE r.user_id = $1
+          AND r.deleted_at IS NULL
           AND ($2::timestamptz IS NULL OR r.created_at < $2::timestamptz)
         ORDER BY r.created_at DESC
         LIMIT $3

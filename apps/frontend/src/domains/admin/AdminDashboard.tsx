@@ -75,6 +75,19 @@ type AuditLogItem = {
   created_at: string;
 };
 
+type DeletedRecordItem = {
+  id: string;
+  user_id: string;
+  mood_phrase: string;
+  visibility_intent: "private" | "public";
+  publication_status: string;
+  deleted_at: string;
+  created_at: string;
+  updated_at: string;
+  display_name: string;
+  username: string;
+};
+
 type AiConfigResponse =
   | {
       configured: false;
@@ -136,7 +149,7 @@ const APPEAL_NOTE_TEMPLATES = [
 
 export const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<
-    "moderation" | "access" | "risk" | "bans" | "appeals" | "audit" | "inspirations" | "ai"
+    "moderation" | "access" | "risk" | "bans" | "appeals" | "deleted" | "audit" | "inspirations" | "ai"
   >("moderation");
 
   return (
@@ -161,6 +174,9 @@ export const AdminDashboard: React.FC = () => {
             <NavButton active={activeTab === "appeals"} onClick={() => setActiveTab("appeals")}>
               申诉中心
             </NavButton>
+            <NavButton active={activeTab === "deleted"} onClick={() => setActiveTab("deleted")}>
+              删除恢复
+            </NavButton>
             <NavButton active={activeTab === "audit"} onClick={() => setActiveTab("audit")}>
               审计日志
             </NavButton>
@@ -179,6 +195,7 @@ export const AdminDashboard: React.FC = () => {
           {activeTab === "risk" && <RiskQueue />}
           {activeTab === "bans" && <BanCenter />}
           {activeTab === "appeals" && <AppealsCenter />}
+          {activeTab === "deleted" && <DeletedRecordsPanel />}
           {activeTab === "audit" && <AuditLogs />}
           {activeTab === "inspirations" && <InspirationsManager />}
           {activeTab === "ai" && <AiConfig />}
@@ -1107,6 +1124,102 @@ const AuditLogs = () => {
             </details>
           </LiquidCard>
         ))}
+      </div>
+    </div>
+  );
+};
+
+const DeletedRecordsPanel = () => {
+  const queryClient = useQueryClient();
+  const [restoreNote, setRestoreNote] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+
+  const deletedQuery = useQuery({
+    queryKey: ["admin-deleted-records"],
+    queryFn: () => fetchApi<{ items: DeletedRecordItem[] }>("/api/admin/records/deleted?limit=120"),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: (payload: { id: string; note?: string }) =>
+      fetchApi(`/api/admin/records/${payload.id}/restore`, {
+        method: "POST",
+        body: JSON.stringify({ note: payload.note }),
+      }),
+    onSuccess: () => {
+      setError(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-deleted-records"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-audit-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-moderation-queue"] });
+    },
+    onError: (mutationError) => {
+      setError(getErrorMessage(mutationError, "恢复记录失败"));
+    },
+  });
+
+  const items = deletedQuery.data?.items ?? [];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h3 className="font-elysia-display text-3xl text-slate-700 dark:text-slate-100">删除恢复</h3>
+        <p className="text-xs text-slate-500 dark:text-slate-300/80">恢复后仅回到私密可见，不自动重新公开。</p>
+      </div>
+
+      {error && (
+        <div className="rounded-2xl border border-rose-200/70 bg-rose-50/70 px-4 py-2 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/25 dark:text-rose-200">
+          {error}
+        </div>
+      )}
+
+      {deletedQuery.isLoading && <div>加载中...</div>}
+      {!deletedQuery.isLoading && items.length === 0 && (
+        <LiquidCard className="p-6 text-sm text-slate-500 dark:text-slate-300/80">当前没有可恢复的删除记录。</LiquidCard>
+      )}
+
+      <div className="grid gap-4">
+        {items.map((item) => {
+          const pending = restoreMutation.isPending && restoreMutation.variables?.id === item.id;
+          const note = restoreNote[item.id] ?? "管理员恢复删除记录";
+
+          return (
+            <LiquidCard key={item.id} className="p-4 bg-white/45 dark:bg-black/22">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                  {item.visibility_intent}
+                </span>
+                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                  {item.publication_status}
+                </span>
+                <span className="text-xs text-slate-400 dark:text-slate-300/70">删除于 {formatDateTime(item.deleted_at)}</span>
+              </div>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-200/85">
+                {item.display_name} (@{item.username})
+              </p>
+              <p className="mt-1 break-all text-xs text-slate-500 dark:text-slate-300/80">record: {item.id}</p>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-200/90">{item.mood_phrase}</p>
+
+              <input
+                value={note}
+                onChange={(event) =>
+                  setRestoreNote((current) => ({
+                    ...current,
+                    [item.id]: event.target.value,
+                  }))
+                }
+                className="mt-3 w-full rounded-full border border-white/45 bg-white/60 px-3 py-2 text-sm outline-none dark:border-white/12 dark:bg-black/22"
+                placeholder="恢复说明（可选）"
+              />
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => restoreMutation.mutate({ id: item.id, note })}
+                className="mt-3 rounded-full bg-emerald-100 px-3 py-1.5 text-xs text-emerald-700 disabled:opacity-50"
+              >
+                {pending ? "恢复中..." : "恢复记录"}
+              </button>
+            </LiquidCard>
+          );
+        })}
       </div>
     </div>
   );

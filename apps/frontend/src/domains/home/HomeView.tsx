@@ -9,6 +9,7 @@ import { MoodStripSelector } from "../../components/ui/MoodStripSelector";
 import { AsymmetricTogglePanel } from "../../components/ui/AsymmetricTogglePanel";
 import { NavIconButton } from "../../components/ui/NavIconButton";
 import {
+  deleteRecord,
   createRecord,
   getHomeFeed,
   getOnboardingProgress,
@@ -648,7 +649,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </div>
           )}
 
-          <div ref={composerGuideRef} className={`${guideTargetClass(0)} rounded-[2.25rem] w-full flex flex-col gap-10`}>
+          <div ref={composerGuideRef} className={`${guideTargetClass(0)} rounded-[2.25rem] w-full flex flex-col gap-6`}>
             <MainInputCard
               moodPhrase={draft.moodPhrase}
               setMoodPhrase={(v) => {
@@ -836,6 +837,18 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteRecord(currentItem.id),
+    onSuccess: () => {
+      setIsEditing(false);
+      queryClient.invalidateQueries({ queryKey: ["home-feed"] });
+      queryClient.invalidateQueries({ queryKey: ["universe"] });
+    },
+    onError: (error) => {
+      setEditFeedback(resolveCreateErrorMessage(error));
+    },
+  });
+
   useEffect(() => {
     if (isEditing) return;
     setEditIsPublic(isPublic);
@@ -912,7 +925,25 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
     });
   };
 
-  const actionBusy = visibilityMutation.isPending || editMutation.isPending;
+  const handleDelete = () => {
+    if (deleteMutation.isPending) {
+      return;
+    }
+
+    if (isMockItem) {
+      setEditFeedback("测试记录暂不支持删除哦♪");
+      return;
+    }
+
+    const confirmed = window.confirm("确定删除这条日记吗？删除后请联系管理员恢复。");
+    if (!confirmed) {
+      return;
+    }
+
+    deleteMutation.mutate();
+  };
+
+  const actionBusy = visibilityMutation.isPending || editMutation.isPending || deleteMutation.isPending;
   const badgeInfo = getStatusBadgeInfo(publicationMeta.tone);
 
   return (
@@ -1003,8 +1034,8 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
               <div className="flex items-center gap-2">
                 <NavIconButton
                   icon={<Trash2 className="w-4 h-4 text-slate-400 group-hover:text-rose-500 transition-colors" />}
-                  label="删除"
-                  onClick={() => alert("Delete not implemented")}
+                  label={deleteMutation.isPending ? "删除中" : "删除"}
+                  onClick={handleDelete}
                   isActive={false}
                 />
                 <NavIconButton

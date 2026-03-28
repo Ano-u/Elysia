@@ -85,6 +85,7 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
         FROM records r
         LEFT JOIN comments c ON c.derived_record_id = r.id
         WHERE r.id = $1
+          AND r.deleted_at IS NULL
         LIMIT 1
       `,
       [params.id],

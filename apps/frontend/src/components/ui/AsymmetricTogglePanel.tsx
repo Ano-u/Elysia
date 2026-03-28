@@ -93,7 +93,7 @@ export const AsymmetricTogglePanel: React.FC<AsymmetricTogglePanelProps> = ({
             backgroundPosition: ["0% 50%", "200% 50%"],
           }}
           transition={{
-            duration: isHovered ? 1.5 : 3,
+            duration: isHovered ? 3 : 0.5,
             ease: "linear",
             repeat: Infinity,
           }}

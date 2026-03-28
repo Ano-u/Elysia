@@ -276,6 +276,11 @@ export interface UpdateRecordResponse extends CreateRecordResponse {
   ok: boolean;
 }
 
+export interface DeleteRecordResponse {
+  ok: boolean;
+  id: string;
+}
+
 export interface RecordDetailResponse {
   record: RecordDetail;
   quote: string | null;
