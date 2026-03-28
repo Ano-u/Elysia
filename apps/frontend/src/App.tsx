@@ -7,9 +7,7 @@ import {
   SquareStop,
   Shield,
   Sun,
-  Landmark,
-  Compass,
-  Network
+  Landmark
 } from "lucide-react";
 import { NavIconButton } from "./components/ui/NavIconButton";
 import { AccessApplicationModal } from "./components/ui/AccessApplicationModal";
@@ -259,8 +257,22 @@ function App() {
       <AnimatePresence initial={false}>
         {[
           { id: "home", view: "home" as AppView, icon: <Landmark className="h-5 w-5" />, label: "往世乐土" },
-          { id: "universe", view: "universe" as AppView, icon: <Compass className="h-5 w-5" />, label: "星海回响" },
-          { id: "mindmap", view: "mindmap" as AppView, icon: <Network className="h-5 w-5" />, label: "记忆织网" },
+          {
+            id: "universe",
+            view: "universe" as AppView,
+            iconSrc: "/svg/crystal-icon.svg",
+            activeIconColorClass: "text-blue-500",
+            activeLabelColorClass: "text-blue-700 dark:text-blue-100",
+            label: "星海回响",
+          },
+          {
+            id: "mindmap",
+            view: "mindmap" as AppView,
+            iconSrc: "/svg/wreath-icon.svg",
+            activeIconColorClass: "text-[#FFA6C9]",
+            activeLabelColorClass: "text-pink-700 dark:text-pink-200",
+            label: "记忆织网",
+          },
           ...(canOpenAdmin ? [{ id: "admin", view: "admin" as AppView, icon: <Shield className="h-5 w-5" />, label: "治理面板" }] : [])
         ].map(item => {
           if (!isLeftExpanded && activeView !== item.view) return null;
@@ -277,9 +289,12 @@ function App() {
               <div style={{ width: 48, marginRight: 12 }}>
                 <NavIconButton
                   icon={item.icon}
+                  iconSrc={item.iconSrc}
                   label={item.label}
                   onClick={() => setCurrentView(item.view)}
                   isActive={activeView === item.view}
+                  activeIconColorClass={item.activeIconColorClass}
+                  activeLabelColorClass={item.activeLabelColorClass}
                 />
               </div>
             </motion.div>
