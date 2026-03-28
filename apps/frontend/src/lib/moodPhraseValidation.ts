@@ -15,20 +15,19 @@ function countEnglishWords(text: string): number {
 export function validateMoodPhraseLength(input: string): { ok: true } | { ok: false; reason: string } {
   const value = input.trim();
   if (value.length === 0) {
-    return { ok: false, reason: "先写下一句标题，再让爱莉帮你送出吧♪" };
+    return { ok: false, reason: "要先留下一个标题，爱莉才能帮你送出这份心意呀♪" };
   }
 
   if (isLikelyEnglish(value)) {
     if (countEnglishWords(value) > 20) {
-      return { ok: false, reason: "标题英文最多 20 个词，请精简后再试♪" };
+      return { ok: false, reason: "标题最多只能写 20 个词哦，稍微精简一下我们再出发吧♪" };
     }
     return { ok: true };
   }
 
   if (value.length > 20) {
-    return { ok: false, reason: "标题最多 20 个字，请精简后再试♪" };
+    return { ok: false, reason: "标题最多只能写 20 个字哦，把悬念留给下一次不是更浪漫嘛♪" };
   }
 
   return { ok: true };
 }
-

@@ -7,8 +7,8 @@ export type AdminInspirationItem = {
 export const ADMIN_INSPIRATION_STORAGE_KEY = "elysia-admin-inspirations-v1";
 
 const DEFAULT_ADMIN_INSPIRATIONS = [
-  "今天哪怕只写下一句话，也是在认真抱住自己。",
-  "把不确定留在这里，Elysia 会陪你慢慢看清它。",
+  "今天哪怕只留下一个字，也是在拥抱闪光的瞬间哦♪",
+  "如果有迷茫的小秘密，就留在往世乐土吧，爱莉会陪你一起看清它呀。",
 ];
 
 function generateId(): string {
@@ -94,4 +94,3 @@ export function writeAdminInspirations(items: AdminInspirationItem[]): AdminInsp
 export function readAdminInspirationTexts(): string[] {
   return readAdminInspirations().map((item) => item.text);
 }
-

@@ -7,7 +7,7 @@ import { useUiStore } from "../../store/uiStore";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getUniverseViewport, toggleReaction, createReply, getRecord } from "../../lib/apiClient";
 import { MainInputCard } from "../../components/ui/MainInputCard";
-import { ActionPairRow } from "../../components/ui/ActionPairRow";
+import { AsymmetricTogglePanel } from "../../components/ui/AsymmetricTogglePanel";
 import { MoodStripSelector } from "../../components/ui/MoodStripSelector";
 import { Tag as TagIcon, MessageCircle, CornerLeftUp, ArrowUpToLine, X } from "lucide-react";
 import { StarSeaCanvas } from "./StarSeaCanvas";
@@ -104,8 +104,8 @@ export const UniverseView: React.FC = () => {
   const [openedCards, setOpenedCards] = useState<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
   // To track which card we are replying to
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
-  
-  
+
+
   const [isReplying, setIsReplying] = useState(false);
   const [replyDraft, setReplyDraft] = useState({
     moodPhrase: "",
@@ -114,7 +114,7 @@ export const UniverseView: React.FC = () => {
     extraEmotions: [] as string[],
     visibilityIntent: "public" as "public" | "private",
   });
-  
+
   const createMutation = useMutation({
     mutationFn: (data: any) => createReply(replyingToId || '', data),
     onSuccess: () => {
@@ -161,12 +161,12 @@ export const UniverseView: React.FC = () => {
       if (selectedCardRef.current.length > 0) return;
       // 防止触控板双指滚动变成页面滚动或前进后退
       e.preventDefault();
-      
+
       const zoomSensitivity = 0.0015;
       const delta = -e.deltaY * zoomSensitivity;
       const current = scale.get();
       const next = Math.max(0.4, Math.min(2, current + delta));
-      
+
       animate(scale, next, { duration: 0.1, ease: "easeOut" });
     };
 
@@ -188,7 +188,7 @@ export const UniverseView: React.FC = () => {
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        
+
         const nextScale = initialScale * (distance / initialDistance);
         scale.set(Math.max(0.4, Math.min(2, nextScale)));
       }
@@ -302,12 +302,12 @@ export const UniverseView: React.FC = () => {
     const positions = cards.map((card) => {
       let x = center + card.coord.x;
       let y = center + card.coord.y;
-      
+
       // 基于情绪标签的极坐标聚类偏移，使卡片更紧凑且有联系
       const tag = card.tags?.[0] || '';
       let clusterAngle = 0;
       let clusterRadius = 150 + Math.random() * 80;
-      
+
       if (['开心', '喜悦', '治愈', '感动'].includes(tag)) {
         clusterAngle = -Math.PI / 4; // 右上方
       } else if (['难过', '悲伤', '孤独', '心碎'].includes(tag)) {
@@ -323,8 +323,8 @@ export const UniverseView: React.FC = () => {
       }
 
       // 添加随机角度扰动，让不同聚类相互渗透连接，避免空荡荡
-      clusterAngle += (Math.random() - 0.5) * 1.5; 
-      
+      clusterAngle += (Math.random() - 0.5) * 1.5;
+
       x += Math.cos(clusterAngle) * clusterRadius;
       y += Math.sin(clusterAngle) * clusterRadius;
 
@@ -466,10 +466,10 @@ export const UniverseView: React.FC = () => {
     >
       {/* 梦幻水晶星云层 - 浅色模式 */}
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_15%_20%,rgba(255,160,190,0.4),transparent_50%),radial-gradient(circle_at_85%_20%,rgba(210,150,230,0.35),transparent_50%),radial-gradient(circle_at_50%_85%,rgba(255,140,180,0.3),transparent_60%),radial-gradient(circle_at_25%_75%,rgba(255,220,230,0.6),transparent_50%)] animate-nebula mix-blend-normal opacity-90 dark:hidden" />
-      
+
       {/* 梦幻水晶星云层 - 恢复 11:40 的暗色模式经典配置 */}
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_20%_20%,rgba(240,182,214,0.4),transparent_40%),radial-gradient(circle_at_80%_15%,rgba(200,162,232,0.3),transparent_45%),radial-gradient(circle_at_50%_90%,rgba(255,182,193,0.35),transparent_50%)] animate-nebula mix-blend-screen hidden dark:block" />
-      
+
       {/* 柔和的环境辉光叠加（仅浅色模式下增加梦幻朦胧感） */}
       <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-white/50 via-transparent to-pink-100/40 dark:hidden mix-blend-overlay" />
 
@@ -478,14 +478,14 @@ export const UniverseView: React.FC = () => {
 
       {/* 星尘背景 - 浅色模式为粉紫色晶尘，深色模式恢复为 11:40 的纯白星光 */}
       <div className="absolute inset-0 pointer-events-none">
-        <div 
+        <div
           className="absolute inset-0 opacity-50 dark:hidden"
           style={{
             backgroundImage: "radial-gradient(circle, rgba(255,160,190,0.3) 1.5px, transparent 1.5px)",
             backgroundSize: "40px 40px",
           }}
         />
-        <div 
+        <div
           className="absolute inset-0 hidden dark:block opacity-30 dark:opacity-40"
           style={{
             backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
@@ -508,7 +508,7 @@ export const UniverseView: React.FC = () => {
         </div>
       )}
 
-      <motion.div 
+      <motion.div
         className="pointer-events-none absolute left-1/2 top-24 z-30 -translate-x-1/2"
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: showTooltip ? 1 : 0, y: showTooltip ? 0 : -10 }}
@@ -607,7 +607,7 @@ export const UniverseView: React.FC = () => {
 
           if (bHearts > 0 && !cardReactions.heart) cardReactions.heart = bHearts;
           else if (bHearts > 0) cardReactions.heart += bHearts;
-          
+
           if (bHugs > 0 && !cardReactions.hug) cardReactions.hug = bHugs;
           else if (bHugs > 0) cardReactions.hug += bHugs;
 
@@ -686,13 +686,13 @@ export const UniverseView: React.FC = () => {
               {/* 装饰性背景光晕 */}
               <div className="absolute -top-20 -right-20 w-64 h-64 bg-pink-300/30 rounded-full blur-3xl mix-blend-screen pointer-events-none" />
               <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-purple-300/30 rounded-full blur-3xl mix-blend-screen pointer-events-none" />
-              
+
               {/* Header Info */}
               <div className="flex flex-wrap items-center gap-2 mb-6 relative z-10">
                 {(selectedCard.extraEmotions?.length ? selectedCard.extraEmotions : (selectedCard.tags || [])).map((tag: string, idx: number) => {
                   const config = getEmotionConfig(tag);
                   return (
-                    <span 
+                    <span
                       key={idx}
                       className={cn(
                         "inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border shadow-sm",
@@ -706,7 +706,7 @@ export const UniverseView: React.FC = () => {
                     </span>
                   );
                 })}
-                
+
                 {/* 反应标签 */}
                 {(() => {
                   const cardReactions = { ...reactionsStore[selectedCard.id] };
@@ -718,7 +718,7 @@ export const UniverseView: React.FC = () => {
 
                   if (bHearts > 0 && !cardReactions.heart) cardReactions.heart = bHearts;
                   else if (bHearts > 0) cardReactions.heart += bHearts;
-                  
+
                   if (bHugs > 0 && !cardReactions.hug) cardReactions.hug = bHugs;
                   else if (bHugs > 0) cardReactions.hug += bHugs;
 
@@ -795,7 +795,7 @@ export const UniverseView: React.FC = () => {
 
               {/* Footer Author */}
               <div className="mt-auto pt-4 border-t border-slate-200/60 dark:border-slate-700/50 flex justify-between items-center relative z-10">
-                <div 
+                <div
                   className="group flex items-center gap-2 relative cursor-pointer"
                   onClick={() => {
                     const isCurrentReplying = isReplying && replyingToId === selectedCard.id;
@@ -811,7 +811,7 @@ export const UniverseView: React.FC = () => {
                       {selectedCard.authorName || '无名星光'}
                     </span>
                   </div>
-                  
+
                   <div className="absolute inset-0 flex items-center opacity-0 transition-opacity duration-300 group-hover:opacity-100">
                     <div className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-300 text-sm font-medium shadow-sm">
                       <MessageCircle className="w-4 h-4" />
@@ -819,7 +819,7 @@ export const UniverseView: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex gap-2">
                   {/* 查看父帖图标 */}
                   {selectedCard.replyContext?.showParentArrow && selectedCard.replyContext?.parentRecordId && !openedCards.find(c => c.id === selectedCard.replyContext?.parentRecordId) && (
@@ -849,7 +849,7 @@ export const UniverseView: React.FC = () => {
                       <CornerLeftUp className="w-4 h-4" />
                     </button>
                   )}
-                  
+
                   {/* 查看主帖图标 */}
                   {selectedCard.replyContext?.showRootArrow && selectedCard.replyContext?.rootRecordId && selectedCard.replyContext?.rootRecordId !== selectedCard.replyContext?.parentRecordId && !openedCards.find(c => c.id === selectedCard.replyContext?.rootRecordId) && (
                     <button
@@ -878,9 +878,9 @@ export const UniverseView: React.FC = () => {
                       <ArrowUpToLine className="w-4 h-4" />
                     </button>
                   )}
-                  
+
                   {index === openedCards.length - 1 && (
-                    <button 
+                    <button
                       onClick={() => { setOpenedCards([]); setIsReplying(false); setReplyingToId(null); }}
                       className="w-8 h-8 rounded-full bg-slate-900/10 dark:bg-white/10 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-900 dark:hover:bg-white hover:text-white dark:hover:text-slate-900 transition-colors"
                     >
@@ -909,7 +909,7 @@ export const UniverseView: React.FC = () => {
                         <MessageCircle className="w-5 h-5 text-pink-500" />
                         回应这份心意
                       </h3>
-                      
+
                       <MainInputCard
                         moodPhrase={replyDraft.moodPhrase}
                         setMoodPhrase={(v) => setReplyDraft({ ...replyDraft, moodPhrase: v })}
@@ -932,21 +932,17 @@ export const UniverseView: React.FC = () => {
                             setReplyDraft({ ...replyDraft, extraEmotions: next });
                           }}
                         />
-                        
-                        <ActionPairRow
-                          type="save-universe"
-                          leftLabel="发送评论"
-                          rightLabel="公开至星海"
-                          onLeftClick={handleSaveReply}
-                          onRightClick={() => {}}
-                          isRightActive={replyDraft.visibilityIntent === "public"}
-                          rightActiveLabel={replyDraft.visibilityIntent === "public" ? "星海可见" : "仅双方可见"}
-                          isSwitched={replyDraft.visibilityIntent === "public"}
-                          onSwitchToggle={(isP) => {
-                            setReplyDraft({ ...replyDraft, visibilityIntent: isP ? "public" : "private" });
-                          }}
-                          isPending={createMutation.isPending}
-                        />
+
+                        <div className="flex justify-end mt-4">
+                          <AsymmetricTogglePanel
+                            currentState={replyDraft.visibilityIntent === "public" ? "universe" : "mindmap"}
+                            onStateChange={(state) => {
+                              setReplyDraft({ ...replyDraft, visibilityIntent: state === "universe" ? "public" : "private" });
+                            }}
+                            onSubmit={handleSaveReply}
+                            isPending={createMutation.isPending}
+                          />
+                        </div>
                       </div>
                     </div>
                 </motion.div>
