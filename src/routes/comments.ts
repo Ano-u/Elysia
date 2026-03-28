@@ -6,6 +6,7 @@ import { broadcast } from "../lib/realtime.js";
 import { hashIp, validateMoodPhraseLength, validateQuoteLength } from "../lib/utils.js";
 import { writeAuditLog } from "../lib/audit.js";
 import { assessModeration } from "../lib/moderation.js";
+import { markGuideCompletedAfterFirstContent } from "../lib/onboarding-guide.js";
 import { decidePublication } from "../lib/publication-workflow.js";
 import { moodModeValues, normalizeEmotionSelection, type EmotionSelection } from "../lib/emotion-selection.js";
 import {
@@ -349,6 +350,12 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
       const replyContext = await loadReplyContext(client, {
         sourceCommentId: summary.source_comment_id,
         requesterUserId: user.id,
+      });
+
+      await markGuideCompletedAfterFirstContent(client, {
+        userId: user.id,
+        recordId: replyRecordId,
+        source: "reply",
       });
 
       return {

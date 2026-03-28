@@ -10,6 +10,7 @@ import { assessModeration } from "../lib/moderation.js";
 import { buildMoodCatalog } from "../lib/mood-catalog.js";
 import { moodModeValues, normalizeEmotionSelection, type EmotionSelection, type MoodMode } from "../lib/emotion-selection.js";
 import { syncRecordMindMapNode } from "../lib/mindmap-records.js";
+import { markGuideCompletedAfterFirstContent } from "../lib/onboarding-guide.js";
 import { buildPublicLocationSummary, redactOccurredAtToMonth, redactPublicText } from "../lib/public-redaction.js";
 import {
   decidePublication,
@@ -461,6 +462,12 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
         `,
         [record.id],
       );
+
+      await markGuideCompletedAfterFirstContent(client, {
+        userId: user.id,
+        recordId: record.id,
+        source: "record",
+      });
 
       return latest.rows[0];
     });

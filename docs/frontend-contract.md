@@ -70,60 +70,181 @@
 
 ## 2.5 新人引导与温柔提示
 
-- 查询引导与 7 天进度：`GET /api/onboarding/progress`
+- 查询引导与 7 天进度：`GET /api/onboarding/progress?entryId=...`
 - 完成某一天任务：`POST /api/onboarding/complete-day`
 - 记录首访导览状态：`PATCH /api/onboarding/guide-state`
 - 查询场景化轻提示：`GET /api/nudges/recommendations?scene=...`
 - 更新提示设置：`PATCH /api/nudges/settings`
 - 提交提示反馈：`POST /api/nudges/feedback`
 
+行为规则：
+
+- 只要用户还没有发送过任何内容，进入 Home 时就应该请求一次 `GET /api/onboarding/progress?entryId=...`。
+- 首次进入且尚未发送内容：
+  - `guide.display.shouldShow=true`
+  - `guide.display.forceBlocking=true`
+  - `guide.display.allowSkip=false`
+- 第二次及之后进入、但仍未发送内容：
+  - 仍然 `shouldShow=true`
+  - 但 `allowSkip=true`
+- 只要还没发送过内容，即使用户上次点过跳过，本次进入仍然会再次提示。
+- 用户一旦成功发送过任意内容，生产环境下引导将自动收起。
+- 本地联调可通过环境变量 `ONBOARDING_FORCE_SHOW=auto|true|false` 控制：
+  - `auto`：`NODE_ENV=development` 时每次进入都显示，但允许跳过
+  - `true`：总是显示且允许跳过
+  - `false`：严格按“是否发送过内容 + 进入次数”判断
+
 ### 2.5.1 `GET /api/onboarding/progress` 响应示例
 
 ```json
 {
   "progress": {
-    "current_day": 2,
-    "completed_days": [1],
-    "last_completed_at": "2026-03-27T08:00:00.000Z",
+    "current_day": 1,
+    "completed_days": [],
+    "last_completed_at": null,
     "metadata": {
       "guide": {
         "completedAt": null,
         "skippedAt": null,
-        "lastSeenStep": 1,
-        "version": "home-guide-v2"
+        "lastSeenStep": 0,
+        "version": "home-guide-v3",
+        "entryCount": 1,
+        "lastPresentedAt": "2026-03-28T08:00:00.000Z",
+        "lastEntryId": "home-entry-1"
       }
     }
   },
   "guide": {
-    "version": "home-guide-v2",
-    "welcomeTitle": "让爱莉轻轻带你熟悉这里吧",
-    "welcomeDescription": "第一次来到这里时，不需要一下子懂完所有事。先写下一句、再看看去向、最后了解安全边界，就已经很好了。",
-    "welcomePrimaryAction": "我想开始",
-    "welcomeSecondaryAction": "稍后再看",
+    "version": "home-guide-v3",
+    "welcomeTitle": "让爱莉陪你把第一张卡片写完吧",
+    "welcomeDescription": "第一次来到这里时，不用急着一下子懂完所有事。先照着引导完成欢迎卡片，再认识往世乐土与星海，就足够顺利地开始了。",
+    "welcomePrimaryAction": "跟着爱莉完成一遍",
+    "welcomeSecondaryAction": "这次先跳过",
     "steps": [
       {
-        "id": "welcome-value",
-        "title": "先把这一刻轻轻放下来",
-        "description": "这里最重要的不是写得多完整，而是你愿意开始。哪怕只有一句，也会被认真接住。",
-        "target": "composer",
-        "ctaText": "先写一句"
+        "id": "compose-welcome-card",
+        "title": "先跟着爱莉完成一张欢迎卡片",
+        "description": "这次会一步一步带你选心情、填标题、写誓言，再展开描述。只要照着系统给出的内容完成，就已经很好了。",
+        "target": "home.composer",
+        "ctaText": "开始填写"
       }
     ],
     "safetyCard": {
-      "title": "在开始之前，先知道这些就好",
+      "title": "开始前，记住这几件事就好",
       "bullets": [
-        "私密内容默认只对自己可见，不会进入星海。",
-        "公开内容会先经过审核，再决定是否展示给他人。",
-        "若你对结果有疑问，可以在后续流程里发起申诉。"
+        "只要还没有真正发送过内容，每次进入都会再次提示这份引导。",
+        "第一次进入且尚未发送内容时，这个入口引导不能跳过。",
+        "按系统模板完成欢迎卡片时，会走轻量通过路径，公开后可直接看到“已发送到星海”。"
       ],
-      "confirmText": "我已了解"
+      "confirmText": "我知道啦"
+    },
+    "display": {
+      "shouldShow": true,
+      "allowSkip": false,
+      "forceBlocking": true,
+      "reason": "first_entry_without_content",
+      "localDebugForceShow": false,
+      "showEveryEntryUntilFirstContent": true
+    },
+    "draftTemplate": {
+      "visibilityIntent": "public",
+      "expectedPublishStatus": "published",
+      "approvalHint": "欢迎卡片按系统给出的内容完成时，会走轻量自动通过路径。",
+      "moodExercise": {
+        "target": "composer.mood-strip",
+        "maxSelections": 2,
+        "presetOnly": true,
+        "sequence": [
+          {
+            "id": "pick-one-mood",
+            "instruction": "先任选一个已有的心情。",
+            "requiredSelectedCount": 1,
+            "allowCancel": false
+          },
+          {
+            "id": "clear-mood",
+            "instruction": "再取消刚刚的选择，感受一下它是可以撤回的。",
+            "requiredSelectedCount": 0,
+            "allowCancel": true
+          },
+          {
+            "id": "pick-two-moods",
+            "instruction": "最后从已有心情里选满两个，完成这一步。",
+            "requiredSelectedCount": 2,
+            "allowCancel": true
+          }
+        ]
+      },
+      "fields": [
+        {
+          "key": "moodPhrase",
+          "label": "标题",
+          "value": "Hello Elysia！",
+          "target": "composer.title",
+          "helperText": "请直接按这个标题填写。"
+        },
+        {
+          "key": "quote",
+          "label": "誓言",
+          "value": "欢迎来到往世乐土！",
+          "target": "composer.quote",
+          "helperText": "请直接按这个誓言填写。"
+        },
+        {
+          "key": "description",
+          "label": "描述",
+          "value": "嗨，既然你来了，就把第一缕心情放心交给我吧，往后的回声，我会陪你一起听。",
+          "target": "composer.description",
+          "helperText": "先展开描述，再把系统提供的欢迎语填写进去。"
+        }
+      ]
+    },
+    "featureTour": [
+      {
+        "id": "home-bottom-elysian-realm",
+        "title": "主界面下方的往世乐土",
+        "description": "这里会留着你的记录与脉络入口，方便你继续回看和延展。",
+        "target": "home.bottom.elysian-realm",
+        "interaction": "observe"
+      },
+      {
+        "id": "nav-universe-entry",
+        "title": "从左上角前往星海",
+        "description": "左上角的入口要能把用户带去星海视图。",
+        "target": "nav.universe",
+        "interaction": "tap"
+      }
+    ],
+    "statusGlossary": [
+      {
+        "status": "published",
+        "label": "已发送到星海",
+        "description": "公开内容已经进入星海，可以被他人看见。"
+      },
+      {
+        "status": "pending_manual",
+        "label": "等待温柔审核",
+        "description": "内容正在排队审核，结果会很快回来。"
+      },
+      {
+        "status": "private",
+        "label": "只留给自己",
+        "description": "这条记录只会留在你的往世乐土里，不会进入星海。"
+      }
+    ],
+    "contentState": {
+      "hasSentAnyContent": false,
+      "sentContentCount": 0
     },
     "state": {
       "completedAt": null,
       "skippedAt": null,
-      "lastSeenStep": 1,
-      "version": "home-guide-v2",
-      "canReplay": true
+      "lastSeenStep": 0,
+      "version": "home-guide-v3",
+      "canReplay": true,
+      "entryCount": 1,
+      "lastPresentedAt": "2026-03-28T08:00:00.000Z",
+      "lastEntryId": "home-entry-1"
     }
   },
   "tasks": [
@@ -148,6 +269,10 @@
     "shouldShow": false,
     "headline": null,
     "body": null
+  },
+  "contentState": {
+    "hasSentAnyContent": false,
+    "sentContentCount": 0
   }
 }
 ```
@@ -158,9 +283,15 @@
 {
   "completedAt": "2026-03-27T09:00:00.000Z",
   "lastSeenStep": 2,
-  "version": "home-guide-v2"
+  "version": "home-guide-v3"
 }
 ```
+
+补充约定：
+
+- 若当前响应里 `guide.display.forceBlocking=true`，前端不应展示跳过按钮。
+- 此时如果仍调用 `PATCH /api/onboarding/guide-state` 并传 `skippedAt`，服务端会返回 `409 + ONBOARDING_SKIP_DISABLED`。
+- `entryId` 应由前端在每次真正“进入 Home 页面”时生成一次，并在该次页面生命周期内复用，避免一次进入重复累计 `entryCount`。
 
 ### 2.5.3 `GET /api/nudges/recommendations` 说明
 

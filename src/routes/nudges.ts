@@ -2,51 +2,14 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { requireUser } from "../lib/auth.js";
 import { query } from "../lib/db.js";
-
-const guideVersion = "home-guide-v2";
-
-const guideContent = {
-  version: guideVersion,
-  welcomeTitle: "让爱莉轻轻带你熟悉这里吧",
-  welcomeDescription:
-    "第一次来到这里时，不需要一下子懂完所有事。先写下一句、再看看去向、最后了解安全边界，就已经很好了。",
-  welcomePrimaryAction: "我想开始",
-  welcomeSecondaryAction: "稍后再看",
-  steps: [
-    {
-      id: "welcome-value",
-      title: "先把这一刻轻轻放下来",
-      description: "这里最重要的不是写得多完整，而是你愿意开始。哪怕只有一句，也会被认真接住。",
-      target: "composer",
-      ctaText: "先写一句",
-    },
-    {
-      id: "feature-map",
-      title: "想怎么走，都可以慢慢决定",
-      description:
-        "Home 适合记录当下，Universe 适合看见共鸣，MindMap 适合回望脉络。你不用立刻选定一种方式。",
-      target: "navigation",
-      ctaText: "继续看看",
-    },
-    {
-      id: "status-safety",
-      title: "每一步都会有清楚说明",
-      description:
-        "私密内容只留给你自己，公开内容会经过审核。若遇到误判，也保留了申诉与回看的空间。",
-      target: "status-card",
-      ctaText: "我明白了",
-    },
-  ],
-  safetyCard: {
-    title: "在开始之前，先知道这些就好",
-    bullets: [
-      "私密内容默认只对自己可见，不会进入星海。",
-      "公开内容会先经过审核，再决定是否展示给他人。",
-      "若你对结果有疑问，可以在后续流程里发起申诉。",
-    ],
-    confirmText: "我已了解",
-  },
-} as const;
+import {
+  buildGuideContent,
+  buildGuideDisplayState,
+  guideSteps,
+  guideVersion,
+  normalizeGuideState,
+  shouldForceOnboardingGuideForTesting,
+} from "../lib/onboarding-guide.js";
 
 const onboardingTasks = [
   {
@@ -176,29 +139,6 @@ const nudgeRecommendationQuerySchema = z.object({
 
 type NudgeScene = keyof typeof sceneNudges;
 
-type GuideState = {
-  completedAt: string | null;
-  skippedAt: string | null;
-  lastSeenStep: number;
-  version: string;
-  canReplay: boolean;
-};
-
-function normalizeGuideState(metadata: unknown): GuideState {
-  const source = metadata && typeof metadata === "object" ? (metadata as Record<string, unknown>) : {};
-  const rawGuide = source.guide;
-  const guide = rawGuide && typeof rawGuide === "object" ? (rawGuide as Record<string, unknown>) : {};
-  const lastSeenStep = Number.isFinite(Number(guide.lastSeenStep)) ? Number(guide.lastSeenStep) : 0;
-
-  return {
-    completedAt: typeof guide.completedAt === "string" ? guide.completedAt : null,
-    skippedAt: typeof guide.skippedAt === "string" ? guide.skippedAt : null,
-    lastSeenStep: Math.max(0, Math.min(lastSeenStep, guideContent.steps.length - 1)),
-    version: typeof guide.version === "string" ? guide.version : guideVersion,
-    canReplay: true,
-  };
-}
-
 function buildRestartSuggestion(currentDay: number, lastCompletedAt: string | null) {
   if (!lastCompletedAt) {
     return {
@@ -278,6 +218,11 @@ export async function nudgeRoutes(app: FastifyInstance): Promise<void> {
     if (!user) {
       return;
     }
+    const parsedQuery = z
+      .object({
+        entryId: z.string().trim().min(1).max(128).optional(),
+      })
+      .parse(req.query);
 
     await query(
       `
@@ -302,19 +247,99 @@ export async function nudgeRoutes(app: FastifyInstance): Promise<void> {
       [user.id],
     );
 
-    const progress = row.rows[0];
-    const guideState = normalizeGuideState(progress.metadata);
+    const progress = row.rows[0] ?? {
+      current_day: 1,
+      completed_days: [] as number[],
+      last_completed_at: null,
+      metadata: {},
+    };
+    let guideState = normalizeGuideState(progress.metadata);
+    const contentStats = await query<{ sent_count: string }>(
+      `
+        SELECT COUNT(*)::text AS sent_count
+        FROM records
+        WHERE user_id = $1
+      `,
+      [user.id],
+    );
+    const sentContentCount = Number(contentStats.rows[0]?.sent_count ?? "0");
+    const hasSentAnyContent = sentContentCount > 0;
+    const entryId = parsedQuery.entryId?.trim() || null;
+    const shouldCountThisEntry =
+      !hasSentAnyContent
+      && (entryId ? guideState.lastEntryId !== entryId : true);
+
+    if (shouldCountThisEntry) {
+      const nowIso = new Date().toISOString();
+      const nextGuidePatch = {
+        entryCount: guideState.entryCount + 1,
+        lastPresentedAt: nowIso,
+        lastEntryId: entryId,
+        version: guideVersion,
+      };
+
+      await query(
+        `
+          UPDATE onboarding_progress
+          SET
+            metadata = jsonb_set(
+              metadata,
+              '{guide}',
+              COALESCE(metadata->'guide', '{}'::jsonb) || $2::jsonb,
+              true
+            ),
+            updated_at = NOW()
+          WHERE user_id = $1
+        `,
+        [user.id, JSON.stringify(nextGuidePatch)],
+      );
+
+      guideState = {
+        ...guideState,
+        ...nextGuidePatch,
+      };
+    }
+
+    const rawMetadata =
+      progress.metadata && typeof progress.metadata === "object"
+        ? (progress.metadata as Record<string, unknown>)
+        : {};
+    const rawGuide =
+      rawMetadata.guide && typeof rawMetadata.guide === "object"
+        ? (rawMetadata.guide as Record<string, unknown>)
+        : {};
+    const display = buildGuideDisplayState({
+      hasSentAnyContent,
+      entryCount: guideState.entryCount,
+      localDebugForceShow: shouldForceOnboardingGuideForTesting(),
+    });
+    const guide = buildGuideContent({
+      state: guideState,
+      display,
+      hasSentAnyContent,
+      sentContentCount,
+    });
 
     return {
-      progress,
-      guide: {
-        ...guideContent,
-        state: guideState,
+      progress: {
+        ...progress,
+        metadata: {
+          ...rawMetadata,
+          guide: {
+            ...rawGuide,
+            ...guideState,
+          },
+        },
       },
+      guide,
       tasks: onboardingTasks,
       targetTimeSeconds: 60,
       entryContext: buildEntryContext(user.accessStatus),
       restartSuggestion: buildRestartSuggestion(progress.current_day, progress.last_completed_at),
+      contentState: {
+        hasSentAnyContent,
+        sentContentCount,
+      },
     };
   });
 
@@ -361,8 +386,9 @@ export async function nudgeRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const nextCompletedDays = Array.from(new Set([...completedDays, body.day])).sort((left, right) => left - right);
-    const nextCurrentDay = body.day >= 7 ? 8 : body.day + 1;
-    const rewardAlreadyUnlocked = completedDays.includes(7);
+    const maxOnboardingDay = onboardingTasks.length;
+    const nextCurrentDay = Math.min(body.day + 1, maxOnboardingDay);
+    const rewardAlreadyUnlocked = completedDays.includes(maxOnboardingDay);
 
     await query(
       `
@@ -379,7 +405,7 @@ export async function nudgeRoutes(app: FastifyInstance): Promise<void> {
       [user.id, nextCurrentDay, nextCompletedDays, JSON.stringify(body.evidence ?? {})],
     );
 
-    if (body.day === 7 && !rewardAlreadyUnlocked) {
+    if (body.day === maxOnboardingDay && !rewardAlreadyUnlocked) {
       await query(
         `
           INSERT INTO notifications (user_id, category, title, body)
@@ -410,7 +436,7 @@ export async function nudgeRoutes(app: FastifyInstance): Promise<void> {
       .object({
         completedAt: z.string().datetime().nullable().optional(),
         skippedAt: z.string().datetime().nullable().optional(),
-        lastSeenStep: z.coerce.number().int().min(0).max(guideContent.steps.length - 1).optional(),
+        lastSeenStep: z.coerce.number().int().min(0).max(guideSteps.length - 1).optional(),
         version: z.string().trim().min(1).max(64).optional(),
       })
       .refine(
@@ -422,6 +448,39 @@ export async function nudgeRoutes(app: FastifyInstance): Promise<void> {
         { message: "至少需要更新一个导览状态字段。" },
       )
       .parse(req.body);
+
+    if (body.skippedAt) {
+      const current = await query<{ metadata: unknown }>(
+        `
+          SELECT metadata
+          FROM onboarding_progress
+          WHERE user_id = $1
+        `,
+        [user.id],
+      );
+      const sentContent = await query<{ sent_count: string }>(
+        `
+          SELECT COUNT(*)::text AS sent_count
+          FROM records
+          WHERE user_id = $1
+        `,
+        [user.id],
+      );
+      const currentGuideState = normalizeGuideState(current.rows[0]?.metadata ?? {});
+      const display = buildGuideDisplayState({
+        hasSentAnyContent: Number(sentContent.rows[0]?.sent_count ?? "0") > 0,
+        entryCount: currentGuideState.entryCount,
+        localDebugForceShow: shouldForceOnboardingGuideForTesting(),
+      });
+
+      if (display.forceBlocking) {
+        reply.code(409).send({
+          message: "首次进入且尚未发送任何内容时，当前引导不能跳过。",
+          code: "ONBOARDING_SKIP_DISABLED",
+        });
+        return;
+      }
+    }
 
     const patch: Record<string, unknown> = {};
     if (body.completedAt !== undefined) {
@@ -435,6 +494,8 @@ export async function nudgeRoutes(app: FastifyInstance): Promise<void> {
     }
     if (body.version !== undefined) {
       patch.version = body.version;
+    } else {
+      patch.version = guideVersion;
     }
 
     await query(

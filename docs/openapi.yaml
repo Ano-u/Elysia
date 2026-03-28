@@ -10,6 +10,13 @@ paths:
   /onboarding/progress:
     get:
       summary: 查询新人引导与 7 天进度
+      parameters:
+        - in: query
+          name: entryId
+          schema:
+            type: string
+          description: |
+            前端在每次真正进入 Home 页面时生成一次，并在该次页面生命周期内复用。
       responses:
         '200':
           description: OK
@@ -694,6 +701,114 @@ components:
           type: string
         canReplay:
           type: boolean
+        entryCount:
+          type: integer
+        lastPresentedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastEntryId:
+          type: string
+          nullable: true
+    OnboardingGuideDisplay:
+      type: object
+      properties:
+        shouldShow:
+          type: boolean
+        allowSkip:
+          type: boolean
+        forceBlocking:
+          type: boolean
+        reason:
+          type: string
+          enum: [first_entry_without_content, returning_without_content, already_sent_content, local_debug]
+        localDebugForceShow:
+          type: boolean
+        showEveryEntryUntilFirstContent:
+          type: boolean
+    OnboardingGuideMoodExerciseStep:
+      type: object
+      properties:
+        id:
+          type: string
+        instruction:
+          type: string
+        requiredSelectedCount:
+          type: integer
+        allowCancel:
+          type: boolean
+    OnboardingGuideMoodExercise:
+      type: object
+      properties:
+        target:
+          type: string
+        maxSelections:
+          type: integer
+        presetOnly:
+          type: boolean
+        sequence:
+          type: array
+          items:
+            $ref: '#/components/schemas/OnboardingGuideMoodExerciseStep'
+    OnboardingGuideDraftField:
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        value:
+          type: string
+        target:
+          type: string
+        helperText:
+          type: string
+    OnboardingGuideDraftTemplate:
+      type: object
+      properties:
+        visibilityIntent:
+          type: string
+          enum: [private, public]
+        expectedPublishStatus:
+          type: string
+        approvalHint:
+          type: string
+        moodExercise:
+          $ref: '#/components/schemas/OnboardingGuideMoodExercise'
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/OnboardingGuideDraftField'
+    OnboardingGuideFeatureTourItem:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        target:
+          type: string
+        interaction:
+          type: string
+          enum: [tap, drag, zoom, observe]
+    OnboardingGuideStatusHint:
+      type: object
+      properties:
+        status:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+    OnboardingGuideContentState:
+      type: object
+      properties:
+        hasSentAnyContent:
+          type: boolean
+        sentContentCount:
+          type: integer
     OnboardingGuide:
       type: object
       properties:
@@ -713,6 +828,20 @@ components:
             $ref: '#/components/schemas/OnboardingGuideStep'
         safetyCard:
           $ref: '#/components/schemas/OnboardingGuideSafetyCard'
+        display:
+          $ref: '#/components/schemas/OnboardingGuideDisplay'
+        draftTemplate:
+          $ref: '#/components/schemas/OnboardingGuideDraftTemplate'
+        featureTour:
+          type: array
+          items:
+            $ref: '#/components/schemas/OnboardingGuideFeatureTourItem'
+        statusGlossary:
+          type: array
+          items:
+            $ref: '#/components/schemas/OnboardingGuideStatusHint'
+        contentState:
+          $ref: '#/components/schemas/OnboardingGuideContentState'
         state:
           $ref: '#/components/schemas/OnboardingGuideState'
     OnboardingTask:
@@ -788,6 +917,8 @@ components:
           $ref: '#/components/schemas/OnboardingEntryContext'
         restartSuggestion:
           $ref: '#/components/schemas/OnboardingRestartSuggestion'
+        contentState:
+          $ref: '#/components/schemas/OnboardingGuideContentState'
     OnboardingGuideStatePatchRequest:
       type: object
       minProperties: 1
