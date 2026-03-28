@@ -40,7 +40,7 @@ export const MoodStripSelector: React.FC<MoodStripSelectorProps> = ({
     <div className="flex flex-col items-center gap-6 w-full">
       <div
         className={twMerge(
-          "relative flex justify-start sm:justify-center items-center py-12 overflow-x-auto hide-scrollbar w-full max-w-full",
+          "relative flex justify-start sm:justify-center items-center py-12 overflow-visible hide-scrollbar w-full max-w-full",
           mode === "main"
             ? "-mx-8 px-8 sm:-mx-12 sm:px-12 lg:-mx-16 lg:px-16 gap-[8px]"
             : "px-4 gap-[10px]",
@@ -97,7 +97,7 @@ export const MoodStripSelector: React.FC<MoodStripSelectorProps> = ({
               }}
               style={{
                 width: stripWidth,
-                height: 260,
+                height: 240,
                 backgroundImage: "url('/mood-bg.webp')",
                 backgroundSize: bgSize,
                 backgroundPosition: `${bgPosX} ${bgPosY}`,
@@ -107,9 +107,9 @@ export const MoodStripSelector: React.FC<MoodStripSelectorProps> = ({
                 "relative flex flex-col items-center justify-center rounded-full border-2 transition-all duration-300 overflow-hidden",
                 reduceMotion
                   ? "bg-white/70 dark:bg-black/40 border-white/60 dark:border-white/10"
-                  : "bg-white/40 dark:bg-black/30 backdrop-blur-xl border-white/60 dark:border-white/10 shadow-[var(--shadow-crystal)]",
+                  : "bg-white/40 dark:bg-black/30 backdrop-blur-xl border-white/60 dark:border-white/10",
                 isSelected
-                  ? "border-pink-300/90 ring-4 ring-pink-400/40 scale-105 z-10 brightness-110 shadow-[0_0_24px_rgba(244,114,182,0.8)]"
+                  ? "border-pink-300/10 scale-105 z-10 brightness-110 shadow-[0_0_8px_2px_rgba(244,114,182,0.8)]"
                   : isRotating
                     ? "border-white/10 opacity-70 hover:opacity-90 hover:scale-[1.02] brightness-90 hover:brightness-100 grayscale-[0.2] shadow-sm"
                     : "border-white/20 opacity-80 hover:opacity-100 hover:scale-[1.02] brightness-95 hover:brightness-105 grayscale-[0.1] shadow-lg"

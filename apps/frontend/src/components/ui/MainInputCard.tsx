@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LiquidCard } from "./LiquidCard";
 import { ChevronDown, ChevronUp, Quote } from "lucide-react";
@@ -12,6 +12,7 @@ interface MainInputCardProps {
   description: string;
   setDescription: (value: string) => void;
   isPending?: boolean;
+  applicationHint?: string | null;
 }
 
 const COMPANION_MESSAGES = [
@@ -55,6 +56,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
   description,
   setDescription,
   isPending,
+  applicationHint,
 }) => {
   const editorAreaRef = useRef<HTMLDivElement>(null);
   const quoteInputRef = useRef<HTMLInputElement>(null);
@@ -70,7 +72,8 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
   const isComposerExpanded = isFocused || isQuoteFocused || isDescFocused;
   const isLanding = !hasValue && !isComposerExpanded;
   const isCompact = hasValue && !isComposerExpanded;
-  const ambientMessages = isPending ? WAITING_MESSAGES : hasValue ? GUIDANCE_MESSAGES : COMPANION_MESSAGES;
+  const HINT_MESSAGES = useMemo(() => (applicationHint ? [applicationHint] : []), [applicationHint]);
+  const ambientMessages = applicationHint ? HINT_MESSAGES : isPending ? WAITING_MESSAGES : hasValue ? GUIDANCE_MESSAGES : COMPANION_MESSAGES;
   const ambientMessage = useRotatingCopy(ambientMessages, 15000, ambientMessages.length > 1);
 
   const isTargetInsideEditor = (target: EventTarget | null): boolean => {
