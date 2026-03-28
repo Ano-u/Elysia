@@ -222,6 +222,131 @@ function safeDecrypt(value: string): string {
 }
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
+  app.get("/admin/records/deleted", async (req, reply) => {
+    const admin = await requireAdmin(req, reply);
+    if (!admin) {
+      return;
+    }
+
+    const q = z
+      .object({
+        limit: z.coerce.number().int().min(1).max(200).default(80),
+      })
+      .parse(req.query);
+
+    const rows = await query<{
+      id: string;
+      user_id: string;
+      mood_phrase: string;
+      visibility_intent: "private" | "public";
+      publication_status: string;
+      deleted_at: string;
+      created_at: string;
+      updated_at: string;
+      display_name: string;
+      username: string;
+    }>(
+      `
+        SELECT
+          r.id,
+          r.user_id,
+          r.mood_phrase,
+          r.visibility_intent,
+          r.publication_status,
+          r.deleted_at,
+          r.created_at,
+          r.updated_at,
+          u.display_name,
+          u.username
+        FROM records r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.deleted_at IS NOT NULL
+        ORDER BY r.deleted_at DESC
+        LIMIT $1
+      `,
+      [q.limit],
+    );
+
+    return {
+      items: rows.rows,
+    };
+  });
+
+  app.post("/admin/records/:id/restore", async (req, reply) => {
+    const admin = await requireAdmin(req, reply);
+    if (!admin) {
+      return;
+    }
+
+    const params = z.object({ id: z.string().uuid() }).parse(req.params);
+    const body = z
+      .object({
+        note: z.string().trim().max(500).optional(),
+      })
+      .parse(req.body ?? {});
+    const note = body.note && body.note.length > 0 ? body.note : "管理员恢复已删除记录";
+
+    const restored = await withTransaction(async (client) => {
+      const row = await client.query<{
+        id: string;
+        user_id: string;
+        publication_status: string;
+      }>(
+        `
+          UPDATE records
+          SET
+            deleted_at = NULL,
+            is_public = FALSE,
+            publication_status = CASE
+              WHEN publication_status = 'published' THEN 'private'
+              ELSE publication_status
+            END,
+            updated_at = NOW(),
+            review_notes = COALESCE($2, review_notes)
+          WHERE id = $1
+            AND deleted_at IS NOT NULL
+          RETURNING id, user_id, publication_status
+        `,
+        [params.id, note],
+      );
+
+      if (row.rowCount !== 1) {
+        return null;
+      }
+
+      await resolveModerationQueue(client, {
+        adminId: admin.id,
+        targetType: "record",
+        targetId: params.id,
+      });
+
+      return row.rows[0];
+    });
+
+    if (!restored) {
+      reply.code(404).send({ message: "未找到可恢复的删除记录" });
+      return;
+    }
+
+    await writeAuditLog({
+      actorUserId: admin.id,
+      action: "record.restore",
+      targetType: "record",
+      targetId: params.id,
+      payload: {
+        restoredUserId: restored.user_id,
+        publicationStatus: restored.publication_status,
+        note,
+      },
+    });
+
+    return {
+      ok: true,
+      id: params.id,
+      publicationStatus: restored.publication_status,
+    };
+  });
+
   app.get("/admin/moderation/queue", async (req, reply) => {
     const admin = await requireAdmin(req, reply);
     if (!admin) {

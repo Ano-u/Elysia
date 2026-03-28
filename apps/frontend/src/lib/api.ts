@@ -13,12 +13,15 @@ export class ApiError extends Error {
 }
 
 export const fetchApi = async <T>(url: string, options?: RequestInit): Promise<T> => {
+  const hasBody = typeof options?.body !== 'undefined';
+  const headers = {
+    ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+    ...options?.headers,
+  };
+
   const response = await fetch(url, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
+    headers,
   });
 
   let data;

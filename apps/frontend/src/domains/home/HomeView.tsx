@@ -5,7 +5,11 @@ import { useUiStore } from "../../store/uiStore";
 import { LiquidCard } from "../../components/ui/LiquidCard";
 import { MainInputCard } from "../../components/ui/MainInputCard";
 import { HomeGuideOverlay, type HomeGuideStepContent } from "../../components/ui/HomeGuideOverlay";
+import { MoodStripSelector } from "../../components/ui/MoodStripSelector";
+import { AsymmetricTogglePanel } from "../../components/ui/AsymmetricTogglePanel";
+import { NavIconButton } from "../../components/ui/NavIconButton";
 import {
+  deleteRecord,
   createRecord,
   getHomeFeed,
   getOnboardingProgress,
@@ -16,7 +20,7 @@ import {
   completeOnboardingDay,
 } from "../../lib/apiClient";
 import type { RecordSummary, VisibilityIntent, CreateRecordRequest } from "../../types/api";
-import { Clock, PenLine, Loader, Check, X, Lock, Compass, Eye, AlertTriangle, Tag as TagIcon, Quote, ListChevronsUpDown } from "lucide-react";
+import { Clock, PenLine, Loader, Check, X, Trash2, Lock, Compass, Eye, AlertTriangle, Tag as TagIcon, Quote, ListChevronsUpDown } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { pickRandomCopy, useRotatingCopy } from "../../lib/rotatingCopy";
 import { getCreateSuccessMessage, getPublicationStatusMeta, type PublicationTone } from "../../lib/publicationCopy";
@@ -233,7 +237,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
     queryKey: ["mood-options"],
     queryFn: getMoodOptions,
   });
-
   const guideStorageKey = `${GUIDE_COMPLETED_STORAGE_PREFIX}:${viewerUserId ?? "anonymous"}`;
   const isGuideVisible = guideMode !== "hidden";
   const isGuideSpotlight = guideMode === "spotlight";
@@ -878,6 +881,18 @@ const TimelineCard: React.FC<{ item: RecordSummary; moodOptions?: { primary: str
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteRecord(currentItem.id),
+    onSuccess: () => {
+      setIsEditing(false);
+      queryClient.invalidateQueries({ queryKey: ["home-feed"] });
+      queryClient.invalidateQueries({ queryKey: ["universe"] });
+    },
+    onError: (error) => {
+      setEditFeedback(resolveCreateErrorMessage(error));
+    },
+  });
+
   useEffect(() => {
     if (isEditing) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -985,7 +1000,25 @@ const TimelineCard: React.FC<{ item: RecordSummary; moodOptions?: { primary: str
     });
   };
 
-  const actionBusy = visibilityMutation.isPending || editMutation.isPending;
+  const handleDelete = () => {
+    if (deleteMutation.isPending) {
+      return;
+    }
+
+    if (isMockItem) {
+      setEditFeedback("测试记录暂不支持删除哦♪");
+      return;
+    }
+
+    const confirmed = window.confirm("确定删除这条日记吗？删除后请联系管理员恢复。");
+    if (!confirmed) {
+      return;
+    }
+
+    deleteMutation.mutate();
+  };
+
+  const actionBusy = visibilityMutation.isPending || editMutation.isPending || deleteMutation.isPending;
   const badgeInfo = getStatusBadgeInfo(publicationMeta.tone);
 
   return (
@@ -1055,43 +1088,28 @@ const TimelineCard: React.FC<{ item: RecordSummary; moodOptions?: { primary: str
               />
             </div>
 
-            
-
             <div className="flex items-center justify-between mt-2">
-              <label className="flex items-center gap-2 cursor-pointer group/toggle">
-                <div className={`relative w-8 h-4 rounded-full transition-colors duration-300 ${editIsPublic ? 'bg-pink-400 dark:bg-pink-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
-                  <div className={`absolute left-0.5 top-0.5 w-3 h-3 rounded-full bg-white transition-transform duration-300 shadow-sm ${editIsPublic ? 'translate-x-4' : 'translate-x-0'}`} />
-                </div>
-                <input
-                  type="checkbox"
-                  className="hidden"
-                  checked={editIsPublic}
-                  onChange={(e) => setEditIsPublic(e.target.checked)}
-                />
-                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 group-hover/toggle:text-slate-700 dark:group-hover/toggle:text-slate-200 transition-colors">
-                  {editIsPublic ? "公开日记" : "私密日记"}
-                </span>
-              </label>
-
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
+                <NavIconButton
+                  icon={<Trash2 className="w-4 h-4 text-slate-400 group-hover:text-rose-500 transition-colors" />}
+                  label={deleteMutation.isPending ? "删除中" : "删除"}
+                  onClick={handleDelete}
+                  isActive={false}
+                />
+                <NavIconButton
+                  icon={<X className="w-4 h-4 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors" />}
+                  label="取消"
                   onClick={handleEditCancel}
-                  className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/85 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-white dark:border-white/20 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/20"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  取消
-                </button>
-                <button
-                  type="button"
-                  onClick={handleEditSave}
-                  disabled={editMutation.isPending}
-                  className="inline-flex items-center gap-1 rounded-full border border-emerald-200/80 bg-emerald-50/90 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-300/20 dark:bg-emerald-500/20 dark:text-emerald-200 dark:hover:bg-emerald-500/30"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  {editMutation.isPending ? "提交中..." : "提交修改"}
-                </button>
+                  isActive={false}
+                />
               </div>
+
+              <AsymmetricTogglePanel
+                currentState={editIsPublic ? "universe" : "mindmap"}
+                onStateChange={(newState) => setEditIsPublic(newState === "universe")}
+                onSubmit={handleEditSave}
+                isPending={editMutation.isPending}
+              />
             </div>
           </div>
         ) : (
@@ -1157,10 +1175,6 @@ const TimelineCard: React.FC<{ item: RecordSummary; moodOptions?: { primary: str
     </div>
   );
 };
-
-import { MoodStripSelector } from "../../components/ui/MoodStripSelector";
-import { AsymmetricTogglePanel } from "../../components/ui/AsymmetricTogglePanel";
-
 const MainMoodSelector: React.FC<{
   moodOptions: { primary: string[]; rotating: string[]; extra: string[] } | undefined;
   extraEmotions: string[];

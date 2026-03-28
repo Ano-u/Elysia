@@ -226,6 +226,7 @@ async function loadMindMapRecords(args: {
       LEFT JOIN comments c ON c.derived_record_id = r.id
       LEFT JOIN records parent ON parent.id = c.parent_record_id
       WHERE r.user_id = $1
+        AND r.deleted_at IS NULL
         AND ($2::uuid[] IS NULL OR r.id = ANY($2::uuid[]))
         AND ($3::uuid = $1 OR (r.is_public = TRUE AND r.publication_status = 'published'))
       ORDER BY r.created_at DESC
@@ -362,6 +363,7 @@ async function loadMindMapContextRecordIds(args: {
         SELECT id, mood_phrase
         FROM records
         WHERE id = $1
+          AND deleted_at IS NULL
       ),
       target_tags AS (
         SELECT DISTINCT tag
@@ -385,6 +387,7 @@ async function loadMindMapContextRecordIds(args: {
         JOIN records child ON child.id = c.derived_record_id
         WHERE c.parent_record_id = $1
           AND child.user_id = $2
+          AND child.deleted_at IS NULL
           AND ($3::uuid = $2 OR (child.is_public = TRUE AND child.publication_status = 'published'))
         ORDER BY child.created_at DESC
         LIMIT 24
@@ -394,6 +397,7 @@ async function loadMindMapContextRecordIds(args: {
         FROM records r
         CROSS JOIN target t
         WHERE r.user_id = $2
+          AND r.deleted_at IS NULL
           AND r.id <> $1
           AND ($3::uuid = $2 OR (r.is_public = TRUE AND r.publication_status = 'published'))
           AND (
@@ -414,6 +418,7 @@ async function loadMindMapContextRecordIds(args: {
         SELECT r.id AS record_id
         FROM records r
         WHERE r.user_id = $2
+          AND r.deleted_at IS NULL
           AND r.id <> $1
           AND ($3::uuid = $2 OR (r.is_public = TRUE AND r.publication_status = 'published'))
         ORDER BY r.created_at DESC
@@ -487,6 +492,7 @@ export async function mindmapRoutes(app: FastifyInstance): Promise<void> {
         SELECT id, user_id, mood_phrase, is_public, publication_status
         FROM records
         WHERE id = $1
+          AND deleted_at IS NULL
       `,
       [params.recordId],
     );

@@ -133,6 +133,7 @@ export async function loadReplyTargetMap(
       JOIN users u ON u.id = r.user_id
       LEFT JOIN record_quotes rq ON rq.record_id = r.id
       WHERE r.id = ANY($1::uuid[])
+        AND r.deleted_at IS NULL
         AND (
           (r.is_public = TRUE AND r.publication_status = 'published')
           OR ($2::uuid IS NOT NULL AND r.user_id = $2::uuid)
@@ -195,6 +196,7 @@ export async function loadRecordSummary(
       LEFT JOIN record_quotes rq ON rq.record_id = r.id
       LEFT JOIN locations loc ON loc.id = r.location_id
       WHERE r.id = $1
+        AND r.deleted_at IS NULL
       LIMIT 1
     `,
     [recordId],

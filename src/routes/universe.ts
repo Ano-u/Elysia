@@ -73,6 +73,7 @@ const universeSelectFrom = `
   LEFT JOIN comments c ON c.derived_record_id = r.id
   WHERE r.is_public = TRUE
     AND r.publication_status = 'published'
+    AND r.deleted_at IS NULL
 `;
 
 const universeGroupBy = `
@@ -149,6 +150,7 @@ export async function universeRoutes(app: FastifyInstance): Promise<void> {
           FROM record_tags rt
           JOIN records r ON r.id = rt.record_id
           WHERE r.user_id = $1
+            AND r.deleted_at IS NULL
             AND r.created_at > NOW() - INTERVAL '60 days'
           GROUP BY rt.tag
           ORDER BY COUNT(*) DESC

@@ -45,7 +45,7 @@ export const AsymmetricTogglePanel: React.FC<AsymmetricTogglePanelProps> = ({
     {
       id: "mindmap" as const,
       label: "记忆织网",
-      description: "编入私密织网",
+      description: "编入织网珍藏",
       iconSrc: "/svg/wreath-icon.svg",
       activeBg: "bg-white/10 dark:bg-black/20",
       activeText: "text-[#FFA6C9]",
@@ -55,7 +55,7 @@ export const AsymmetricTogglePanel: React.FC<AsymmetricTogglePanelProps> = ({
     {
       id: "universe" as const,
       label: "星海回响",
-      description: "汇入公开星海",
+      description: "汇入星海众愿",
       iconSrc: "/svg/crystal-icon.svg",
       activeBg: "bg-white/10 dark:bg-black/20",
       activeText: "text-blue-400",
@@ -93,7 +93,7 @@ export const AsymmetricTogglePanel: React.FC<AsymmetricTogglePanelProps> = ({
             backgroundPosition: ["0% 50%", "200% 50%"],
           }}
           transition={{
-            duration: isHovered ? 1.5 : 3,
+            duration: isHovered ? 3 : 0.5,
             ease: "linear",
             repeat: Infinity,
           }}
@@ -115,7 +115,7 @@ export const AsymmetricTogglePanel: React.FC<AsymmetricTogglePanelProps> = ({
               transition={springConfig}
               onClick={() => handleButtonClick(opt.id, isActive)}
               disabled={isPending}
-              title={!isActive ? opt.description : undefined}
+              title={opt.description}
               className={cn(
                 "group relative flex items-center justify-center transition-colors outline-none rounded-full shrink-0 h-12",
                 isActive

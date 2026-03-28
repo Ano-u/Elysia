@@ -63,7 +63,7 @@ export const NavIconButton: React.FC<NavIconButtonProps> = ({
           )}
         </div>
         <span
-          className={`pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] font-semibold ${
+          className={`pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] font-semibold min-w-[2em] text-center leading-tight whitespace-normal${
             isActive ? activeLabelColorClass : "text-slate-700 dark:text-slate-100"
           } transition-opacity duration-300 ${
             isHovered ? "opacity-100" : "opacity-0"
