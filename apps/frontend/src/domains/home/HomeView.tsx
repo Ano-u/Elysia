@@ -690,10 +690,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <div ref={composerGuideRef} className={`${guideTargetClass(0)} rounded-[2.25rem] w-full flex flex-col gap-6`}>
             {/* Emotions & Actions */}
             <div className="flex flex-col gap-6 px-6">
-              <div className="flex items-center gap-2">
+              {/* <div className="flex items-center gap-2">
                 <TagIcon className="w-5 h-5 text-slate-400" />
                 <span className="text-xs tracking-widest text-slate-500 uppercase font-black">情绪心境</span>
-              </div>
+              </div> */}
               <MainMoodSelector
                 moodOptions={moodOptionsData}
                 extraEmotions={draft.extraEmotions}
@@ -740,7 +740,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   >
                     <Info className="w-3.5 h-3.5" />
                     <div className="absolute bottom-full right-0 mb-2 w-[220px] p-3 text-xs leading-relaxed text-blue-100 bg-slate-900/90 backdrop-blur-md rounded-xl shadow-xl opacity-0 group-hover/hint:opacity-100 transition-opacity pointer-events-none z-50">
-                      为了保护你的小秘密，链接、地址和时间可能会做一点模糊处理呢♪
+                      在公开的星海里，要记得看好自己的小秘密呀 ♪
                     </div>
                   </motion.div>
                 )}

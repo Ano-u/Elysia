@@ -171,6 +171,30 @@ function normalizeForModeration(text: string): { normalized: string; compact: st
   return { normalized, compact, evasionSignals };
 }
 
+function hasHighlyRepetitiveContent(text: string): boolean {
+  if (!text) {
+    return false;
+  }
+
+  const compact = text.replace(/\s+/g, "");
+  if (compact.length < 24) {
+    return false;
+  }
+
+  if (/([\p{L}\p{N}])\1{7,}/u.test(compact)) {
+    return true;
+  }
+
+  if (/(.{2,8})\1{3,}/u.test(compact)) {
+    return true;
+  }
+
+  const chars = Array.from(compact);
+  const uniqueChars = new Set(chars).size;
+  const uniqueRatio = uniqueChars / chars.length;
+  return chars.length >= 30 && uniqueRatio <= 0.28;
+}
+
 function classifyLexiconMatch(labels: string[]): { level: RiskLevel; violationType: ViolationType; reason: string } {
   const serialized = labels.join(" ").toLowerCase();
   if (serialized.includes("politic") || serialized.includes("extrem")) {
@@ -400,6 +424,25 @@ export function assessModeration(input: {
         sensitiveLexiconLabels: [],
       };
     }
+  }
+
+  if (texts.some((text) => text.length > 0 && hasHighlyRepetitiveContent(text))) {
+    return {
+      decision: "escalate",
+      confidence: 0.5,
+      riskScore: 0.5,
+      riskLabels: ["repetitive_content", ...variants.evasionSignals],
+      reason: "内容疑似高度重复，进入中风险审核",
+      level: "medium",
+      baselineHighRisk: false,
+      violationType: "other",
+      requiresManualReview: Boolean(input.isCustomMood),
+      hasAdOrUrlRisk: false,
+      isCustomMood: Boolean(input.isCustomMood),
+      evasionSignals: variants.evasionSignals,
+      aiReviewRequired: Boolean(input.isCustomMood),
+      sensitiveLexiconLabels: [],
+    };
   }
 
   const publicSafety = input.isPublic ? assessPublicContentSafety(input) : { hasRisk: false, labels: [] as string[], reason: undefined };

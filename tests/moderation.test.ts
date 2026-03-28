@@ -38,4 +38,20 @@ describe("public content moderation", () => {
     expect(assessment.hasAdOrUrlRisk).toBe(true);
     expect(assessment.requiresManualReview).toBe(true);
   });
+
+  it("高度重复文本命中中风险规则", () => {
+    const assessment = assessModeration({
+      moodPhrase: "哈哈哈哈哈哈哈哈哈哈",
+      description: "重复重复重复重复重复重复重复重复重复重复",
+      quote: null,
+      extraEmotions: [],
+      tags: [],
+      isPublic: true,
+    });
+
+    expect(assessment.level).toBe("medium");
+    expect(assessment.riskScore).toBe(0.5);
+    expect(assessment.riskLabels).toContain("repetitive_content");
+    expect(assessment.decision).toBe("escalate");
+  });
 });
