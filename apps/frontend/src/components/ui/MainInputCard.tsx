@@ -21,17 +21,17 @@ const COMPANION_MESSAGES = [
   "往世乐土还安静着呢，有好多话想对我说的话，现在正合适哦 ♪",
   "不想前进的时候，就在这里停下脚步吧，爱莉会认真倾听的哟 ♪",
   "先写下一句吧，可爱的少女可是能完全读懂你的心哦 ♪",
-  "今天这份闪闪发光的心情，也想被我温柔地珍藏起来，对不对？",
+  "今天这份闪闪发光的心情，也想被珍藏起来，对不对？",
   "要是还没想好开场白，不如先把第一句话交给我吧 ♪",
   "这里只有你我二人，正适合把你心里的小秘密悄悄告诉我呀。",
   "不用心急，想到哪就写到哪，你的真心就已经足够动人啦 ♪",
   "今天的记忆，是想写给自己，还是作为前行的灯火呢？",
-  "若是有一点委屈，或者一点点想念我，全都可以交给爱莉哦～",
+  "若是有一点委屈，或者一点点想念，全都可以交给爱莉哦～",
   "悲伤与快乐都会在心底珍藏，慢慢来就好，我会一直在你身边 ♪",
 ];
 const GUIDANCE_MESSAGES = [
   "要不要再为这一切添上一点点绚丽的色彩呢？",
-  "这句已经如花朵般娇艳了呢，剩下的我们可以慢慢来哦。",
+  "这句话已经闪闪发光了呢，剩下的我们可以慢慢来哦。",
   "想让它在群星间闪耀，还是作为我们之间的小秘密？都由你决定哦 ♪",
   "你写下的每一个字，爱莉都会心怀感激地好好收下哟～",
   "这句话已经很让我心动啦，来，让我更深入地了解你一些吧？",
@@ -179,7 +179,7 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
 
         {/* Quote & Details Transformation */}
         <AnimatePresence>
-          {hasValue && (
+          {hasValue && (!isCompact || hasQuote || hasDescription || (extraEmotions && extraEmotions.length > 0)) && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
@@ -187,136 +187,140 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
               className="flex flex-col gap-8 overflow-hidden"
             >
               {/* Row 1: Quote */}
-              <div className="flex flex-col gap-3">
-                <AnimatePresence mode="wait">
-                  {!isCompact ? (
-                    <motion.div
-                      key="quote-input"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="flex flex-col gap-2 overflow-hidden"
-                    >
-                      <span className="text-[10px] tracking-widest text-slate-400 uppercase font-bold flex items-center gap-1">
-                        <Quote
-                          className="w-3 h-3"
-                          style={{ transform: 'scale(-1, -1)' }}
-                        /> 今日誓言
-                      </span>
-                      <input
-                        ref={quoteInputRef}
-                        type="text"
-                        maxLength={200}
-                        value={quote}
-                        onChange={(e) => setQuote(e.target.value)}
-                        onFocus={() => setIsQuoteFocused(true)}
-                        onBlur={(e) => {
-                          if (!isTargetInsideEditor(e.relatedTarget)) {
-                            setIsQuoteFocused(false);
-                          }
-                        }}
-                        placeholder="把这份无瑕的记忆交给我保管吧♪"
-                        className="w-full bg-white/30 dark:bg-black/40 border-none rounded-2xl px-5 py-3 text-base italic text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 transition-all shadow-inner"
-                      />
-                    </motion.div>
-                  ) : hasQuote ? (
-                    <motion.div
-                      key="quote-display"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      onClick={activateQuoteEditor}
-                      className="relative pl-6 py-1 cursor-pointer group overflow-hidden"
-                    >
-                      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-pink-300/60 rounded-full group-hover:bg-pink-400 transition-colors" />
-                      <p className="italic text-slate-600 dark:text-slate-300 text-base leading-relaxed">
-                        {quote}
-                      </p>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
-              </div>
-
-              {/* Row 2: Details */}
-              <div className="flex flex-col gap-3">
-                <AnimatePresence mode="wait">
-                  {!isCompact ? (
-                    <div className="flex flex-col gap-3">
-                      <motion.button
+              {(!isCompact || hasQuote) && (
+                <div className="flex flex-col gap-3">
+                  <AnimatePresence mode="wait">
+                    {!isCompact ? (
+                      <motion.div
+                        key="quote-input"
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
-                        onClick={() => {
-                          if (showDetails) {
-                            setShowDetails(false);
-                            setIsDescFocused(false);
-                            return;
-                          }
-                          activateDescriptionEditor();
-                        }}
-                        className="flex items-center gap-2 text-[10px] tracking-widest text-slate-400 uppercase font-bold hover:text-pink-400 transition-colors w-fit overflow-hidden"
+                        className="flex flex-col gap-2 overflow-hidden"
                       >
-                        {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                        再多告诉爱莉一点吧
-                      </motion.button>
+                        <span className="text-[10px] tracking-widest text-slate-400 uppercase font-bold flex items-center gap-1">
+                          <Quote
+                            className="w-3 h-3"
+                            style={{ transform: 'scale(-1, -1)' }}
+                          /> 今日誓言
+                        </span>
+                        <input
+                          ref={quoteInputRef}
+                          type="text"
+                          maxLength={200}
+                          value={quote}
+                          onChange={(e) => setQuote(e.target.value)}
+                          onFocus={() => setIsQuoteFocused(true)}
+                          onBlur={(e) => {
+                            if (!isTargetInsideEditor(e.relatedTarget)) {
+                              setIsQuoteFocused(false);
+                            }
+                          }}
+                          placeholder="把这份无瑕的记忆交给我保管吧♪"
+                          className="w-full bg-white/30 dark:bg-black/40 border-none rounded-2xl px-5 py-3 text-base italic text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 transition-all shadow-inner"
+                        />
+                      </motion.div>
+                    ) : hasQuote ? (
+                      <motion.div
+                        key="quote-display"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        onClick={activateQuoteEditor}
+                        className="relative pl-6 py-1 cursor-pointer group overflow-hidden"
+                      >
+                        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-pink-300/60 rounded-full group-hover:bg-pink-400 transition-colors" />
+                        <p className="italic text-slate-600 dark:text-slate-300 text-base leading-relaxed">
+                          {quote}
+                        </p>
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
+                </div>
+              )}
 
-                      <AnimatePresence>
-                        {showDetails && (
-                          <motion.div
-                            key="desc-input-area"
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="overflow-hidden"
-                          >
-                            <textarea
-                              ref={descriptionTextareaRef}
-                              value={description}
-                              maxLength={1000}
-                              onChange={(e) => setDescription(e.target.value)}
-                              onFocus={() => setIsDescFocused(true)}
-                              onBlur={(e) => {
-                                if (!isTargetInsideEditor(e.relatedTarget)) {
-                                  setIsDescFocused(false);
-                                }
-                              }}
-                              onClick={activateDescriptionEditor}
-                              placeholder="遇到烦心事了吗？不如深呼吸，让思绪像飞花一样飘散吧~ 需不需要我给你一点小灵感呢？♪"
-                              className={`w-full bg-white/30 dark:bg-black/40 border-none rounded-2xl px-5 py-4 text-sm text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 resize-none shadow-inner transition-[min-height] duration-300 ${
-                                isDescFocused ? "min-h-[140px]" : "min-h-[82px]"
-                              }`}
-                            />
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  ) : hasDescription ? (
-                    <motion.div
-                      key="desc-display"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-                      className="overflow-hidden"
-                    >
-                      <div
-                        onClick={activateDescriptionEditor}
-                        className="flex flex-col gap-2 pl-4 py-2 cursor-pointer group"
-                      >
-                        {description.split("\n").filter(p => p.trim()).map((p, i) => (
-                          <div key={i} className="relative text-slate-500 dark:text-slate-400 text-sm leading-relaxed break-words [overflow-wrap:anywhere]">
-                            <div className="absolute -left-4 top-2.5 w-1.5 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full group-hover:bg-pink-300 transition-colors" />
-                            {p}
-                          </div>
-                        ))}
+              {/* Row 2: Details */}
+              {(!isCompact || hasDescription) && (
+                <div className="flex flex-col gap-3">
+                  <AnimatePresence mode="wait">
+                    {!isCompact ? (
+                      <div className="flex flex-col gap-3">
+                        <motion.button
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          onClick={() => {
+                            if (showDetails) {
+                              setShowDetails(false);
+                              setIsDescFocused(false);
+                              return;
+                            }
+                            activateDescriptionEditor();
+                          }}
+                          className="flex items-center gap-2 text-[10px] tracking-widest text-slate-400 uppercase font-bold hover:text-pink-400 transition-colors w-fit overflow-hidden"
+                        >
+                          {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          再多告诉爱莉一点吧
+                        </motion.button>
+
+                        <AnimatePresence>
+                          {showDetails && (
+                            <motion.div
+                              key="desc-input-area"
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="overflow-hidden"
+                            >
+                              <textarea
+                                ref={descriptionTextareaRef}
+                                value={description}
+                                maxLength={1000}
+                                onChange={(e) => setDescription(e.target.value)}
+                                onFocus={() => setIsDescFocused(true)}
+                                onBlur={(e) => {
+                                  if (!isTargetInsideEditor(e.relatedTarget)) {
+                                    setIsDescFocused(false);
+                                  }
+                                }}
+                                onClick={activateDescriptionEditor}
+                                placeholder="遇到烦心事了吗？不如深呼吸，让思绪像飞花一样飘散吧~ 需不需要我给你一点小灵感呢？♪"
+                                className={`w-full bg-white/30 dark:bg-black/40 border-none rounded-2xl px-5 py-4 text-sm text-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-pink-200/50 resize-none shadow-inner transition-[min-height] duration-300 ${
+                                  isDescFocused ? "min-h-[140px]" : "min-h-[82px]"
+                                }`}
+                              />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
-              </div>
+                    ) : hasDescription ? (
+                      <motion.div
+                        key="desc-display"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                        className="overflow-hidden"
+                      >
+                        <div
+                          onClick={activateDescriptionEditor}
+                          className="flex flex-col gap-2 pl-4 py-2 cursor-pointer group"
+                        >
+                          {description.split("\n").filter(p => p.trim()).map((p, i) => (
+                            <div key={i} className="relative text-slate-500 dark:text-slate-400 text-sm leading-relaxed break-words [overflow-wrap:anywhere]">
+                              <div className="absolute -left-4 top-2.5 w-1.5 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full group-hover:bg-pink-300 transition-colors" />
+                              {p}
+                            </div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
+                </div>
+              )}
 
               {/* Row 3: Emotions */}
-              {extraEmotions && onToggleEmotion && (
+              {extraEmotions && onToggleEmotion && (!isCompact || extraEmotions.length > 0) && (
                 <div className="flex flex-col gap-3">
                   <AnimatePresence mode="wait">
                     {!isCompact ? (

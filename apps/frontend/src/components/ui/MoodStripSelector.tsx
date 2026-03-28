@@ -2,6 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { useUiStore } from "../../store/uiStore";
 
 interface MoodStripSelectorProps {
   mode?: "main" | "extra";
@@ -26,8 +27,10 @@ export const MoodStripSelector: React.FC<MoodStripSelectorProps> = ({
   onCustomMoodPhraseChange,
   customMoodError,
 }) => {
+  const reduceMotion = useUiStore((state) => state.reduceMotion);
+
   const getDisplayLabel = (tag: string) => {
-    if (tag === "custom") return "自定义情绪";
+    if (tag === "custom") return "其它···";
     return tag;
   };
 
@@ -100,16 +103,18 @@ export const MoodStripSelector: React.FC<MoodStripSelectorProps> = ({
               }}
               className={clsx(
                 "relative flex flex-col items-center justify-center rounded-full border-2 transition-all duration-300 overflow-hidden",
+                reduceMotion
+                  ? "bg-white/70 dark:bg-black/40 border-white/60 dark:border-white/10"
+                  : "bg-white/40 dark:bg-black/30 backdrop-blur-xl border-white/60 dark:border-white/10 shadow-[var(--shadow-crystal)]",
                 isSelected
                   ? "border-pink-300/90 ring-4 ring-pink-400/40 scale-105 z-10 brightness-110 shadow-[0_0_24px_rgba(244,114,182,0.8)]"
-                  : isRotating 
+                  : isRotating
                     ? "border-white/10 opacity-60 hover:opacity-80 hover:scale-[1.02] brightness-[0.7] hover:brightness-90 grayscale-[0.5] shadow-sm"
-                    : "border-white/20 opacity-80 hover:opacity-100 hover:scale-[1.02] brightness-[0.8] hover:brightness-100 grayscale-[0.3] shadow-lg"
+                    : "border-white/20 opacity-70 hover:opacity-90 hover:scale-[1.02] brightness-[0.8] hover:brightness-100 grayscale-[0.3] shadow-lg"
               )}
             >
-              <div className="absolute inset-0 bg-black/20 pointer-events-none mix-blend-overlay transition-opacity duration-300" />
-              <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/40 pointer-events-none" />
 
+              <div className={clsx("absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[100%] pointer-events-none blur-md transition-all duration-300 w-6 h-18 bg-black/60")}/>
               <span
                 style={{ writingMode: "vertical-rl" }}
                 className={clsx(
