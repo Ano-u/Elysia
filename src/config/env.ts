@@ -33,6 +33,22 @@ const envSchema = z.object({
   OIDC_SCOPE: z.string().default("openid profile"),
   CLOUDFLARE_TURNSTILE_SITE_KEY: z.string().optional(),
   CLOUDFLARE_TURNSTILE_SECRET: z.string().min(1).optional(),
+  ANALYSIS_ENABLED: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
+  ANALYSIS_CLUSTERING_ENABLED: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
+  ANALYZER_URL: z.string().url().default("http://127.0.0.1:8088"),
+  ANALYZER_INTERNAL_TOKEN: z.string().optional(),
+  ANALYZER_TIMEOUT_MS: z.coerce.number().int().positive().default(20_000),
+  ANALYSIS_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
+  ANALYSIS_LIGHT_BATCH_SIZE: z.coerce.number().int().positive().max(64).default(8),
+  ANALYSIS_IDLE_FREE_MEM_BYTES: z.coerce.number().int().positive().default(6 * 1024 * 1024 * 1024),
+  ANALYSIS_PUBLIC_RECLUSTER_INTERVAL_MINUTES: z.coerce.number().int().positive().default(360),
+  ANALYSIS_PERSONAL_RECLUSTER_INTERVAL_MINUTES: z.coerce.number().int().positive().default(720),
 });
 
 export const env = envSchema.parse(process.env);

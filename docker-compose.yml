@@ -57,11 +57,23 @@ services:
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/elysia
       REDIS_URL: redis://redis:6379
+      ANALYZER_URL: http://analyzer:8088
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      analyzer:
+        condition: service_started
+
+  analyzer:
+    build:
+      context: .
+      dockerfile: Dockerfile.analyzer
+    container_name: elysia-analyzer
+    environment:
+      ANALYZER_HOST: 0.0.0.0
+      ANALYZER_PORT: 8088
 
   caddy:
     image: caddy:2.8

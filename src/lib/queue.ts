@@ -7,5 +7,7 @@ const connection = {
 
 export const imageQueue = new Queue("image-process", { connection });
 export const embeddingQueue = new Queue("embedding-process", { connection });
+export const analysisBackfillQueue = new Queue("analysis-backfill", { connection });
+export const analysisReclusterQueue = new Queue("analysis-recluster", { connection });
 export const weeklyQueue = new Queue("weekly-insight", { connection });
 export const exportQueue = new Queue("export-process", { connection });
