@@ -5,7 +5,8 @@ import { ButterflyDecor } from "./ButterflyDecor";
 import { EmojiDock } from "./EmojiDock";
 import { useUiStore } from "../../store/uiStore";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { getUniverseViewport, toggleReaction, createReply, getRecord } from "../../lib/apiClient";
+import { getUniverseViewport, toggleReaction, createReply, getRecord, getMoodOptions } from "../../lib/apiClient";
+import { validateCustomMoodTagLength } from "../../lib/moodPhraseValidation";
 import { MainInputCard } from "../../components/ui/MainInputCard";
 import { AsymmetricTogglePanel } from "../../components/ui/AsymmetricTogglePanel";
 import { MoodStripSelector } from "../../components/ui/MoodStripSelector";
@@ -61,19 +62,6 @@ function resolveCollisions(
   return positions;
 }
 
-const EmotionSelector: React.FC<{
-  extraEmotions: string[];
-  onToggle: (tag: string) => void;
-}> = ({ extraEmotions, onToggle }) => (
-  <div className="flex flex-col gap-3 mb-6 mt-4">
-    <div className="flex items-center gap-2">
-      <TagIcon className="w-4 h-4 text-slate-400" />
-      <span className="text-[10px] tracking-widest text-slate-500 dark:text-slate-400 uppercase font-black">情绪心境</span>
-    </div>
-    <MoodStripSelector extraEmotions={extraEmotions} onToggle={onToggle} />
-  </div>
-);
-
 export const UniverseView: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [viewportSize, setViewportSize] = useState({
@@ -101,7 +89,7 @@ export const UniverseView: React.FC = () => {
   const scale = useMotionValue(1);
   const [showTooltip, setShowTooltip] = useState(true);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [openedCards, setOpenedCards] = useState<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const [openedCards, setOpenedCards] = useState<any[]>([]);
   // To track which card we are replying to
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
 
@@ -109,39 +97,71 @@ export const UniverseView: React.FC = () => {
   const [isReplying, setIsReplying] = useState(false);
   const [replyDraft, setReplyDraft] = useState({
     moodPhrase: "",
+    moodMode: "preset" as "preset" | "other_random" | "custom",
+    customMoodPhrase: "",
+    extraEmotions: [] as string[],
     quote: "",
     description: "",
-    extraEmotions: [] as string[],
     visibilityIntent: "public" as "public" | "private",
   });
 
+  const { data: moodOptions } = useQuery({
+    queryKey: ['moodOptions'],
+    queryFn: getMoodOptions,
+    staleTime: Infinity,
+  });
+  const primaryTags = moodOptions?.primary || [];
+  const rotatingTags = moodOptions?.rotating || [];
+
   const createMutation = useMutation({
-    mutationFn: (data: any) => createReply(replyingToId || '', data),
+    mutationFn: (data: Parameters<typeof createReply>[1]) => createReply(replyingToId || '', data),
     onSuccess: () => {
       setIsReplying(false);
       setReplyDraft({
         moodPhrase: "",
+        moodMode: "preset",
+        customMoodPhrase: "",
+        extraEmotions: [],
         quote: "",
         description: "",
-        extraEmotions: [],
         visibilityIntent: "public",
       });
     }
   });
 
+  const getCustomError = (val?: string) => {
+    if (!val) return null;
+    const res = validateCustomMoodTagLength(val);
+    return res.ok ? null : res.reason;
+  };
+
   const handleSaveReply = () => {
-    if (!replyDraft.moodPhrase.trim()) return;
+    const finalMood = replyDraft.moodPhrase.trim();
+    if (!finalMood) return;
+
+    if (replyDraft.extraEmotions.includes("custom")) {
+      const customVal = replyDraft.customMoodPhrase || "";
+      const customCheck = validateCustomMoodTagLength(customVal);
+      if (!customCheck.ok) {
+        setElysiaToast(customCheck.reason);
+        return;
+      }
+    }
+    
     createMutation.mutate({
-      content: replyDraft.moodPhrase,
-      moodPhrase: replyDraft.moodPhrase,
+      content: finalMood,
+      moodMode: replyDraft.moodMode,
+      customMoodPhrase: replyDraft.extraEmotions.includes("custom") ? replyDraft.customMoodPhrase : undefined,
+      moodPhrase: finalMood,
+      extraEmotions: replyDraft.extraEmotions.map(e => e === "custom" ? replyDraft.customMoodPhrase || "" : e).filter(Boolean),
       quote: replyDraft.quote,
       description: replyDraft.description,
-      extraEmotions: replyDraft.extraEmotions,
       isPublic: replyDraft.visibilityIntent === "public"
     });
   };
 
-  const selectedCardRef = useRef<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const selectedCardRef = useRef<any[]>([]);
   useEffect(() => {
     selectedCardRef.current = openedCards;
   }, [openedCards]);
@@ -280,6 +300,7 @@ export const UniverseView: React.FC = () => {
 
   useEffect(() => {
     if (!universeData?.items) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCachedCards(prev => {
       const existingIds = new Set(prev.map(p => p.id));
       const newItems = universeData.items.filter(item => !existingIds.has(item.id));
@@ -305,8 +326,16 @@ export const UniverseView: React.FC = () => {
 
       // 基于情绪标签的极坐标聚类偏移，使卡片更紧凑且有联系
       const tag = card.tags?.[0] || '';
+      
+      // 用 id 生成确定性的伪随机数 (0-1)
+      const hash1 = card.id.split("").reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0);
+      const hash2 = card.id.split("").reduce((acc: number, c: string, i: number) => acc + c.charCodeAt(0) * (i + 1), 0);
+      const rand1 = (hash1 % 1000) / 1000;
+      const rand2 = (hash2 % 1000) / 1000;
+      const rand3 = ((hash1 + hash2) % 1000) / 1000;
+      
       let clusterAngle = 0;
-      let clusterRadius = 150 + Math.random() * 80;
+      let clusterRadius = 150 + rand1 * 80;
 
       if (['开心', '喜悦', '治愈', '感动'].includes(tag)) {
         clusterAngle = -Math.PI / 4; // 右上方
@@ -318,12 +347,12 @@ export const UniverseView: React.FC = () => {
         clusterAngle = Math.PI / 4; // 右下方
       } else {
         // 默认混合在中心附近
-        clusterRadius = Math.random() * 100;
-        clusterAngle = Math.random() * Math.PI * 2;
+        clusterRadius = rand2 * 100;
+        clusterAngle = rand3 * Math.PI * 2;
       }
 
       // 添加随机角度扰动，让不同聚类相互渗透连接，避免空荡荡
-      clusterAngle += (Math.random() - 0.5) * 1.5;
+      clusterAngle += (rand1 - 0.5) * 1.5;
 
       x += Math.cos(clusterAngle) * clusterRadius;
       y += Math.sin(clusterAngle) * clusterRadius;
@@ -910,29 +939,55 @@ export const UniverseView: React.FC = () => {
                         回应这份心意
                       </h3>
 
-                      <MainInputCard
-                        moodPhrase={replyDraft.moodPhrase}
-                        setMoodPhrase={(v) => setReplyDraft({ ...replyDraft, moodPhrase: v })}
-                        quote={replyDraft.quote}
-                        setQuote={(v) => setReplyDraft({ ...replyDraft, quote: v })}
-                        description={replyDraft.description}
-                        setDescription={(v) => setReplyDraft({ ...replyDraft, description: v })}
-                        isPending={createMutation.isPending}
-                      />
-
-                      <div className="mt-6 flex flex-col gap-8 flex-1 justify-end pb-2">
-                        <EmotionSelector
-                          extraEmotions={replyDraft.extraEmotions}
+                      <div className="flex flex-col gap-3 mb-6">
+                        <div className="flex items-center gap-2">
+                          <TagIcon className="w-4 h-4 text-slate-400" />
+                          <span className="text-[10px] tracking-widest text-slate-500 dark:text-slate-400 uppercase font-black">情绪心境</span>
+                        </div>
+                        <MoodStripSelector
+                          items={[...primaryTags, ...rotatingTags, "custom"]}
+                          rotatingItems={rotatingTags}
+                          selectedItems={replyDraft.extraEmotions}
+                          customMoodPhrase={replyDraft.customMoodPhrase}
+                          customMoodError={replyDraft.extraEmotions.includes("custom") ? getCustomError(replyDraft.customMoodPhrase) : null}
+                          onCustomMoodPhraseChange={(val) => {
+                            setReplyDraft({ ...replyDraft, customMoodPhrase: val });
+                          }}
                           onToggle={(tag) => {
-                            const next = replyDraft.extraEmotions.includes(tag)
-                              ? replyDraft.extraEmotions.filter((t) => t !== tag)
-                              : replyDraft.extraEmotions.length < 8
-                                ? [...replyDraft.extraEmotions, tag]
-                                : replyDraft.extraEmotions;
-                            setReplyDraft({ ...replyDraft, extraEmotions: next });
+                            if (replyDraft.extraEmotions.includes(tag)) {
+                              setReplyDraft({
+                                ...replyDraft,
+                                extraEmotions: replyDraft.extraEmotions.filter(e => e !== tag),
+                                customMoodPhrase: tag === "custom" ? "" : replyDraft.customMoodPhrase
+                              });
+                            } else {
+                              if (replyDraft.extraEmotions.length >= 2) return;
+                              const newMode = tag === "custom" ? "custom" : rotatingTags.includes(tag) ? "other_random" : "preset";
+                              setReplyDraft({
+                                ...replyDraft,
+                                extraEmotions: [...replyDraft.extraEmotions, tag],
+                                moodMode: replyDraft.extraEmotions.includes("custom") || tag === "custom" ? "custom" : newMode
+                              });
+                            }
                           }}
                         />
+                      </div>
 
+                      <motion.div className="flex-1 w-full relative z-10 px-0 mb-6">
+                        <MainInputCard
+                          moodPhrase={replyDraft.moodPhrase}
+                          setMoodPhrase={(v) => {
+                            setReplyDraft({ ...replyDraft, moodPhrase: v });
+                          }}
+                          quote={replyDraft.quote}
+                          setQuote={(v) => setReplyDraft({ ...replyDraft, quote: v })}
+                          description={replyDraft.description}
+                          setDescription={(v) => setReplyDraft({ ...replyDraft, description: v })}
+                          isPending={createMutation.isPending}
+                        />
+                      </motion.div>
+
+                      <div className="mt-6 flex flex-col gap-8 flex-1 justify-end pb-2">
                         <div className="flex justify-end mt-4">
                           <AsymmetricTogglePanel
                             currentState={replyDraft.visibilityIntent === "public" ? "universe" : "mindmap"}

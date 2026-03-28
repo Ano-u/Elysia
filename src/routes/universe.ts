@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { query } from "../lib/db.js";
+import { redactOccurredAtToMonth, redactPublicText } from "../lib/public-redaction.js";
 
 type UniverseItem = {
   id: string;
@@ -102,10 +103,10 @@ function mapUniverseItem(row: UniverseItem, coord?: { x: number; y: number }, pe
     id: row.id,
     user_id: row.user_id,
     mood_phrase: row.mood_phrase,
-    description: row.description,
-    created_at: row.created_at,
+    description: redactPublicText(row.description),
+    created_at: redactOccurredAtToMonth(row.created_at) ?? row.created_at.slice(0, 7),
     is_public: row.is_public,
-    quote: row.quote,
+    quote: redactPublicText(row.quote),
     display_name: row.display_name,
     avatar_url: row.avatar_url,
     hearts: row.hearts,

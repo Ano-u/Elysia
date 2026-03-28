@@ -9,17 +9,18 @@ import {
   createRecord,
   getHomeFeed,
   getOnboardingProgress,
+  getMoodOptions,
   updateRecord,
   updateRecordVisibility,
   updateOnboardingGuideState,
   completeOnboardingDay,
 } from "../../lib/apiClient";
 import type { RecordSummary, VisibilityIntent, CreateRecordRequest } from "../../types/api";
-import { Clock, PenLine, Loader, Check, X, Lock, Compass, Eye, AlertTriangle, Tag as TagIcon, Quote, ListChevronsUpDown, Lightbulb } from "lucide-react";
+import { Clock, PenLine, Loader, Check, X, Lock, Compass, Eye, AlertTriangle, Tag as TagIcon, Quote, ListChevronsUpDown } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { pickRandomCopy, useRotatingCopy } from "../../lib/rotatingCopy";
 import { getCreateSuccessMessage, getPublicationStatusMeta, type PublicationTone } from "../../lib/publicationCopy";
-import { validateMoodPhraseLength } from "../../lib/moodPhraseValidation";
+import { validateMoodPhraseLength, validateCustomMoodTagLength } from "../../lib/moodPhraseValidation";
 
 const DRAFT_KEY = "elysia-home-draft-v3";
 const GUIDE_COMPLETED_STORAGE_PREFIX = "elysia-home-guide-completed-v1";
@@ -145,10 +146,12 @@ interface HomeViewProps {
 }
 
 type DraftPayload = {
+  moodMode?: "preset" | "other_random" | "custom";
+  customMoodPhrase?: string;
   moodPhrase: string;
+  extraEmotions: string[];
   quote: string;
   description: string;
-  extraEmotions: string[];
   occurredAt: string;
   visibilityIntent: VisibilityIntent;
 };
@@ -156,9 +159,10 @@ type DraftPayload = {
 function readInitialDraft(): DraftPayload {
   const emptyDraft: DraftPayload = {
     moodPhrase: "",
+    customMoodPhrase: "",
+    extraEmotions: [],
     quote: "",
     description: "",
-    extraEmotions: [],
     occurredAt: "",
     visibilityIntent: "private",
   };
@@ -167,7 +171,7 @@ function readInitialDraft(): DraftPayload {
   if (!raw) return emptyDraft;
   try {
     const parsed = JSON.parse(raw);
-    return { ...emptyDraft, ...parsed };
+    return { ...emptyDraft, extraEmotions: parsed.extraEmotions || [], ...parsed };
   } catch {
     return emptyDraft;
   }
@@ -194,8 +198,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
     return () => { if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current); };
   }, [feedbackMessage]);
 
-  const saveEventTokenRef = useRef(0);
-  const [saveAnimationEvent, setSaveAnimationEvent] = useState<{ token: number; status: "success" | "error" } | null>(null);
   const [guideMode, setGuideMode] = useState<"hidden" | "welcome" | "spotlight" | "safety">("hidden");
   const [guideStep, setGuideStep] = useState(0);
   const [guideTargetRect, setGuideTargetRect] = useState<DOMRect | null>(null);
@@ -227,8 +229,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
     queryFn: getOnboardingProgress,
   });
 
-  const mindMapProgress = onboardingData ? onboardingData.progress.completed_days.length : 0;
-  const isMindMapActive = mindMapProgress >= 7;
+  const { data: moodOptionsData } = useQuery({
+    queryKey: ["mood-options"],
+    queryFn: getMoodOptions,
+  });
 
   const guideStorageKey = `${GUIDE_COMPLETED_STORAGE_PREFIX}:${viewerUserId ?? "anonymous"}`;
   const isGuideVisible = guideMode !== "hidden";
@@ -293,11 +297,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
     closeGuide(true);
   };
 
-  const emitSaveAnimationEvent = (status: "success" | "error") => {
-    saveEventTokenRef.current += 1;
-    setSaveAnimationEvent({ token: saveEventTokenRef.current, status });
-  };
-
   const [completingTaskDay, setCompletingTaskDay] = useState<number | null>(null);
   const completeDayMutation = useMutation({
     mutationFn: (day: number) => completeOnboardingDay(day),
@@ -312,7 +311,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const createMutation = useMutation({
     mutationFn: (payload: CreateRecordRequest) => createRecord(payload),
     onSuccess: (response) => {
-      setDraft({ ...draft, moodPhrase: "", quote: "", description: "", extraEmotions: [] });
+      setDraft({ ...draft, moodPhrase: "", quote: "", description: "" });
       localStorage.removeItem(DRAFT_KEY);
       setFeedbackTone("success");
       setFeedbackMessage(getCreateSuccessMessage(response.publishStatus.status));
@@ -330,30 +329,39 @@ export const HomeView: React.FC<HomeViewProps> = ({
     },
   });
 
-  const handleEmotionToggle = (tag: string) => {
-    const next = draft.extraEmotions.includes(tag)
-      ? draft.extraEmotions.filter((t) => t !== tag)
-      : draft.extraEmotions.length < 8
-        ? [...draft.extraEmotions, tag]
-        : draft.extraEmotions;
-    setDraft({ ...draft, extraEmotions: next });
-    setFeedbackMessage(null);
+  const getCustomError = (val?: string) => {
+    if (!val) return null;
+    const res = validateCustomMoodTagLength(val);
+    return res.ok ? null : res.reason;
   };
 
   const handleSave = () => {
-    const moodPhrase = draft.moodPhrase.trim();
-    const moodCheck = validateMoodPhraseLength(moodPhrase);
+    const moodPhraseToSubmit = draft.moodPhrase;
+    const moodToValidate = moodPhraseToSubmit.trim();
+    const moodCheck = validateMoodPhraseLength(moodToValidate);
     if (!moodCheck.ok) {
       setFeedbackTone("error");
       setFeedbackMessage(moodCheck.reason);
       return;
     }
 
+    if (draft.extraEmotions.includes("custom")) {
+      const customVal = draft.customMoodPhrase || "";
+      const customCheck = validateCustomMoodTagLength(customVal);
+      if (!customCheck.ok) {
+        setFeedbackTone("error");
+        setFeedbackMessage(customCheck.reason);
+        return;
+      }
+    }
+
     createMutation.mutate({
-      moodPhrase,
+      moodMode: draft.moodMode,
+      customMoodPhrase: draft.extraEmotions.includes("custom") ? draft.customMoodPhrase : undefined,
+      moodPhrase: moodToValidate,
+      extraEmotions: draft.extraEmotions.map(e => e === "custom" ? draft.customMoodPhrase || "" : e).filter(Boolean),
       quote: draft.quote.trim() || undefined,
       description: draft.description.trim() || undefined,
-      extraEmotions: draft.extraEmotions.length ? draft.extraEmotions : undefined,
       isPublic: draft.visibilityIntent === "public",
     });
   };
@@ -381,6 +389,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     }
 
     if (shouldForceGuide) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setGuideStep(0);
       setGuideMode("welcome");
       return;
@@ -484,7 +493,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isGuideVisible, guideStorageKey]);
 
-  const hasComposerValue = draft.moodPhrase.trim().length > 0;
   const loadingMessage = useRotatingCopy(FEED_LOADING_MESSAGES, 10000, isFeedLoading);
   const feedErrorMessage = isFeedError ? resolveCreateErrorMessage(feedError) : null;
 
@@ -656,34 +664,45 @@ export const HomeView: React.FC<HomeViewProps> = ({
           )}
 
           <div ref={composerGuideRef} className={`${guideTargetClass(0)} rounded-[2.25rem] w-full flex flex-col gap-10`}>
-            <MainInputCard
-              moodPhrase={draft.moodPhrase}
-              setMoodPhrase={(v) => {
-                setDraft({ ...draft, moodPhrase: v });
-                setFeedbackMessage(null);
-              }}
-              quote={draft.quote}
-              setQuote={(v) => {
-                setDraft({ ...draft, quote: v });
-                setFeedbackMessage(null);
-              }}
-              description={draft.description}
-              setDescription={(v) => {
-                setDraft({ ...draft, description: v });
-                setFeedbackMessage(null);
-              }}
-              isPending={createMutation.isPending}
-            />
-
             {/* Emotions & Actions */}
-            {hasComposerValue ? (
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-end justify-between gap-6 px-6">
-                <EmotionSelector
-                  extraEmotions={draft.extraEmotions}
-                  onToggle={handleEmotionToggle}
-                />
+            <div className="flex flex-col gap-6 px-6">
+              <div className="flex items-center gap-2">
+                <TagIcon className="w-5 h-5 text-slate-400" />
+                <span className="text-xs tracking-widest text-slate-500 uppercase font-black">情绪心境</span>
               </div>
-              ) : null}
+              <MainMoodSelector
+                moodOptions={moodOptionsData}
+                extraEmotions={draft.extraEmotions}
+                customMoodPhrase={draft.customMoodPhrase}
+                customMoodError={draft.extraEmotions.includes("custom") ? getCustomError(draft.customMoodPhrase) : null}
+                onSelect={(emotions, customVal) => {
+                  const newMoodMode = emotions.includes("custom") ? "custom" : "preset";
+                  setDraft({ ...draft, extraEmotions: emotions, customMoodPhrase: customVal, moodMode: newMoodMode });
+                  setFeedbackMessage(null);
+                }}
+              />
+            </div>
+
+            <motion.div className="flex-1 w-full relative z-10 px-0">
+              <MainInputCard
+                moodPhrase={draft.moodPhrase}
+                setMoodPhrase={(v) => {
+                  setDraft({ ...draft, moodPhrase: v });
+                  setFeedbackMessage(null);
+                }}
+                quote={draft.quote}
+                setQuote={(v) => {
+                  setDraft({ ...draft, quote: v });
+                  setFeedbackMessage(null);
+                }}
+                description={draft.description}
+                setDescription={(v) => {
+                  setDraft({ ...draft, description: v });
+                  setFeedbackMessage(null);
+                }}
+                isPending={createMutation.isPending}
+              />
+            </motion.div>
 
             <div className="flex-1 min-w-0">
               <div className="flex-shrink-0 flex items-end justify-end mt-2 sm:mt-0 pb-3">
@@ -695,8 +714,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   }}
                   onSubmit={handleSave}
                   isPending={createMutation.isPending}
-                  mindMapProgress={mindMapProgress}
-                  isMindMapActive={isMindMapActive}
                 />
               </div>
             </div>
@@ -775,7 +792,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               </AnimatePresence>
             ) : (
               allItems.map((item) => (
-                <TimelineCard key={item.id} item={item} />
+                <TimelineCard key={item.id} item={item} moodOptions={moodOptionsData} />
               ))
             )}
           </div>
@@ -806,7 +823,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   );
 };
 
-const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
+const TimelineCard: React.FC<{ item: RecordSummary; moodOptions?: { primary: string[]; rotating: string[]; extra: string[] } }> = ({ item, moodOptions }) => {
   const queryClient = useQueryClient();
   const [mockSnapshot, setMockSnapshot] = useState<Partial<RecordSummary> | null>(null);
   const currentItem = mockSnapshot ? { ...item, ...mockSnapshot } : item;
@@ -815,12 +832,20 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
   const emotionTags = currentItem.extraEmotions && currentItem.extraEmotions.length > 0 ? currentItem.extraEmotions : currentItem.tags ?? [];
   const [isEditing, setIsEditing] = useState(false);
   const [editIsPublic, setEditIsPublic] = useState(isPublic);
+  const [editMoodMode, setEditMoodMode] = useState<"preset" | "other_random" | "custom">(currentItem.moodMode ?? "preset");
+  const [editCustomMoodPhrase, setEditCustomMoodPhrase] = useState(currentItem.customMoodPhrase ?? "");
   const [editMoodPhrase, setEditMoodPhrase] = useState(currentItem.moodPhrase);
+  const [editExtraEmotions, setEditExtraEmotions] = useState<string[]>(currentItem.extraEmotions ?? currentItem.tags ?? []);
   const [editQuote, setEditQuote] = useState(currentItem.quote ?? "");
   const [editDescription, setEditDescription] = useState(currentItem.description ?? "");
-  const [editExtraEmotions, setEditExtraEmotions] = useState<string[]>(currentItem.extraEmotions ?? []);
   const [editFeedback, setEditFeedback] = useState<string | null>(null);
   const editFeedbackTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  const getCustomError = (val?: string) => {
+    if (!val) return null;
+    const res = validateCustomMoodTagLength(val);
+    return res.ok ? null : res.reason;
+  };
 
   useEffect(() => {
     if (editFeedbackTimerRef.current) clearTimeout(editFeedbackTimerRef.current);
@@ -840,7 +865,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
   });
 
   const editMutation = useMutation({
-    mutationFn: (payload: { moodPhrase: string; quote: string | null; description: string; extraEmotions?: string[] }) =>
+    mutationFn: (payload: { moodMode?: "preset" | "other_random" | "custom"; customMoodPhrase?: string | null; moodPhrase: string; quote: string | null; description: string; extraEmotions?: string[] }) =>
       updateRecord(currentItem.id, payload),
     onSuccess: () => {
       setIsEditing(false);
@@ -855,12 +880,21 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
 
   useEffect(() => {
     if (isEditing) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEditIsPublic(isPublic);
+    setEditMoodMode(currentItem.moodMode ?? "preset");
+    setEditCustomMoodPhrase(currentItem.customMoodPhrase ?? "");
     setEditMoodPhrase(currentItem.moodPhrase);
+    
+    const rawEmotions = currentItem.extraEmotions ?? currentItem.tags ?? [];
+    const normalizedEmotions = currentItem.customMoodPhrase 
+      ? rawEmotions.map(e => e === currentItem.customMoodPhrase ? "custom" : e)
+      : rawEmotions;
+    setEditExtraEmotions(normalizedEmotions);
+
     setEditQuote(currentItem.quote ?? "");
     setEditDescription(currentItem.description ?? "");
-    setEditExtraEmotions(currentItem.extraEmotions ?? []);
-  }, [isEditing, isPublic, currentItem.moodPhrase, currentItem.quote, currentItem.description, currentItem.extraEmotions, currentItem.updatedAt]);
+  }, [isEditing, isPublic, currentItem.moodMode, currentItem.customMoodPhrase, currentItem.moodPhrase, currentItem.extraEmotions, currentItem.tags, currentItem.quote, currentItem.description, currentItem.updatedAt]);
 
   const toggleVisibility = () => {
     if (isMockItem) {
@@ -885,29 +919,49 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
 
   const handleEditCancel = () => {
     setEditIsPublic(isPublic);
+    setEditMoodMode(currentItem.moodMode ?? "preset");
+    setEditCustomMoodPhrase(currentItem.customMoodPhrase ?? "");
     setEditMoodPhrase(currentItem.moodPhrase);
+    
+    const rawEmotions = currentItem.extraEmotions ?? currentItem.tags ?? [];
+    const normalizedEmotions = currentItem.customMoodPhrase 
+      ? rawEmotions.map(e => e === currentItem.customMoodPhrase ? "custom" : e)
+      : rawEmotions;
+    setEditExtraEmotions(normalizedEmotions);
+
     setEditQuote(currentItem.quote ?? "");
     setEditDescription(currentItem.description ?? "");
-    setEditExtraEmotions(currentItem.extraEmotions ?? []);
     setEditFeedback(null);
     setIsEditing(false);
   };
 
   const handleEditSave = () => {
-    const moodPhrase = editMoodPhrase.trim();
+    const finalMoodPhrase = editMoodPhrase;
+    const moodPhrase = finalMoodPhrase.trim();
     const moodCheck = validateMoodPhraseLength(moodPhrase);
     if (!moodCheck.ok) {
       setEditFeedback(moodCheck.reason);
       return;
     }
 
+    if (editExtraEmotions.includes("custom")) {
+      const customVal = editCustomMoodPhrase || "";
+      const customCheck = validateCustomMoodTagLength(customVal);
+      if (!customCheck.ok) {
+        setEditFeedback(customCheck.reason);
+        return;
+      }
+    }
+
     if (isMockItem) {
       setMockSnapshot((prev) => ({
         ...(prev ?? {}),
+        moodMode: editMoodMode,
+        customMoodPhrase: editExtraEmotions.includes("custom") ? editCustomMoodPhrase : null,
         moodPhrase,
+        extraEmotions: editExtraEmotions.map(e => e === "custom" ? editCustomMoodPhrase || "" : e).filter(Boolean),
         quote: editQuote.trim().length > 0 ? editQuote.trim() : null,
         description: editDescription.trim().length > 0 ? editDescription.trim() : null,
-        extraEmotions: editExtraEmotions.length > 0 ? editExtraEmotions : null,
         visibilityIntent: editIsPublic ? "public" : "private",
         publicationStatus: "pending_second_review",
         updatedAt: new Date().toISOString(),
@@ -922,10 +976,12 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
     }
 
     editMutation.mutate({
+      moodMode: editMoodMode,
+      customMoodPhrase: editExtraEmotions.includes("custom") ? editCustomMoodPhrase : null,
       moodPhrase,
+      extraEmotions: editExtraEmotions.map(e => e === "custom" ? editCustomMoodPhrase || "" : e).filter(Boolean),
       quote: editQuote.trim().length > 0 ? editQuote.trim() : null,
       description: editDescription.trim(),
-      extraEmotions: editExtraEmotions.length > 0 ? editExtraEmotions : undefined,
     });
   };
 
@@ -959,19 +1015,18 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
       <LiquidCard className="bg-white/50 dark:bg-black/30 backdrop-blur-xl border-white/60 dark:border-white/10 p-10 flex flex-col gap-8 shadow-xl hover:shadow-2xl transition-all duration-500">
         {isEditing ? (
           <div className="flex flex-col gap-5">
-            <div className="flex flex-col gap-2">
-              <span className="text-[10px] tracking-widest uppercase font-bold text-slate-400 flex items-center gap-1">
-                <Lightbulb className="w-3 h-3" /> 标题
-              </span>
-              <input
-                type="text"
-                maxLength={200}
-                value={editMoodPhrase}
-                onChange={(e) => setEditMoodPhrase(e.target.value)}
-                placeholder="嗨，今天有什么绚丽的想法，想要告诉我吗？♪"
-                className="w-full bg-white/30 dark:bg-black/40 border-none rounded-2xl px-5 py-4 text-base font-bold text-slate-700 dark:text-slate-100 outline-none focus:ring-2 focus:ring-pink-200/60 shadow-inner overflow-hidden"
-              />
-            </div>
+            <MainMoodSelector
+              moodOptions={moodOptions}
+              extraEmotions={editExtraEmotions}
+              customMoodPhrase={editCustomMoodPhrase}
+              customMoodError={editExtraEmotions.includes("custom") ? getCustomError(editCustomMoodPhrase) : null}
+              onSelect={(emotions, customVal) => {
+                setEditExtraEmotions(emotions);
+                setEditCustomMoodPhrase(customVal);
+                setEditMoodMode(emotions.includes("custom") ? "custom" : "preset");
+                setEditFeedback(null);
+              }}
+            />
 
             <div className="flex flex-col gap-2">
               <span className="text-[10px] tracking-widest uppercase font-bold text-slate-400 flex items-center gap-1">
@@ -1000,18 +1055,7 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
               />
             </div>
 
-            <EmotionSelector
-              extraEmotions={editExtraEmotions}
-              onToggle={(tag) => {
-                const next = editExtraEmotions.includes(tag)
-                  ? editExtraEmotions.filter((t) => t !== tag)
-                  : editExtraEmotions.length < 8
-                    ? [...editExtraEmotions, tag]
-                    : editExtraEmotions;
-                setEditExtraEmotions(next);
-                setEditFeedback(null);
-              }}
-            />
+            
 
             <div className="flex items-center justify-between mt-2">
               <label className="flex items-center gap-2 cursor-pointer group/toggle">
@@ -1117,15 +1161,43 @@ const TimelineCard: React.FC<{ item: RecordSummary }> = ({ item }) => {
 import { MoodStripSelector } from "../../components/ui/MoodStripSelector";
 import { AsymmetricTogglePanel } from "../../components/ui/AsymmetricTogglePanel";
 
-const EmotionSelector: React.FC<{
+const MainMoodSelector: React.FC<{
+  moodOptions: { primary: string[]; rotating: string[]; extra: string[] } | undefined;
   extraEmotions: string[];
-  onToggle: (tag: string) => void;
-}> = ({ extraEmotions, onToggle }) => (
+  customMoodPhrase?: string;
+  customMoodError?: string | null;
+  onSelect: (extraEmotions: string[], customVal: string) => void;
+}> = ({ moodOptions, extraEmotions, customMoodPhrase, customMoodError, onSelect }) => {
+  const primaryTags = moodOptions?.primary ?? ["温柔", "热烈", "想念", "孤独", "平静", "欢欣", "迷茫", "希望"];
+  const rotatingTags = moodOptions?.rotating ?? ["期盼", "激动", "感动", "满足", "震撼", "释然", "宁静", "狂喜"];
+  
+  // Mix rotating tags into the strip directly, followed by custom.
+  const items = [...primaryTags, ...rotatingTags, "custom"];
+
+  return (
   <div className="flex flex-col gap-3 flex-1 w-full min-w-0">
-    <div className="flex items-center gap-2">
-      <TagIcon className="w-4 h-4 text-slate-400" />
-      <span className="text-[10px] tracking-widest text-slate-500 dark:text-slate-400 uppercase font-black">情绪心境</span>
-    </div>
-    <MoodStripSelector extraEmotions={extraEmotions} onToggle={onToggle} />
+    <MoodStripSelector
+      mode="main"
+      items={items}
+      rotatingItems={rotatingTags}
+      selectedItems={extraEmotions}
+      customMoodPhrase={customMoodPhrase}
+      customMoodError={customMoodError}
+      onCustomMoodPhraseChange={(val) => {
+        onSelect(extraEmotions.includes("custom") ? [...extraEmotions.filter(e => e !== "custom"), "custom"] : extraEmotions, val);
+      }}
+      onToggle={(tag) => {
+        if (extraEmotions.includes(tag)) {
+          // Remove
+          const newEmotions = extraEmotions.filter(e => e !== tag);
+          // Map back "custom" to actual val if not removed? No, we just emit the array of keys, and "custom" is emitted as "custom".
+          // The parent maps "custom" -> customVal on submit.
+          onSelect(newEmotions, tag === "custom" ? "" : (customMoodPhrase || ""));
+        } else {
+          if (extraEmotions.length >= 2) return; // Prevent more than 2
+          onSelect([...extraEmotions, tag], customMoodPhrase || "");
+        }
+      }}
+    />
   </div>
-);
+)};

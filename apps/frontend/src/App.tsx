@@ -143,6 +143,7 @@ function App() {
   useEffect(() => {
     if (activeView !== lastActiveViewRef.current) {
       lastActiveViewRef.current = activeView;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setNavExpanded(true);
       setNavVisible(true);
     }
@@ -153,6 +154,7 @@ function App() {
       window.clearTimeout(expandTimerRef.current);
     }
     if (hoveredLeft || hoveredRight) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setNavExpanded(true);
       return;
     }

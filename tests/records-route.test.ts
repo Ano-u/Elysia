@@ -143,6 +143,9 @@ describe("recordsRoutes detail response", () => {
         review_notes: null,
         occurred_at: null,
         location_id: null,
+        location_summary: null,
+        mood_mode: "preset",
+        custom_mood_phrase: null,
         source_record_id: ids.parent,
         source_comment_id: ids.comment,
         edit_deadline_at: "2026-04-23T00:00:00.000Z",
@@ -188,6 +191,63 @@ describe("recordsRoutes detail response", () => {
           },
         },
       },
+    });
+  });
+
+  it("redacts public detail for non-owner viewers", async () => {
+    mockedLoadRecordSummary.mockResolvedValueOnce({
+      id: ids.reply,
+      user_id: "user-2",
+      mood_phrase: "想被接住",
+      mood_mode: "custom",
+      custom_mood_phrase: "想被接住",
+      description: "联系我 13800138000，周末在上海市浦东新区世纪大道88号见，网址 https://spam.example.com",
+      is_public: true,
+      visibility_intent: "public",
+      publication_status: "published",
+      publish_requested_at: "2026-03-24T00:00:00.000Z",
+      published_at: "2026-03-24T00:00:00.000Z",
+      risk_summary: { level: "medium" },
+      review_notes: null,
+      occurred_at: "2026-03-24T08:00:00.000Z",
+      location_id: "99999999-9999-4999-8999-999999999999",
+      edit_deadline_at: "2026-04-23T00:00:00.000Z",
+      created_at: "2026-03-24T00:00:00.000Z",
+      updated_at: "2026-03-24T00:00:00.000Z",
+      source_record_id: ids.parent,
+      source_comment_id: ids.comment,
+      quote: "看这里 https://promo.example.com",
+      extra_emotions: ["平静"],
+      tags: ["希望"],
+      display_name: "Reply Author",
+      avatar_url: "https://example.com/avatar.png",
+      location_country: "中国",
+      location_region: "上海",
+      location_city: "上海",
+    });
+    mockedLoadReplyContext.mockResolvedValueOnce(null);
+
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: `/records/${ids.reply}`,
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      record: {
+        description: "联系我 [已隐藏联系方式]，[已模糊地址]见，网址 [已隐藏链接]",
+        occurred_at: "2026-03",
+        location_id: null,
+        location_summary: {
+          label: "上海",
+          precision: "city",
+        },
+        mood_mode: "custom",
+        custom_mood_phrase: "想被接住",
+      },
+      quote: "看这里 [已隐藏链接]",
     });
   });
 });

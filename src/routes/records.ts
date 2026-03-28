@@ -7,6 +7,10 @@ import { broadcast } from "../lib/realtime.js";
 import { validateMoodPhraseLength, validateQuoteLength, hashIp } from "../lib/utils.js";
 import { writeAuditLog } from "../lib/audit.js";
 import { assessModeration } from "../lib/moderation.js";
+import { buildMoodCatalog } from "../lib/mood-catalog.js";
+import { moodModeValues, normalizeEmotionSelection, type EmotionSelection, type MoodMode } from "../lib/emotion-selection.js";
+import { syncRecordMindMapNode } from "../lib/mindmap-records.js";
+import { buildPublicLocationSummary, redactOccurredAtToMonth, redactPublicText } from "../lib/public-redaction.js";
 import {
   decidePublication,
   isPubliclyVisibleStatus,
@@ -22,10 +26,14 @@ import {
 } from "../lib/record-publication.js";
 import { buildRecordAuthorPayload, loadRecordSummary, loadReplyContext } from "../lib/record-views.js";
 
+const moodModeSchema = z.enum(moodModeValues);
+
 const recordCreateSchema = z.object({
-  moodPhrase: z.string().min(1).max(140),
+  moodPhrase: z.string().trim().min(1).max(140),
+  moodMode: moodModeSchema.optional(),
+  customMoodPhrase: z.string().trim().min(1).max(32).optional().nullable(),
   quote: z.string().trim().min(1).max(200).optional(),
-  extraEmotions: z.array(z.string().min(1).max(32)).max(8).optional(),
+  extraEmotions: z.array(z.string().trim().min(1).max(32)).optional(),
   description: z.string().max(1000).optional(),
   isPublic: z.boolean().optional(),
   imageIds: z.array(z.string().uuid()).max(4).optional(),
@@ -36,9 +44,11 @@ const recordCreateSchema = z.object({
 });
 
 const recordPatchSchema = z.object({
-  moodPhrase: z.string().min(1).max(140).optional(),
+  moodPhrase: z.string().trim().min(1).max(140).optional(),
+  moodMode: moodModeSchema.optional(),
+  customMoodPhrase: z.string().trim().min(1).max(32).optional().nullable(),
   quote: z.string().max(200).optional().nullable(),
-  extraEmotions: z.array(z.string().min(1).max(32)).max(8).optional(),
+  extraEmotions: z.array(z.string().trim().min(1).max(32)).optional(),
   description: z.string().max(1000).optional(),
   occurredAt: z.string().datetime().optional().nullable(),
   locationId: z.string().uuid().optional().nullable(),
@@ -49,6 +59,8 @@ type RecordRow = {
   id: string;
   user_id: string;
   mood_phrase: string;
+  mood_mode?: MoodMode;
+  custom_mood_phrase?: string | null;
   description: string | null;
   is_public: boolean;
   visibility_intent: VisibilityIntent;
@@ -80,6 +92,10 @@ type RecordModerationInput = {
   tags: string[];
   has_images: boolean;
   visibility_intent: VisibilityIntent;
+  occurred_at?: string | null;
+  location_id?: string | null;
+  mood_mode?: MoodMode;
+  custom_mood_phrase?: string | null;
 };
 
 async function ensureImageQuota(userId: string, imageIds: string[]): Promise<void> {
@@ -126,6 +142,10 @@ async function loadRecordModerationInput(client: Pick<PoolClient, "query">, reco
         r.mood_phrase,
         r.description,
         r.visibility_intent,
+        r.occurred_at,
+        r.location_id,
+        r.mood_mode,
+        r.custom_mood_phrase,
         rq.quote,
         COALESCE((
           SELECT ARRAY_AGG(re.emotion ORDER BY re.created_at ASC)
@@ -181,6 +201,16 @@ async function requireWriteUser(
 }
 
 export async function recordsRoutes(app: FastifyInstance): Promise<void> {
+  app.get("/records/mood-options", async (req, reply) => {
+    const user = await requireUser(req, reply);
+    if (!user) {
+      return;
+    }
+
+    const seed = `${user.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    return buildMoodCatalog(seed);
+  });
+
   app.post("/records", async (req, reply) => {
     const user = await requireWriteUser(req, reply, { checkRiskControl: false });
     if (!user) {
@@ -188,9 +218,22 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const body = recordCreateSchema.parse(req.body);
-    const moodPhraseCheck = validateMoodPhraseLength(body.moodPhrase);
+    const title = body.moodPhrase.trim();
+    const moodPhraseCheck = validateMoodPhraseLength(title);
     if (!moodPhraseCheck.ok) {
       reply.code(400).send({ message: moodPhraseCheck.reason });
+      return;
+    }
+
+    let emotionSelection: EmotionSelection;
+    try {
+      emotionSelection = normalizeEmotionSelection({
+        extraEmotions: body.extraEmotions ?? [],
+        moodMode: body.moodMode,
+        customMoodPhrase: body.customMoodPhrase ?? null,
+      });
+    } catch (error) {
+      reply.code(400).send({ message: error instanceof Error ? error.message : "情绪标签校验失败" });
       return;
     }
 
@@ -219,16 +262,22 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
       }
     }
     const assessment = assessModeration({
-      moodPhrase: body.moodPhrase,
+      moodPhrase: title,
+      customMoodPhrase: emotionSelection.customMoodPhrase,
       description: body.description ?? null,
       quote: body.quote ?? null,
-      extraEmotions: body.extraEmotions ?? [],
+      extraEmotions: emotionSelection.extraEmotions,
       tags: body.tags ?? [],
+      isPublic: visibilityIntent === "public",
+      isCustomMood: emotionSelection.isCustomMood,
     });
     const publicationDecision = decidePublication({
       visibilityIntent,
       hasImages: imageIds.length > 0,
       textAssessment: assessment,
+      isCustomMood: emotionSelection.isCustomMood,
+      hasAdOrUrlRisk: assessment.hasAdOrUrlRisk,
+      requiresManualReview: assessment.requiresManualReview,
     });
 
     const triggerIpHash = hashIp(req.ip);
@@ -246,20 +295,31 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
             published_at,
             risk_summary,
             occurred_at,
-            location_id
-          ) VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $5 = 'public' THEN NOW() ELSE NULL END, CASE WHEN $4 THEN NOW() ELSE NULL END, $7::jsonb, $8, $9)
+            location_id,
+            mood_mode,
+            custom_mood_phrase
+          ) VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $5 = 'public' THEN NOW() ELSE NULL END, CASE WHEN $4 THEN NOW() ELSE NULL END, $7::jsonb, $8, $9, $10, $11)
           RETURNING *
         `,
         [
           user.id,
-          body.moodPhrase,
+          title,
           body.description ?? null,
           publicationDecision.isPublic,
           visibilityIntent,
           publicationDecision.publicationStatus,
-          JSON.stringify(buildRiskSummary({ assessment, decision: publicationDecision })),
+          JSON.stringify(
+            buildRiskSummary({
+              assessment,
+              decision: publicationDecision,
+              moodMode: emotionSelection.moodMode,
+              customMoodPhrase: emotionSelection.customMoodPhrase,
+            }),
+          ),
           body.occurredAt ?? null,
           body.locationId ?? null,
+          emotionSelection.moodMode,
+          emotionSelection.customMoodPhrase,
         ],
       );
       const record = inserted.rows[0];
@@ -284,7 +344,7 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
         );
       }
 
-      for (const emotion of body.extraEmotions ?? []) {
+      for (const emotion of emotionSelection.extraEmotions) {
         await client.query(
           `
             INSERT INTO record_emotions (record_id, emotion)
@@ -335,24 +395,12 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
         );
       }
 
-      const recordNode = await client.query<{ id: string }>(
-        `
-          INSERT INTO mindmap_nodes (user_id, record_id, node_type, label, payload)
-          VALUES ($1, $2, 'record', $3, $4::jsonb)
-          RETURNING id
-        `,
-        [
-          user.id,
-          record.id,
-          body.moodPhrase,
-          JSON.stringify({
-            visibilityIntent,
-            publicationStatus: publicationDecision.publicationStatus,
-          }),
-        ],
-      );
+      const recordNodeId = await syncRecordMindMapNode(client, {
+        ownerUserId: user.id,
+        recordId: record.id,
+      });
 
-      if (body.quote) {
+      if (body.quote && recordNodeId) {
         const quoteNode = await client.query<{ id: string }>(
           `
             INSERT INTO mindmap_nodes (user_id, record_id, node_type, label, payload)
@@ -366,7 +414,7 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
             INSERT INTO mindmap_edges (source_node_id, target_node_id, edge_type, weight)
             VALUES ($1, $2, 'manual', 0.8)
           `,
-          [recordNode.rows[0].id, quoteNode.rows[0].id],
+          [recordNodeId, quoteNode.rows[0].id],
         );
       }
 
@@ -375,13 +423,15 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
         recordId: record.id,
         editedBy: user.id,
         snapshot: {
-          moodPhrase: body.moodPhrase,
+          moodPhrase: title,
+          customMoodPhrase: emotionSelection.customMoodPhrase,
           description: body.description ?? null,
           quote: body.quote ?? null,
-          extraEmotions: body.extraEmotions ?? [],
+          extraEmotions: emotionSelection.extraEmotions,
           tags: body.tags ?? [],
           visibilityIntent,
           imageIds,
+          moodMode: emotionSelection.moodMode,
         },
       });
 
@@ -398,6 +448,8 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
         modelMeta: {
           source: "text_rules",
         },
+        moodMode: emotionSelection.moodMode,
+        customMoodPhrase: emotionSelection.customMoodPhrase,
       });
 
       const latest = await client.query<RecordRow>(
@@ -447,13 +499,6 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
 
     const params = z.object({ id: z.string().uuid() }).parse(req.params);
     const body = recordPatchSchema.parse(req.body);
-    if (body.moodPhrase) {
-      const moodPhraseCheck = validateMoodPhraseLength(body.moodPhrase);
-      if (!moodPhraseCheck.ok) {
-        reply.code(400).send({ message: moodPhraseCheck.reason });
-        return;
-      }
-    }
 
     const current = await query<RecordRow>(
       `
@@ -482,13 +527,69 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
+    const nextTitle = body.moodPhrase?.trim() ?? record.mood_phrase;
+    const titleCheck = validateMoodPhraseLength(nextTitle);
+    if (!titleCheck.ok) {
+      reply.code(400).send({ message: titleCheck.reason });
+      return;
+    }
+
     const triggerIpHash = hashIp(req.ip);
     const updatedRecord = await withTransaction(async (client) => {
       const hasMoodPhrase = Object.prototype.hasOwnProperty.call(body, "moodPhrase");
       const hasDescription = Object.prototype.hasOwnProperty.call(body, "description");
       const hasOccurredAt = Object.prototype.hasOwnProperty.call(body, "occurredAt");
       const hasLocationId = Object.prototype.hasOwnProperty.call(body, "locationId");
+      const hasCustomMoodPhrase = Object.prototype.hasOwnProperty.call(body, "customMoodPhrase");
+      const hasMoodMode = Object.prototype.hasOwnProperty.call(body, "moodMode");
+      const hasExtraEmotions = Object.prototype.hasOwnProperty.call(body, "extraEmotions");
+      const moderationInput = await loadRecordModerationInput(client, params.id);
+      if (!moderationInput || moderationInput.user_id !== user.id) {
+        throw new Error("记录不存在");
+      }
 
+      const existingCustomMood = moderationInput.custom_mood_phrase?.trim() || null;
+      let rawNextExtraEmotions = hasExtraEmotions ? body.extraEmotions ?? [] : [...moderationInput.extra_emotions];
+      if (!hasExtraEmotions && existingCustomMood) {
+        const requestedCustomMood = hasCustomMoodPhrase ? body.customMoodPhrase?.trim() || null : existingCustomMood;
+        const shouldDropExistingCustom = requestedCustomMood !== existingCustomMood || (hasMoodMode && body.moodMode !== "custom");
+        if (shouldDropExistingCustom) {
+          rawNextExtraEmotions = rawNextExtraEmotions.filter((emotion) => emotion !== existingCustomMood);
+        }
+        if (requestedCustomMood && !rawNextExtraEmotions.includes(requestedCustomMood)) {
+          rawNextExtraEmotions.push(requestedCustomMood);
+        }
+      }
+
+      let nextEmotionSelection: EmotionSelection;
+      try {
+        nextEmotionSelection = normalizeEmotionSelection({
+          extraEmotions: rawNextExtraEmotions,
+          moodMode: body.moodMode ?? (hasExtraEmotions ? "preset" : moderationInput.mood_mode ?? "preset"),
+          customMoodPhrase:
+            hasCustomMoodPhrase
+              ? body.customMoodPhrase ?? null
+              : hasExtraEmotions
+                ? null
+              : hasMoodMode && body.moodMode !== "custom"
+                ? null
+                : moderationInput.custom_mood_phrase ?? null,
+        });
+      } catch (error) {
+        reply.code(400).send({ message: error instanceof Error ? error.message : "情绪标签校验失败" });
+        return null;
+      }
+
+      const nextTitleValue = hasMoodPhrase ? body.moodPhrase?.trim() ?? moderationInput.mood_phrase : moderationInput.mood_phrase;
+      const nextQuote = Object.prototype.hasOwnProperty.call(body, "quote")
+        ? body.quote?.trim() || null
+        : moderationInput.quote;
+      const nextDescription = hasDescription ? body.description ?? null : moderationInput.description;
+      const nextOccurredAt = hasOccurredAt ? body.occurredAt ?? null : moderationInput.occurred_at ?? null;
+      const nextLocationId = hasLocationId ? body.locationId ?? null : moderationInput.location_id ?? null;
+      const nextExtraEmotions = nextEmotionSelection.extraEmotions;
+      const nextTags = body.tags ?? moderationInput.tags;
+      const shouldSyncEmotions = hasExtraEmotions || hasCustomMoodPhrase || hasMoodMode;
       await client.query(
         `
           UPDATE records
@@ -497,19 +598,25 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
             description = CASE WHEN $3 THEN $4 ELSE description END,
             occurred_at = CASE WHEN $5 THEN $6 ELSE occurred_at END,
             location_id = CASE WHEN $7 THEN $8 ELSE location_id END,
+            mood_mode = CASE WHEN $9 THEN $10 ELSE mood_mode END,
+            custom_mood_phrase = CASE WHEN $11 THEN $12 ELSE custom_mood_phrase END,
             requires_re_review = TRUE,
             updated_at = NOW()
-          WHERE id = $9 AND user_id = $10
+          WHERE id = $13 AND user_id = $14
         `,
         [
-          hasMoodPhrase,
-          body.moodPhrase ?? null,
+          hasMoodPhrase || nextTitleValue !== moderationInput.mood_phrase,
+          nextTitleValue,
           hasDescription,
-          body.description ?? null,
+          nextDescription,
           hasOccurredAt,
-          body.occurredAt ?? null,
+          nextOccurredAt,
           hasLocationId,
-          body.locationId ?? null,
+          nextLocationId,
+          hasMoodMode || nextEmotionSelection.moodMode !== moderationInput.mood_mode,
+          nextEmotionSelection.moodMode,
+          hasCustomMoodPhrase || nextEmotionSelection.customMoodPhrase !== (moderationInput.custom_mood_phrase ?? null),
+          nextEmotionSelection.customMoodPhrase,
           params.id,
           user.id,
         ],
@@ -531,9 +638,9 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
-      if (body.extraEmotions) {
+      if (shouldSyncEmotions) {
         await client.query("DELETE FROM record_emotions WHERE record_id = $1", [params.id]);
-        for (const emotion of body.extraEmotions) {
+        for (const emotion of nextExtraEmotions) {
           await client.query(
             `
               INSERT INTO record_emotions (record_id, emotion)
@@ -557,33 +664,31 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
-      const moderationInput = await loadRecordModerationInput(client, params.id);
-      if (!moderationInput || moderationInput.user_id !== user.id) {
-        throw new Error("记录不存在");
-      }
-
       const assessment = assessModeration({
-        moodPhrase: moderationInput.mood_phrase,
-        description: moderationInput.description,
-        quote: moderationInput.quote,
-        extraEmotions: moderationInput.extra_emotions,
-        tags: moderationInput.tags,
+        moodPhrase: nextTitleValue,
+        customMoodPhrase: nextEmotionSelection.customMoodPhrase,
+        description: nextDescription,
+        quote: nextQuote,
+        extraEmotions: nextExtraEmotions,
+        tags: nextTags,
+        isPublic: moderationInput.visibility_intent === "public",
+        isCustomMood: nextEmotionSelection.isCustomMood,
       });
       const publicationDecision = decidePublication({
         visibilityIntent: moderationInput.visibility_intent,
         hasImages: moderationInput.has_images,
         textAssessment: assessment,
+        isCustomMood: nextEmotionSelection.isCustomMood,
+        hasAdOrUrlRisk: assessment.hasAdOrUrlRisk,
+        requiresManualReview: assessment.requiresManualReview,
       });
       const finalDecision: PublicationDecision =
         publicationDecision.publicationStatus === "risk_control_24h"
           ? publicationDecision
           : {
               ...publicationDecision,
-              publicationStatus: "pending_second_review",
               isPublic: false,
-              queueType: "second_review",
-              queuePriority: publicationDecision.queuePriority ?? 4,
-              reason: "内容修改后进入二次审查",
+              reason: publicationDecision.reason === "低/极低风险公开内容可直发" ? "内容修改后重新进入审核" : publicationDecision.reason,
             };
 
       const revisionNo = await createRecordRevision({
@@ -591,13 +696,17 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
         recordId: params.id,
         editedBy: user.id,
         snapshot: {
-          moodPhrase: moderationInput.mood_phrase,
-          description: moderationInput.description,
-          quote: moderationInput.quote,
-          extraEmotions: moderationInput.extra_emotions,
-          tags: moderationInput.tags,
+          moodPhrase: nextTitleValue,
+          customMoodPhrase: nextEmotionSelection.customMoodPhrase,
+          description: nextDescription,
+          quote: nextQuote,
+          extraEmotions: nextExtraEmotions,
+          tags: nextTags,
           visibilityIntent: moderationInput.visibility_intent,
           hasImages: moderationInput.has_images,
+          moodMode: nextEmotionSelection.moodMode,
+          occurredAt: nextOccurredAt,
+          locationId: nextLocationId,
         },
       });
 
@@ -614,6 +723,13 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
         modelMeta: {
           source: "text_rules_edit",
         },
+        moodMode: nextEmotionSelection.moodMode,
+        customMoodPhrase: nextEmotionSelection.customMoodPhrase,
+      });
+
+      await syncRecordMindMapNode(client, {
+        ownerUserId: user.id,
+        recordId: params.id,
       });
 
       const latest = await client.query<RecordRow>(
@@ -627,6 +743,10 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
 
       return latest.rows[0];
     });
+
+    if (!updatedRecord) {
+      return;
+    }
 
     broadcast("record.updated", {
       recordId: params.id,
@@ -662,6 +782,13 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
     const params = z.object({ id: z.string().uuid() }).parse(req.params);
     const body = z.object({ isPublic: z.boolean() }).parse(req.body);
 
+    if (body.isPublic) {
+      const allowed = await requireNotInRiskControl(req, reply);
+      if (!allowed) {
+        return;
+      }
+    }
+
     const triggerIpHash = hashIp(req.ip);
     const result = await withTransaction(async (client) => {
       const existing = await loadRecordModerationInput(client, params.id);
@@ -672,15 +799,21 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
       const visibilityIntent = parseRecordVisibilityIntent(body.isPublic);
       const assessment = assessModeration({
         moodPhrase: existing.mood_phrase,
+        customMoodPhrase: existing.custom_mood_phrase ?? null,
         description: existing.description,
         quote: existing.quote,
         extraEmotions: existing.extra_emotions,
         tags: existing.tags,
+        isPublic: visibilityIntent === "public",
+        isCustomMood: existing.mood_mode === "custom",
       });
       const publicationDecision = decidePublication({
         visibilityIntent,
         hasImages: existing.has_images,
         textAssessment: assessment,
+        isCustomMood: existing.mood_mode === "custom",
+        hasAdOrUrlRisk: assessment.hasAdOrUrlRisk,
+        requiresManualReview: assessment.requiresManualReview,
       });
 
       const revisionNo = await createRecordRevision({
@@ -689,12 +822,14 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
         editedBy: user.id,
         snapshot: {
           moodPhrase: existing.mood_phrase,
+          customMoodPhrase: existing.custom_mood_phrase ?? null,
           description: existing.description,
           quote: existing.quote,
           extraEmotions: existing.extra_emotions,
           tags: existing.tags,
           visibilityIntent,
           hasImages: existing.has_images,
+          moodMode: existing.mood_mode ?? "preset",
         },
       });
 
@@ -711,6 +846,13 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
         modelMeta: {
           source: "visibility_switch",
         },
+        moodMode: existing.mood_mode ?? "preset",
+        customMoodPhrase: existing.custom_mood_phrase ?? null,
+      });
+
+      await syncRecordMindMapNode(client, {
+        ownerUserId: user.id,
+        recordId: params.id,
       });
 
       await client.query(
@@ -822,12 +964,19 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
       requesterUserId: req.user?.id ?? null,
     });
 
+    const isOwner = !!req.user && req.user.id === summary.user_id;
+    const locationSummary = buildPublicLocationSummary({
+      country: summary.location_country,
+      region: summary.location_region,
+      city: summary.location_city,
+    });
+
     return {
       record: {
         id: summary.id,
         user_id: summary.user_id,
         mood_phrase: summary.mood_phrase,
-        description: summary.description,
+        description: isOwner ? summary.description : redactPublicText(summary.description),
         is_public: summary.is_public,
         visibility_intent: summary.visibility_intent,
         publication_status: summary.publication_status,
@@ -835,15 +984,18 @@ export async function recordsRoutes(app: FastifyInstance): Promise<void> {
         published_at: summary.published_at,
         risk_summary: summary.risk_summary,
         review_notes: summary.review_notes,
-        occurred_at: summary.occurred_at,
-        location_id: summary.location_id,
+        occurred_at: isOwner ? summary.occurred_at : redactOccurredAtToMonth(summary.occurred_at),
+        location_id: isOwner ? summary.location_id : null,
+        location_summary: locationSummary,
+        mood_mode: summary.mood_mode ?? "preset",
+        custom_mood_phrase: summary.custom_mood_phrase ?? null,
         source_record_id: summary.source_record_id,
         source_comment_id: summary.source_comment_id,
         edit_deadline_at: summary.edit_deadline_at,
         created_at: summary.created_at,
         updated_at: summary.updated_at,
       },
-      quote: summary.quote,
+      quote: isOwner ? summary.quote : redactPublicText(summary.quote),
       extraEmotions: summary.extra_emotions,
       tags: summary.tags,
       author: buildRecordAuthorPayload(summary),

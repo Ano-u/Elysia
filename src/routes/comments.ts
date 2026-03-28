@@ -7,6 +7,7 @@ import { hashIp, validateMoodPhraseLength, validateQuoteLength } from "../lib/ut
 import { writeAuditLog } from "../lib/audit.js";
 import { assessModeration } from "../lib/moderation.js";
 import { decidePublication } from "../lib/publication-workflow.js";
+import { moodModeValues, normalizeEmotionSelection, type EmotionSelection } from "../lib/emotion-selection.js";
 import {
   applyPublicationDecision,
   buildRiskSummary,
@@ -35,12 +36,16 @@ type ReplyTargetRow = {
   root_record_id: string;
 };
 
+const moodModeSchema = z.enum(moodModeValues);
+
 const createCommentSchema = z.object({
   content: z.string().trim().min(1).max(300),
-  moodPhrase: z.string().min(1).max(140),
+  moodPhrase: z.string().trim().min(1).max(140),
+  moodMode: moodModeSchema.optional(),
+  customMoodPhrase: z.string().trim().min(1).max(32).optional().nullable(),
   quote: z.string().trim().min(1).max(200).optional(),
   description: z.string().max(1000).optional(),
-  extraEmotions: z.array(z.string().min(1).max(32)).max(8).optional(),
+  extraEmotions: z.array(z.string().trim().min(1).max(32)).optional(),
   isPublic: z.boolean().optional(),
 });
 
@@ -53,6 +58,7 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
 
     const params = z.object({ id: z.string().uuid() }).parse(req.params);
     const body = createCommentSchema.parse(req.body);
+    const title = body.moodPhrase.trim();
     const visibilityIntent = parseRecordVisibilityIntent(body.isPublic ?? true);
     const user =
       visibilityIntent === "public"
@@ -62,9 +68,21 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
       return;
     }
 
-    const moodPhraseCheck = validateMoodPhraseLength(body.moodPhrase);
+    const moodPhraseCheck = validateMoodPhraseLength(title);
     if (!moodPhraseCheck.ok) {
       reply.code(400).send({ message: moodPhraseCheck.reason });
+      return;
+    }
+
+    let emotionSelection: EmotionSelection;
+    try {
+      emotionSelection = normalizeEmotionSelection({
+        extraEmotions: body.extraEmotions ?? [],
+        moodMode: body.moodMode,
+        customMoodPhrase: body.customMoodPhrase ?? null,
+      });
+    } catch (error) {
+      reply.code(400).send({ message: error instanceof Error ? error.message : "情绪标签校验失败" });
       return;
     }
 
@@ -105,16 +123,21 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const textAssessment = assessModeration({
-      moodPhrase: `${body.moodPhrase}\n${body.content}`,
+      moodPhrase: `${title}\n${body.content}`,
+      customMoodPhrase: emotionSelection.customMoodPhrase,
       quote: body.quote ?? undefined,
       description: body.description ?? undefined,
-      extraEmotions: body.extraEmotions ?? [],
+      extraEmotions: emotionSelection.extraEmotions,
       tags: [],
+      isCustomMood: emotionSelection.isCustomMood,
     });
     const decision = decidePublication({
       visibilityIntent,
       hasImages: false,
       textAssessment,
+      isCustomMood: emotionSelection.isCustomMood,
+      hasAdOrUrlRisk: textAssessment.hasAdOrUrlRisk,
+      requiresManualReview: textAssessment.requiresManualReview,
     });
     const triggerIpHash = hashIp(req.ip);
 
@@ -142,20 +165,31 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
             published_at,
             risk_summary,
             review_notes,
+            mood_mode,
+            custom_mood_phrase,
             source_record_id,
             source_comment_id
-          ) VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $5 = 'public' THEN NOW() ELSE NULL END, CASE WHEN $4 THEN NOW() ELSE NULL END, $7::jsonb, $8, $9, $10)
+          ) VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $5 = 'public' THEN NOW() ELSE NULL END, CASE WHEN $4 THEN NOW() ELSE NULL END, $7::jsonb, $8, $9, $10, $11, $12)
           RETURNING id
         `,
         [
           user.id,
-          body.moodPhrase,
+          title,
           body.description ?? null,
           decision.isPublic,
           visibilityIntent,
           decision.publicationStatus,
-          JSON.stringify(buildRiskSummary({ assessment: textAssessment, decision })),
+          JSON.stringify(
+            buildRiskSummary({
+              assessment: textAssessment,
+              decision,
+              moodMode: emotionSelection.moodMode,
+              customMoodPhrase: emotionSelection.customMoodPhrase,
+            }),
+          ),
           decision.reason,
+          emotionSelection.moodMode,
+          emotionSelection.customMoodPhrase,
           params.id,
           comment.id,
         ],
@@ -181,7 +215,7 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
         );
       }
 
-      for (const emotion of body.extraEmotions ?? []) {
+      for (const emotion of emotionSelection.extraEmotions) {
         await client.query(
           `
             INSERT INTO record_emotions (record_id, emotion)
@@ -237,7 +271,7 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
         [
           user.id,
           replyRecordId,
-          body.moodPhrase,
+          title,
           JSON.stringify({
             visibilityIntent,
             publicationStatus: decision.publicationStatus,
@@ -275,10 +309,12 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
         editedBy: user.id,
         snapshot: {
           content: body.content,
-          moodPhrase: body.moodPhrase,
+          moodPhrase: title,
+          moodMode: emotionSelection.moodMode,
+          customMoodPhrase: emotionSelection.customMoodPhrase,
           description: body.description ?? null,
           quote: body.quote ?? null,
-          extraEmotions: body.extraEmotions ?? [],
+          extraEmotions: emotionSelection.extraEmotions,
           visibilityIntent,
           parentRecordId: params.id,
           rootRecordId: target.root_record_id,
@@ -301,6 +337,8 @@ export async function commentsRoutes(app: FastifyInstance): Promise<void> {
           parentRecordId: params.id,
           rootRecordId: target.root_record_id,
         },
+        moodMode: emotionSelection.moodMode,
+        customMoodPhrase: emotionSelection.customMoodPhrase,
       });
 
       const summary = await loadRecordSummary(client, replyRecordId);

@@ -185,6 +185,8 @@ export interface MindMapResponse {
 
 // Record Types
 export interface CreateRecordRequest {
+  moodMode?: "preset" | "other_random" | "custom";
+  customMoodPhrase?: string | null;
   moodPhrase: string;
   quote?: string;
   extraEmotions?: string[];
@@ -198,6 +200,8 @@ export interface CreateRecordRequest {
 }
 
 export interface UpdateRecordRequest {
+  moodMode?: "preset" | "other_random" | "custom";
+  customMoodPhrase?: string | null;
   moodPhrase?: string;
   quote?: string | null;
   extraEmotions?: string[];
@@ -209,6 +213,8 @@ export interface UpdateRecordRequest {
 
 export interface RecordSummary {
   id: string;
+  moodMode?: "preset" | "other_random" | "custom";
+  customMoodPhrase?: string | null;
   moodPhrase: string;
   quote?: string | null;
   extraEmotions?: string[] | null;
@@ -227,6 +233,8 @@ export interface RecordSummary {
 export interface RecordDetail {
   id: string;
   userId: string;
+  moodMode?: "preset" | "other_random" | "custom";
+  customMoodPhrase?: string | null;
   moodPhrase: string;
   description: string | null;
   isPublic: boolean;
@@ -268,6 +276,8 @@ export interface RecordDetailResponse {
 
 export interface CreateReplyRequest {
   content: string;
+  moodMode?: "preset" | "other_random" | "custom";
+  customMoodPhrase?: string | null;
   moodPhrase: string;
   quote?: string;
   description?: string;

@@ -217,7 +217,7 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
       setShowIdleHint(true);
     },
   });
-  const requestInspiration = (scene: NudgeScene = "home_idle") => nudgeMutation.mutate(scene);
+  const requestInspiration = React.useCallback((scene: NudgeScene = "home_idle") => nudgeMutation.mutate(scene), [nudgeMutation]);
 
   useEffect(() => {
     if (!isGuideActive) {
@@ -297,7 +297,7 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
       requestInspiration("guide_complete");
     }
     prevGuideActiveRef.current = isGuideActive;
-  }, [isGuideActive]);
+  }, [isGuideActive, requestInspiration]);
 
   useEffect(() => {
     if (hasAnyInput) {
@@ -309,7 +309,7 @@ export const ProgressiveInput: React.FC<ProgressiveInputProps> = ({
     }, 7000);
 
     return () => window.clearTimeout(timer);
-  }, [hasAnyInput]); // Note: requestInspiration is stable but omitting from deps to avoid re-triggering
+  }, [hasAnyInput, requestInspiration]);
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {

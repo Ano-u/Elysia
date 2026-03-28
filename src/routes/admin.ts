@@ -11,7 +11,14 @@ import type { ViolationType } from "../lib/moderation.js";
 
 type SqlClient = Pick<PoolClient, "query">;
 
-type QueueType = "moderation" | "second_review" | "risk_control" | "access_application" | "appeal" | "media_review";
+type QueueType =
+  | "moderation"
+  | "second_review"
+  | "risk_control"
+  | "access_application"
+  | "appeal"
+  | "media_review"
+  | "custom_mood_review";
 type QueueStatus = "open" | "claimed" | "resolved";
 type RiskEventStatus = "active" | "released" | "warned" | "banned";
 
@@ -29,6 +36,7 @@ const moderationQueueTypeSchema = z.enum([
   "access_application",
   "appeal",
   "media_review",
+  "custom_mood_review",
 ]);
 const moderationQueueStatusSchema = z.enum(["open", "claimed", "resolved"]);
 
@@ -39,7 +47,28 @@ function normalizeViolationType(value: unknown): ViolationType {
   return "other";
 }
 
-function aiDecisionToApply(level: string): AiDecisionApply {
+function aiDecisionToApply(
+  level: string,
+  args?: { visibilityIntent?: "private" | "public"; isCustomMood?: boolean },
+): AiDecisionApply {
+  if (args?.isCustomMood) {
+    if (level === "very_high") {
+      return {
+        publicationStatus: "risk_control_24h",
+        isPublic: false,
+        queueType: "risk_control",
+        triggerRiskControl: true,
+      };
+    }
+
+    return {
+      publicationStatus: "pending_manual",
+      isPublic: false,
+      queueType: "custom_mood_review",
+      triggerRiskControl: false,
+    };
+  }
+
   switch (level) {
     case "very_low":
     case "low":
@@ -1774,6 +1803,9 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       record_id: string;
       user_id: string;
       username: string;
+      visibility_intent: "private" | "public";
+      mood_mode: "preset" | "other_random" | "custom" | null;
+      custom_mood_phrase: string | null;
       mood_phrase: string;
       quote: string | null;
       description: string | null;
@@ -1785,6 +1817,9 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
           r.id AS record_id,
           r.user_id,
           u.username,
+          r.visibility_intent,
+          r.mood_mode,
+          r.custom_mood_phrase,
           r.mood_phrase,
           rq.quote,
           r.description,
@@ -1797,8 +1832,10 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         FROM records r
         JOIN users u ON u.id = r.user_id
         LEFT JOIN record_quotes rq ON rq.record_id = r.id
-        WHERE r.visibility_intent = 'public'
-          AND r.publication_status IN ('pending_auto', 'pending_manual')
+        WHERE (
+            (r.visibility_intent = 'public' AND r.publication_status IN ('pending_auto', 'pending_manual'))
+            OR (r.mood_mode = 'custom' AND r.publication_status = 'pending_manual')
+          )
           AND r.created_at >= NOW() - INTERVAL '1 hour'
           AND NOT EXISTS (
             SELECT 1
@@ -1989,7 +2026,10 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
           continue;
         }
 
-        const action = aiDecisionToApply(decision.riskLevel);
+        const action = aiDecisionToApply(decision.riskLevel, {
+          visibilityIntent: candidate.visibility_intent,
+          isCustomMood: candidate.mood_mode === "custom",
+        });
 
         await client.query(
           `
@@ -2022,6 +2062,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
               aiRiskLabels: decision.riskLabels,
               aiReason: decision.reason,
               aiReviewedAt: new Date().toISOString(),
+              aiReviewAppliedToCustomMood: candidate.mood_mode === "custom",
             }),
           ],
         );

@@ -4,7 +4,7 @@ import type { ViolationType } from "./moderation.js";
 type SqlExecutor = Pick<PoolClient, "query">;
 
 export type QueueTargetType = "record" | "media" | "user" | "access_application" | "appeal";
-export type QueueType = "moderation" | "second_review" | "risk_control" | "access_application" | "appeal" | "media_review";
+export type QueueType = "moderation" | "second_review" | "risk_control" | "access_application" | "appeal" | "media_review" | "custom_mood_review";
 
 export async function enqueueModerationQueue(
   client: SqlExecutor,

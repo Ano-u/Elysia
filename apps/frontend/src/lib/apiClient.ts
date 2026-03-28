@@ -35,6 +35,8 @@ import type {
 
 type RawRecordSummary = {
   id: string;
+  mood_mode?: "preset" | "other_random" | "custom";
+  custom_mood_phrase?: string | null;
   mood_phrase: string;
   quote?: string | null;
   extra_emotions?: string[] | null;
@@ -169,6 +171,8 @@ type RawRecordDetailResponse = {
   record: {
     id: string;
     user_id: string;
+    mood_mode?: "preset" | "other_random" | "custom";
+    custom_mood_phrase?: string | null;
     mood_phrase: string;
     description: string | null;
     is_public: boolean;
@@ -245,6 +249,8 @@ function mapReplyContext(raw?: RawReplyContext | null): ReplyContext | null {
 function mapRecordSummary(raw: RawRecordSummary): RecordSummary {
   return {
     id: raw.id,
+    moodMode: raw.mood_mode,
+    customMoodPhrase: raw.custom_mood_phrase,
     moodPhrase: raw.mood_phrase,
     quote: raw.quote,
     extraEmotions: raw.extra_emotions,
@@ -298,6 +304,19 @@ export const updateRecordVisibility = (id: string, isPublic: boolean) =>
     publishStatus: raw.publishStatus,
   }));
 
+export const getMoodOptions = () =>
+  fetchApi<{
+    primary: string[];
+    rotating: string[];
+    extra: string[];
+    custom: {
+      enabled: boolean;
+      maxChineseChars: number;
+      maxEnglishWords: number;
+      reviewPipeline: string[];
+    };
+  }>('/api/records/mood-options');
+
 export const updateRecord = (id: string, data: UpdateRecordRequest) =>
   fetchApi<RawUpdateRecordResponse>(`/api/records/${id}`, {
     method: 'PATCH',
@@ -314,6 +333,8 @@ export const getRecord = (id: string) =>
       record: {
         id: raw.record.id,
         userId: raw.record.user_id,
+        moodMode: raw.record.mood_mode,
+        customMoodPhrase: raw.record.custom_mood_phrase,
         moodPhrase: raw.record.mood_phrase,
         description: raw.record.description,
         isPublic: raw.record.is_public,

@@ -196,11 +196,47 @@
 
 相关接口：
 
+- 心情 tag 配置：`GET /api/records/mood-options`
 - 创建记录：`POST /api/records`
 - 编辑记录：`PATCH /api/records/:id`
 - 切换公开：`PATCH /api/records/:id/visibility`
 - 查询发布状态：`GET /api/records/:id/publish-status`
 - 查询记录详情：`GET /api/records/:id`
+
+### 3.0 心情 tag 配置
+
+`GET /api/records/mood-options`
+
+响应示例：
+
+```json
+{
+  "primary": ["平静", "温柔", "希望", "想念", "释然", "迷茫", "疲惫", "开心"],
+  "rotating": ["雀跃", "安心", "委屈", "笃定", "空茫", "轻盈"],
+  "extra": ["被理解", "想拥抱", "想休息"],
+  "custom": {
+    "enabled": true,
+    "maxChineseChars": 5,
+    "maxEnglishWords": 2,
+    "reviewPipeline": ["rules", "lexicon", "ai", "admin"]
+  }
+}
+```
+
+说明：
+
+- `primary`：高频心情 tag，主界面优先固定展示。
+- `rotating`：低频预设 tag，接口每次请求都会给出一组新的随机结果；前端应作为“其他情绪”备选池展示，而不是点击后即时随机生成一个词。
+- `custom`：自定义情绪规则；点击后应展开输入框，前端做即时校验。
+
+补充约定：
+
+- `moodPhrase` 始终表示标题，不承载情绪 tag。
+- `extraEmotions` 才是用户实际选中的情绪 tag，最多 2 个，可为 0 个。
+- 若选择了自定义情绪：
+  - `customMoodPhrase` 传自定义文本
+  - 该文本也必须出现在 `extraEmotions` 中
+- `moodMode` 仅用于前端编辑态回填和 UI 来源标记，不可再拿它去覆盖标题。
 
 ### 3.1 状态定义
 
@@ -221,12 +257,15 @@
 - `high`（纯文本）-> `pending_second_review`
 - `very_high` -> `risk_control_24h`
 - 含图片公开申请：统一 `pending_manual`（人工图片审核队列）
+- 命中网址/广告/引流风险：进入 `pending_manual`
+- 存在自定义情绪（`customMoodPhrase` 非空，或 `extraEmotions` 中含非预设情绪）时：无论公开或私密，都会进入更严格审核链路（规则/词库/AI/管理员）
 
 私密内容（`visibilityIntent=private`）：
 
 - 默认 `private`
 - 命中高危底线（含极高风险）-> `risk_control_24h`
 - 私密图片：进入 `media_review` 人工审核，但本人仍可见记录
+- 存在自定义情绪时：进入 `pending_manual`，等待更严格审核
 
 ### 3.3 状态查询响应示例
 
@@ -258,12 +297,23 @@
 
 - `author`: `{ id, displayName, avatarUrl }`
 - `replyContext`: `null | { content, parentRecordId, rootRecordId, parentTarget, rootTarget }`
+- `record.mood_mode`: `preset | other_random | custom`
+- `record.custom_mood_phrase`: `string | null`
+- `record.location_summary`: `null | { country, region, city, label, precision }`
 
 说明：
 
 - 普通卡片 `replyContext = null`
 - 回复卡片会返回自己的回复正文，以及可跳转的父卡片 / 主帖摘要
+- 前端编辑态回填时：
+  - 标题使用 `record.mood_phrase`
+  - 已选情绪使用 `extraEmotions`
+  - 自定义输入框状态使用 `record.custom_mood_phrase`
 - `parentTarget / rootTarget` 仅在当前用户有权限读取时返回，否则为 `null`
+- 对非本人查看公开内容时：
+  - `description / quote` 中的链接、联系方式、疑似地址、时间会被模糊处理
+  - `occurred_at` 只保留到月份（`YYYY-MM`）
+  - `location_id = null`，仅通过 `location_summary` 暴露到城市级别
 
 ## 4. 风控限制
 
@@ -300,6 +350,8 @@
 {
   "content": "你的这句让我想起前几天的自己。",
   "moodPhrase": "也想把这一刻轻轻接住",
+  "moodMode": "custom",
+  "customMoodPhrase": "被理解",
   "quote": "愿我们都能被温柔回应",
   "description": "看到这张卡片时，我突然觉得自己也没有那么孤单了。",
   "extraEmotions": ["平静", "被理解"],
@@ -311,7 +363,8 @@
 
 - `content`：回复正文，独立于卡片标题
 - `moodPhrase`：回复卡片标题
-- `extraEmotions`：回复卡片的“心情 tag”
+- `extraEmotions`：回复卡片的“心情 tag”，最多 2 个
+- `customMoodPhrase`：若选择自定义情绪，则必须同时传这个字段，并把该值包含在 `extraEmotions` 中
 - 本期不支持回复专用 `tags`
 
 ### 5.2 创建回复卡片响应示例（服务端原始响应）

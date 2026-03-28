@@ -1,4 +1,10 @@
 import type { PoolClient, QueryResult, QueryResultRow } from "pg";
+import {
+  buildPublicLocationSummary,
+  redactOccurredAtToMonth,
+  redactPublicText,
+  type PublicLocationSummary,
+} from "./public-redaction.js";
 
 type Queryable = {
   query<T extends QueryResultRow = any>(sql: string, params?: unknown[]): Promise<QueryResult<T>>;
@@ -16,6 +22,8 @@ export type RecordSummaryRow = {
   id: string;
   user_id: string;
   mood_phrase: string;
+  mood_mode?: "preset" | "other_random" | "custom" | null;
+  custom_mood_phrase?: string | null;
   description: string | null;
   is_public: boolean;
   visibility_intent: string;
@@ -36,6 +44,9 @@ export type RecordSummaryRow = {
   tags: string[];
   display_name: string;
   avatar_url: string | null;
+  location_country?: string | null;
+  location_region?: string | null;
+  location_city?: string | null;
 };
 
 type ReplyMetaRow = {
@@ -63,6 +74,7 @@ export type ReplyTargetPayload = {
   createdAt: string;
   isPublic: boolean;
   publicationStatus: string;
+  occurredAt?: string | null;
   author: {
     id: string;
     displayName: string;
@@ -86,6 +98,7 @@ function toReplyTargetPayload(row: ReplyTargetRow): ReplyTargetPayload {
     createdAt: row.created_at,
     isPublic: row.is_public,
     publicationStatus: row.publication_status,
+    occurredAt: row.created_at,
     author: {
       id: row.user_id,
       displayName: row.display_name,
@@ -144,6 +157,8 @@ export async function loadRecordSummary(
         r.id,
         r.user_id,
         r.mood_phrase,
+        r.mood_mode,
+        r.custom_mood_phrase,
         r.description,
         r.is_public,
         r.visibility_intent,
@@ -170,11 +185,15 @@ export async function loadRecordSummary(
           FROM record_tags rt
           WHERE rt.record_id = r.id
         ), ARRAY[]::text[]) AS tags,
+        loc.country AS location_country,
+        loc.region AS location_region,
+        loc.city AS location_city,
         u.display_name,
         u.avatar_url
       FROM records r
       JOIN users u ON u.id = r.user_id
       LEFT JOIN record_quotes rq ON rq.record_id = r.id
+      LEFT JOIN locations loc ON loc.id = r.location_id
       WHERE r.id = $1
       LIMIT 1
     `,
@@ -223,20 +242,33 @@ export async function loadReplyContext(
 export function buildRecordSummaryPayload(args: {
   summary: RecordSummaryRow;
   replyContext: ReplyContextPayload | null;
+  isOwner?: boolean;
 }) {
+  const isOwner = Boolean(args.isOwner);
+  const locationSummary = buildPublicLocationSummary({
+    country: args.summary.location_country,
+    region: args.summary.location_region,
+    city: args.summary.location_city,
+  });
+
   return {
     id: args.summary.id,
     user_id: args.summary.user_id,
     mood_phrase: args.summary.mood_phrase,
-    quote: args.summary.quote,
+    quote: isOwner ? args.summary.quote : redactPublicText(args.summary.quote),
     extra_emotions: args.summary.extra_emotions,
     tags: args.summary.tags,
-    description: args.summary.description,
+    description: isOwner ? args.summary.description : redactPublicText(args.summary.description),
     visibility_intent: args.summary.visibility_intent,
     publication_status: args.summary.publication_status,
     is_public: args.summary.is_public,
     created_at: args.summary.created_at,
     updated_at: args.summary.updated_at,
+    occurred_at: isOwner ? args.summary.occurred_at : redactOccurredAtToMonth(args.summary.occurred_at),
+    location_id: isOwner ? args.summary.location_id : null,
+    location_summary: locationSummary as PublicLocationSummary | null,
+    mood_mode: args.summary.mood_mode ?? "preset",
+    custom_mood_phrase: args.summary.custom_mood_phrase,
     replyContext: args.replyContext,
   };
 }

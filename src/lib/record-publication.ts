@@ -24,6 +24,8 @@ export function buildRiskSummary(args: {
   assessment: ModerationAssessment;
   decision: PublicationDecision;
   aiRiskLevel?: RiskLevel | null;
+  moodMode?: string;
+  customMoodPhrase?: string | null;
 }): Record<string, unknown> {
   return {
     level: args.decision.effectiveRiskLevel,
@@ -35,6 +37,13 @@ export function buildRiskSummary(args: {
     confidence: args.assessment.confidence,
     score: args.assessment.riskScore,
     aiRiskLevel: args.aiRiskLevel ?? null,
+    moodMode: args.moodMode ?? null,
+    customMoodPhrase: args.customMoodPhrase ?? null,
+    customMoodReviewRequired: Boolean(args.assessment.isCustomMood),
+    aiReviewRequired: Boolean(args.assessment.aiReviewRequired),
+    hasAdOrUrlRisk: Boolean(args.assessment.hasAdOrUrlRisk),
+    evasionSignals: args.assessment.evasionSignals ?? [],
+    sensitiveLexiconLabels: args.assessment.sensitiveLexiconLabels ?? [],
     updatedAt: new Date().toISOString(),
   };
 }
@@ -78,11 +87,15 @@ export async function applyPublicationDecision(args: {
   reviewerUserId?: string | null;
   modelMeta?: Record<string, unknown>;
   aiRiskLevel?: RiskLevel | null;
+  moodMode?: string;
+  customMoodPhrase?: string | null;
 }): Promise<{ riskControlEventId: string | null; riskControlEndsAt: string | null }> {
   const riskSummary = buildRiskSummary({
     assessment: args.assessment,
     decision: args.decision,
     aiRiskLevel: args.aiRiskLevel ?? null,
+    moodMode: args.moodMode,
+    customMoodPhrase: args.customMoodPhrase ?? null,
   });
 
   const reviewDecision = args.assessment.decision;
@@ -129,6 +142,12 @@ export async function applyPublicationDecision(args: {
         ...args.modelMeta,
         effectiveRiskLevel: args.decision.effectiveRiskLevel,
         publicationDecision: args.decision.publicationStatus,
+        moodMode: args.moodMode ?? null,
+        customMoodPhrase: args.customMoodPhrase ?? null,
+        hasAdOrUrlRisk: Boolean(args.assessment.hasAdOrUrlRisk),
+        evasionSignals: args.assessment.evasionSignals ?? [],
+        aiReviewRequired: Boolean(args.assessment.aiReviewRequired),
+        sensitiveLexiconLabels: args.assessment.sensitiveLexiconLabels ?? [],
       }),
       args.reviewerUserId ?? null,
     ],
@@ -173,6 +192,13 @@ export async function applyPublicationDecision(args: {
         riskLevel: args.decision.effectiveRiskLevel,
         riskLabels: args.assessment.riskLabels,
         visibilityIntent: args.visibilityIntent,
+        moodMode: args.moodMode ?? null,
+        customMoodPhrase: args.customMoodPhrase ?? null,
+        reviewCategory: args.assessment.isCustomMood ? "custom_mood" : "record_text",
+        hasAdOrUrlRisk: Boolean(args.assessment.hasAdOrUrlRisk),
+        evasionSignals: args.assessment.evasionSignals ?? [],
+        aiReviewRequired: Boolean(args.assessment.aiReviewRequired),
+        sensitiveLexiconLabels: args.assessment.sensitiveLexiconLabels ?? [],
       },
       slaHours: args.decision.queueType === "risk_control" ? 4 : 24,
     });
@@ -197,6 +223,10 @@ export async function applyPublicationDecision(args: {
       violationType: args.assessment.violationType,
       baselineHighRisk: args.assessment.baselineHighRisk,
       assessmentReason: args.assessment.reason,
+      moodMode: args.moodMode ?? null,
+      customMoodPhrase: args.customMoodPhrase ?? null,
+      aiReviewRequired: Boolean(args.assessment.aiReviewRequired),
+      sensitiveLexiconLabels: args.assessment.sensitiveLexiconLabels ?? [],
     },
     durationHours: 24,
   });

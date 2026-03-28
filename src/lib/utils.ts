@@ -10,6 +10,10 @@ export function countEnglishWords(text: string): number {
   return words.length;
 }
 
+function countNonWhitespaceChars(text: string): number {
+  return text.replace(/\s+/g, "").length;
+}
+
 export function validateQuoteLength(quote: string): { ok: boolean; reason?: string } {
   if (quote.trim().length === 0) {
     return { ok: false, reason: "金句不能为空" };
@@ -42,6 +46,24 @@ export function validateMoodPhraseLength(moodPhrase: string): { ok: boolean; rea
 
   if (moodPhrase.length > 20) {
     return { ok: false, reason: "标题最多 20 字" };
+  }
+  return { ok: true };
+}
+
+export function validateCustomMoodLength(moodPhrase: string): { ok: boolean; reason?: string } {
+  if (moodPhrase.trim().length === 0) {
+    return { ok: false, reason: "自定义情绪不能为空" };
+  }
+
+  if (isLikelyEnglish(moodPhrase)) {
+    if (countEnglishWords(moodPhrase) > 2) {
+      return { ok: false, reason: "英文自定义情绪最多 2 个词" };
+    }
+    return { ok: true };
+  }
+
+  if (countNonWhitespaceChars(moodPhrase) > 5) {
+    return { ok: false, reason: "中文自定义情绪最多 5 个字" };
   }
   return { ok: true };
 }

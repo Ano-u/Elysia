@@ -1,25 +1,13 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getRecord, createReply } from "../../lib/apiClient";
+import { getRecord, createReply, getMoodOptions } from "../../lib/apiClient";
+import { validateCustomMoodTagLength, validateMoodPhraseLength } from "../../lib/moodPhraseValidation";
 import { getEmotionConfig } from "../universe/UniverseCard";
 import { cn } from "../../lib/cn";
 import { MainInputCard } from "../../components/ui/MainInputCard";
 import { MoodStripSelector } from "../../components/ui/MoodStripSelector";
 import { Tag as TagIcon } from "lucide-react";
-
-const EmotionSelector: React.FC<{
-  extraEmotions: string[];
-  onToggle: (tag: string) => void;
-}> = ({ extraEmotions, onToggle }) => (
-  <div className="flex flex-col gap-3 mt-6 mb-4 px-2">
-    <div className="flex items-center gap-2">
-      <TagIcon className="w-4 h-4 text-slate-400" />
-      <span className="text-[10px] tracking-widest text-slate-500 dark:text-slate-400 uppercase font-black">情绪心境</span>
-    </div>
-    <MoodStripSelector extraEmotions={extraEmotions} onToggle={onToggle} />
-  </div>
-);
 
 export const MindMapDetailModal: React.FC<{ recordId: string | null; onClose: () => void }> = ({ recordId, onClose }) => {
   const queryClient = useQueryClient();
@@ -29,20 +17,47 @@ export const MindMapDetailModal: React.FC<{ recordId: string | null; onClose: ()
     enabled: !!recordId,
   });
 
+  const { data: moodOptionsData } = useQuery({
+    queryKey: ["mood-options"],
+    queryFn: getMoodOptions,
+  });
+
   const [isReplying, setIsReplying] = useState(false);
+  const [moodMode, setMoodMode] = useState<"preset" | "other_random" | "custom">("preset");
+  const [extraEmotions, setExtraEmotions] = useState<string[]>([]);
+  const [customMoodPhrase, setCustomMoodPhrase] = useState("");
   const [moodPhrase, setMoodPhrase] = useState("");
   const [quote, setQuote] = useState("");
   const [description, setDescription] = useState("");
   const [isPublic, setIsPublic] = useState(false);
-  const [extraEmotions, setExtraEmotions] = useState<string[]>([]);
+
+  const getCustomError = (val?: string) => {
+    if (!val) return null;
+    const res = validateCustomMoodTagLength(val);
+    return res.ok ? null : res.reason;
+  };
+
+  const handleReplySubmit = () => {
+    const moodCheck = validateMoodPhraseLength(moodPhrase);
+    if (!moodCheck.ok) return;
+
+    if (extraEmotions.includes("custom")) {
+      const customCheck = validateCustomMoodTagLength(customMoodPhrase);
+      if (!customCheck.ok) return;
+    }
+    
+    replyMutation.mutate();
+  };
 
   const replyMutation = useMutation({
     mutationFn: () => createReply(recordId!, {
       content: moodPhrase,
-      moodPhrase: moodPhrase,
+      moodMode,
+      customMoodPhrase: extraEmotions.includes("custom") ? customMoodPhrase : undefined,
+      moodPhrase,
+      extraEmotions: extraEmotions.map(e => e === "custom" ? customMoodPhrase || "" : e).filter(Boolean),
       quote: quote || undefined,
       description: description || undefined,
-      extraEmotions,
       isPublic,
     }),
     onSuccess: () => {
@@ -199,23 +214,44 @@ export const MindMapDetailModal: React.FC<{ recordId: string | null; onClose: ()
                         </button>
                       </div>
                       <div className="flex-1 overflow-y-auto custom-scrollbar -mx-6 px-6 pb-20">
-                        <MainInputCard
-                          moodPhrase={moodPhrase}
-                          setMoodPhrase={setMoodPhrase}
-                          quote={quote}
-                          setQuote={setQuote}
-                          description={description}
-                          setDescription={setDescription}
-                          isPending={replyMutation.isPending}
-                        />
-                        <EmotionSelector
-                          extraEmotions={extraEmotions}
-                          onToggle={(tag) =>
-                            setExtraEmotions((prev) =>
-                              prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-                            )
-                          }
-                        />
+                        <div className="flex flex-col gap-3 mt-6 mb-4 px-2">
+                          <div className="flex items-center gap-2">
+                            <TagIcon className="w-4 h-4 text-slate-400" />
+                            <span className="text-[10px] tracking-widest text-slate-500 dark:text-slate-400 uppercase font-black">情绪心境</span>
+                          </div>
+                          <MoodStripSelector
+                            items={[...(moodOptionsData?.primary || []), ...(moodOptionsData?.rotating || []), "custom"]}
+                            rotatingItems={moodOptionsData?.rotating || []}
+                            selectedItems={extraEmotions}
+                            customMoodPhrase={customMoodPhrase}
+                            customMoodError={extraEmotions.includes("custom") ? getCustomError(customMoodPhrase) : null}
+                            onCustomMoodPhraseChange={setCustomMoodPhrase}
+                            onToggle={(tag) => {
+                              if (extraEmotions.includes(tag)) {
+                                setExtraEmotions(extraEmotions.filter(e => e !== tag));
+                                if (tag === "custom") setCustomMoodPhrase("");
+                              } else {
+                                if (extraEmotions.length >= 2) return;
+                                setExtraEmotions([...extraEmotions, tag]);
+                                setMoodMode(tag === "custom" || extraEmotions.includes("custom") ? "custom" : "preset");
+                              }
+                            }}
+                          />
+                        </div>
+
+                        <motion.div className="flex-1 w-full relative z-10 px-0">
+                          <MainInputCard
+                            moodPhrase={moodPhrase}
+                            setMoodPhrase={(v) => {
+                              setMoodPhrase(v);
+                            }}
+                            quote={quote}
+                            setQuote={setQuote}
+                            description={description}
+                            setDescription={setDescription}
+                            isPending={replyMutation.isPending}
+                          />
+                        </motion.div>
                       </div>
                       
                       <div className="pt-4 mt-auto border-t border-white/20 dark:border-white/10 flex items-center justify-between shrink-0 bg-white/40 dark:bg-slate-800/40 backdrop-blur-xl absolute bottom-0 left-0 right-0 px-6 pb-6">
@@ -233,7 +269,7 @@ export const MindMapDetailModal: React.FC<{ recordId: string | null; onClose: ()
                         </button>
                         
                         <button
-                          onClick={() => replyMutation.mutate()}
+                          onClick={handleReplySubmit}
                           disabled={!moodPhrase.trim() || replyMutation.isPending}
                           className="px-6 py-2 rounded-full bg-gradient-to-r from-pink-400 to-indigo-400 hover:from-pink-500 hover:to-indigo-500 text-white text-sm font-bold shadow-md hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                         >

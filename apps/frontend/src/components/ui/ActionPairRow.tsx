@@ -71,6 +71,7 @@ export const ActionPairRow: React.FC<ActionPairRowProps> = ({
   useEffect(() => {
     if (!isSaveUniverse || !leftActionEvent) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLeftSendAnimation(leftActionEvent.status);
     const resetDelay = leftActionEvent.status === "success" ? 1150 : 520;
     const timer = setTimeout(() => {
@@ -78,7 +79,7 @@ export const ActionPairRow: React.FC<ActionPairRowProps> = ({
     }, resetDelay);
 
     return () => clearTimeout(timer);
-  }, [isSaveUniverse, leftActionEvent?.token, leftActionEvent?.status]);
+  }, [isSaveUniverse, leftActionEvent]);
 
   const showLabelOnHover = isDesktopHoverMode;
 

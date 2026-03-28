@@ -130,7 +130,9 @@ export const UniverseCard = React.forwardRef<HTMLDivElement, UniverseCardProps>(
     const pointerEvents = d > 0.8 ? "none" as const : "auto" as const;
 
     // 随机的入场延迟（只在挂载时生成一次）
-    const entranceDelay = useRef(Math.random() * 0.3).current;
+    const hash = title.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+    // eslint-disable-next-line react-hooks/refs
+    const entranceDelay = useRef((hash % 100) / 100 * 0.3).current;
     const isFirstMount = useRef(true);
     React.useEffect(() => {
       isFirstMount.current = false;
@@ -185,6 +187,7 @@ export const UniverseCard = React.forwardRef<HTMLDivElement, UniverseCardProps>(
         transition={{
           duration: 1.2,
           ease: [0.2, 0.8, 0.2, 1], // 更平滑的贝塞尔曲线，避免 spring 带来的生硬感
+          // eslint-disable-next-line react-hooks/refs
           delay: isFirstMount.current ? entranceDelay * 1.5 : 0, // 把随机延迟的跨度拉长一点
         }}
         style={{

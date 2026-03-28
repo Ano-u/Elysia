@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireUser } from "../lib/auth.js";
 import { query } from "../lib/db.js";
 import { writeAuditLog } from "../lib/audit.js";
+import { ensureRecordMindMapNodes } from "../lib/mindmap-records.js";
 import { loadReplyTargetMap, type ReplyTargetPayload } from "../lib/record-views.js";
 
 type MindMapRecordRow = {
@@ -253,6 +254,11 @@ async function buildMindMapProjection(args: {
   edges: MindMapEdgePayload[];
   hints: MindMapHintsPayload;
 }> {
+  await ensureRecordMindMapNodes(args.queryable, {
+    ownerUserId: args.ownerUserId,
+    recordIds: args.recordIds,
+  });
+
   const preparedRecords = await loadMindMapRecords({
     queryable: args.queryable,
     ownerUserId: args.ownerUserId,

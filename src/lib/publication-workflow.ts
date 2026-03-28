@@ -12,7 +12,7 @@ export type PublicationStatus =
   | "needs_changes"
   | "risk_control_24h";
 
-export type ModerationQueueType = "moderation" | "second_review" | "risk_control" | "media_review";
+export type ModerationQueueType = "moderation" | "second_review" | "risk_control" | "media_review" | "custom_mood_review";
 
 export type PublicationDecision = {
   publicationStatus: PublicationStatus;
@@ -68,8 +68,12 @@ export function decidePublication(args: {
   hasImages: boolean;
   textAssessment: ModerationAssessment;
   aiRiskLevel?: RiskLevel | null;
+  isCustomMood?: boolean;
+  hasAdOrUrlRisk?: boolean;
+  requiresManualReview?: boolean;
 }): PublicationDecision {
   const effectiveRisk = maxRiskLevel(args.textAssessment.level, args.aiRiskLevel ?? null);
+  const mustManualReview = args.requiresManualReview || args.isCustomMood || args.hasAdOrUrlRisk;
 
   if (args.visibilityIntent === "private") {
     const hitPrivateBaseline = effectiveRisk === "very_high" || args.textAssessment.baselineHighRisk;
@@ -82,6 +86,18 @@ export function decidePublication(args: {
         reason: "私密内容命中高危底线，进入24h风控",
         effectiveRiskLevel: effectiveRisk,
         triggerRiskControl: true,
+      };
+    }
+
+    if (args.isCustomMood) {
+      return {
+        publicationStatus: "pending_manual",
+        isPublic: false,
+        queueType: "custom_mood_review",
+        queuePriority: queuePriorityByLevel(effectiveRisk),
+        reason: "自定义情绪需进入人工审核",
+        effectiveRiskLevel: effectiveRisk,
+        triggerRiskControl: false,
       };
     }
 
@@ -120,6 +136,18 @@ export function decidePublication(args: {
     };
   }
 
+  if (args.isCustomMood) {
+    return {
+      publicationStatus: "pending_manual",
+      isPublic: false,
+      queueType: "custom_mood_review",
+      queuePriority: queuePriorityByLevel(effectiveRisk),
+      reason: args.aiRiskLevel ? "自定义情绪需结合 AI 与人工审核" : "自定义情绪需进入人工审核",
+      effectiveRiskLevel: effectiveRisk,
+      triggerRiskControl: false,
+    };
+  }
+
   if (effectiveRisk === "high") {
     return {
       publicationStatus: "pending_second_review",
@@ -132,13 +160,13 @@ export function decidePublication(args: {
     };
   }
 
-  if (effectiveRisk === "medium" || effectiveRisk === "elevated") {
+  if (mustManualReview || effectiveRisk === "medium" || effectiveRisk === "elevated") {
     return {
       publicationStatus: "pending_manual",
       isPublic: false,
       queueType: "moderation",
       queuePriority: queuePriorityByLevel(effectiveRisk),
-      reason: "中风险内容进入人工审核",
+      reason: args.hasAdOrUrlRisk ? "公开内容命中网址或广告风险，进入人工审核" : "中风险内容进入人工审核",
       effectiveRiskLevel: effectiveRisk,
       triggerRiskControl: false,
     };

@@ -435,4 +435,116 @@ describe("commentsRoutes", () => {
     });
     expect(mockedRequireNotInRiskControl).not.toHaveBeenCalled();
   });
+
+  it("stores custom reply emotions without overwriting the reply title", async () => {
+    mockedQuery.mockResolvedValueOnce(
+      makeQueryResult([
+        {
+          id: ids.parent,
+          user_id: "author-1",
+          mood_phrase: "主帖",
+          is_public: true,
+          publication_status: "published",
+          root_record_id: ids.parent,
+        },
+      ]),
+    );
+
+    const client = {
+      query: vi
+        .fn()
+        .mockResolvedValueOnce(
+          makeQueryResult([
+            {
+              id: ids.comment1,
+              record_id: ids.parent,
+              user_id: "user-1",
+              content: "我也在慢慢恢复",
+              parent_record_id: ids.parent,
+              root_record_id: ids.parent,
+              created_at: "2026-03-24T03:00:00.000Z",
+            },
+          ]),
+        )
+        .mockResolvedValueOnce(makeQueryResult([{ id: ids.publicReply }]))
+        .mockResolvedValueOnce(makeQueryResult([]))
+        .mockResolvedValueOnce(makeQueryResult([]))
+        .mockResolvedValueOnce(makeQueryResult([]))
+        .mockResolvedValueOnce(makeQueryResult([]))
+        .mockResolvedValueOnce(makeQueryResult([]))
+        .mockResolvedValueOnce(makeQueryResult([{ id: "node-reply" }])),
+    };
+    mockedWithTransaction.mockImplementation(async (handler) => handler(client as any));
+    mockedLoadRecordSummary.mockResolvedValueOnce({
+      id: ids.publicReply,
+      user_id: "user-1",
+      mood_phrase: "回复标题仍独立",
+      mood_mode: "custom",
+      custom_mood_phrase: "松弛",
+      description: null,
+      is_public: false,
+      visibility_intent: "private",
+      publication_status: "pending_manual",
+      publish_requested_at: null,
+      published_at: null,
+      risk_summary: {},
+      review_notes: null,
+      occurred_at: null,
+      location_id: null,
+      edit_deadline_at: "2026-04-23T03:00:00.000Z",
+      created_at: "2026-03-24T03:00:00.000Z",
+      updated_at: "2026-03-24T03:00:00.000Z",
+      source_record_id: ids.parent,
+      source_comment_id: ids.comment1,
+      quote: null,
+      extra_emotions: ["平静", "松弛"],
+      tags: [],
+      display_name: "Tester",
+      avatar_url: null,
+    });
+    mockedLoadReplyContext.mockResolvedValueOnce({
+      content: "我也在慢慢恢复",
+      parentRecordId: ids.parent,
+      rootRecordId: ids.parent,
+      parentTarget: null,
+      rootTarget: null,
+    });
+
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "POST",
+      url: `/records/${ids.parent}/comments`,
+      payload: {
+        content: "我也在慢慢恢复",
+        moodPhrase: "回复标题仍独立",
+        moodMode: "custom",
+        customMoodPhrase: "松弛",
+        extraEmotions: ["平静"],
+        isPublic: false,
+      },
+    });
+    await app.close();
+
+    expect(response.statusCode).toBe(200);
+    expect(client.query.mock.calls[1]?.[1]).toEqual([
+      "user-1",
+      "回复标题仍独立",
+      null,
+      false,
+      "private",
+      "pending_manual",
+      expect.any(String),
+      "自定义情绪需进入人工审核",
+      "custom",
+      "松弛",
+      ids.parent,
+      ids.comment1,
+    ]);
+    expect(client.query.mock.calls).toEqual(
+      expect.arrayContaining([
+        [expect.stringContaining("INSERT INTO record_emotions"), [ids.publicReply, "平静"]],
+        [expect.stringContaining("INSERT INTO record_emotions"), [ids.publicReply, "松弛"]],
+      ]),
+    );
+  });
 });

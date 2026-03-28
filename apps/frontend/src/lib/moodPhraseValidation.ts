@@ -31,3 +31,23 @@ export function validateMoodPhraseLength(input: string): { ok: true } | { ok: fa
 
   return { ok: true };
 }
+
+export function validateCustomMoodTagLength(input: string): { ok: true } | { ok: false; reason: string } {
+  const value = input.trim();
+  if (value.length === 0) {
+    return { ok: false, reason: "自定义情绪不能为空哦♪" };
+  }
+
+  if (isLikelyEnglish(value)) {
+    if (countEnglishWords(value) > 2) {
+      return { ok: false, reason: "自定义情绪英文最多只能写 2 个词哦♪" };
+    }
+    return { ok: true };
+  }
+
+  if (value.length > 5) {
+    return { ok: false, reason: "自定义情绪中文最多只能写 5 个字哦♪" };
+  }
+
+  return { ok: true };
+}

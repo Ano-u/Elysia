@@ -27,10 +27,13 @@ export function useRotatingCopy(
   const [index, setIndex] = useState(() =>
     items.length > 0 ? Math.floor(Math.random() * items.length) : 0,
   );
+  const [prevItems, setPrevItems] = useState(items);
 
-  useEffect(() => {
+  if (items !== prevItems) {
+    setPrevItems(items);
+    // eslint-disable-next-line react-hooks/purity
     setIndex(items.length > 0 ? Math.floor(Math.random() * items.length) : 0);
-  }, [items]);
+  }
 
   useEffect(() => {
     if (!enabled || items.length <= 1) {
