@@ -40,6 +40,8 @@ vi.mock("../src/lib/record-views.js", () => ({
 
 import { recordsRoutes } from "../src/routes/records.js";
 import { loadRecordSummary, loadReplyContext } from "../src/lib/record-views.js";
+import { requireUser } from "../src/lib/auth.js";
+import { EXTRA_EMOTION_POOL, HIGH_FREQUENCY_MOOD_TAGS, ROTATING_MOOD_TAG_POOL } from "../src/lib/mood-catalog.js";
 
 const ids = {
   root: "11111111-1111-4111-8111-111111111111",
@@ -57,9 +59,49 @@ async function buildApp() {
 describe("recordsRoutes detail response", () => {
   const mockedLoadRecordSummary = vi.mocked(loadRecordSummary);
   const mockedLoadReplyContext = vi.mocked(loadReplyContext);
+  const mockedRequireUser = vi.mocked(requireUser);
 
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("returns homepageDisplay alongside the existing mood option fields", async () => {
+    mockedRequireUser.mockResolvedValueOnce({
+      id: "user-1",
+      username: "tester",
+      displayName: "Tester",
+      role: "user",
+    } as never);
+
+    const app = await buildApp();
+    const response = await app.inject({
+      method: "GET",
+      url: "/records/mood-options",
+    });
+    await app.close();
+
+    const body = response.json();
+    const highFrequencySet = new Set(HIGH_FREQUENCY_MOOD_TAGS);
+    const lowFrequencySet = new Set([
+      ...ROTATING_MOOD_TAG_POOL,
+      ...EXTRA_EMOTION_POOL,
+    ]);
+
+    expect(response.statusCode).toBe(200);
+    expect(body.primary).toEqual(Array.from(HIGH_FREQUENCY_MOOD_TAGS));
+    expect(body.extra).toEqual(Array.from(EXTRA_EMOTION_POOL));
+    expect(body.rotating).toBeInstanceOf(Array);
+    expect(body.custom).toMatchObject({
+      enabled: true,
+      maxChineseChars: 5,
+      maxEnglishWords: 2,
+      reviewPipeline: ["rules", "lexicon", "ai", "admin"],
+    });
+    expect(body.homepageDisplay).toHaveLength(14);
+    expect(new Set(body.homepageDisplay).size).toBe(14);
+    expect(body.homepageDisplay).not.toContain("custom");
+    expect(body.homepageDisplay.filter((tag: string) => highFrequencySet.has(tag))).toHaveLength(4);
+    expect(body.homepageDisplay.filter((tag: string) => lowFrequencySet.has(tag) && !highFrequencySet.has(tag))).toHaveLength(10);
   });
 
   it("returns author and replyContext for a public reply card", async () => {

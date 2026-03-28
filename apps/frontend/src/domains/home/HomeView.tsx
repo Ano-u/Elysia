@@ -19,7 +19,7 @@ import {
   updateOnboardingGuideState,
   completeOnboardingDay,
 } from "../../lib/apiClient";
-import type { RecordSummary, VisibilityIntent, CreateRecordRequest } from "../../types/api";
+import type { RecordSummary, VisibilityIntent, CreateRecordRequest, MoodOptionsResponse } from "../../types/api";
 import { Clock, PenLine, Loader, Check, X, Trash2, Lock, Compass, Eye, AlertTriangle, Tag as TagIcon, Quote, ListChevronsUpDown, Info } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { pickRandomCopy, useRotatingCopy } from "../../lib/rotatingCopy";
@@ -121,6 +121,44 @@ function resolveCreateErrorMessage(error: unknown): string {
 }
 
 type StatusBadgeInfo = { Icon: LucideIcon; classes: string };
+type HomeMoodMode = "preset" | "other_random" | "custom";
+
+const HOME_PRIMARY_TAG_FALLBACK = ["温柔", "热烈", "想念", "孤独", "平静", "欢欣", "迷茫", "希望"];
+const HOME_ROTATING_TAG_FALLBACK = ["期盼", "激动", "感动", "满足", "震撼", "释然", "宁静", "狂喜"];
+
+function uniqueTags(tags: string[]): string[] {
+  return Array.from(new Set(tags));
+}
+
+function resolveHomeMoodMode(primaryTags: string[], extraEmotions: string[]): HomeMoodMode {
+  if (extraEmotions.includes("custom")) {
+    return "custom";
+  }
+
+  const primarySet = new Set(primaryTags);
+  return extraEmotions.some((tag) => !primarySet.has(tag)) ? "other_random" : "preset";
+}
+
+function buildHomeMoodSelectorState(
+  moodOptions: MoodOptionsResponse | undefined,
+  extraEmotions: string[],
+) {
+  const primaryTags = moodOptions?.primary ?? HOME_PRIMARY_TAG_FALLBACK;
+  const rotatingTags = moodOptions?.rotating ?? HOME_ROTATING_TAG_FALLBACK;
+  const homepageDisplay = moodOptions?.homepageDisplay?.length
+    ? moodOptions.homepageDisplay
+    : [...primaryTags, ...rotatingTags];
+  const pinnedSelections = extraEmotions.filter((tag) => tag !== "custom" && !homepageDisplay.includes(tag));
+  const displayTags = uniqueTags([...homepageDisplay, ...pinnedSelections]);
+  const lowFrequencyTags = displayTags.filter((tag) => !primaryTags.includes(tag));
+
+  return {
+    primaryTags,
+    displayTags,
+    lowFrequencyTags,
+    moodMode: resolveHomeMoodMode(primaryTags, extraEmotions),
+  };
+}
 
 function getStatusBadgeInfo(tone: PublicationTone): StatusBadgeInfo {
   switch (tone) {
@@ -235,8 +273,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
   });
 
   const { data: moodOptionsData } = useQuery({
-    queryKey: ["mood-options"],
+    queryKey: ["home-mood-options", viewerUserId ?? "anonymous"],
     queryFn: getMoodOptions,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
   const guideStorageKey = `${GUIDE_COMPLETED_STORAGE_PREFIX}:${viewerUserId ?? "anonymous"}`;
   const isGuideVisible = guideMode !== "hidden";
@@ -342,6 +382,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const handleSave = () => {
     const moodPhraseToSubmit = draft.moodPhrase;
     const moodToValidate = moodPhraseToSubmit.trim();
+    const resolvedMoodMode = buildHomeMoodSelectorState(moodOptionsData, draft.extraEmotions).moodMode;
     const moodCheck = validateMoodPhraseLength(moodToValidate);
     if (!moodCheck.ok) {
       setFeedbackTone("error");
@@ -360,7 +401,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
     }
 
     createMutation.mutate({
-      moodMode: draft.moodMode,
+      moodMode: resolvedMoodMode,
       customMoodPhrase: draft.extraEmotions.includes("custom") ? draft.customMoodPhrase : undefined,
       moodPhrase: moodToValidate,
       extraEmotions: draft.extraEmotions.map(e => e === "custom" ? draft.customMoodPhrase || "" : e).filter(Boolean),
@@ -679,9 +720,8 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 extraEmotions={draft.extraEmotions}
                 customMoodPhrase={draft.customMoodPhrase}
                 customMoodError={draft.extraEmotions.includes("custom") ? getCustomError(draft.customMoodPhrase) : null}
-                onSelect={(emotions, customVal) => {
-                  const newMoodMode = emotions.includes("custom") ? "custom" : "preset";
-                  setDraft({ ...draft, extraEmotions: emotions, customMoodPhrase: customVal, moodMode: newMoodMode });
+                onSelect={(emotions, customVal, moodMode) => {
+                  setDraft({ ...draft, extraEmotions: emotions, customMoodPhrase: customVal, moodMode });
                   setFeedbackMessage(null);
                 }}
               />
@@ -846,7 +886,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   );
 };
 
-const TimelineCard: React.FC<{ item: RecordSummary; moodOptions?: { primary: string[]; rotating: string[]; extra: string[] } }> = ({ item, moodOptions }) => {
+const TimelineCard: React.FC<{ item: RecordSummary; moodOptions?: MoodOptionsResponse }> = ({ item, moodOptions }) => {
   const queryClient = useQueryClient();
   const [mockSnapshot, setMockSnapshot] = useState<Partial<RecordSummary> | null>(null);
   const currentItem = mockSnapshot ? { ...item, ...mockSnapshot } : item;
@@ -855,7 +895,6 @@ const TimelineCard: React.FC<{ item: RecordSummary; moodOptions?: { primary: str
   const emotionTags = currentItem.extraEmotions && currentItem.extraEmotions.length > 0 ? currentItem.extraEmotions : currentItem.tags ?? [];
   const [isEditing, setIsEditing] = useState(false);
   const [editIsPublic, setEditIsPublic] = useState(isPublic);
-  const [editMoodMode, setEditMoodMode] = useState<"preset" | "other_random" | "custom">(currentItem.moodMode ?? "preset");
   const [editCustomMoodPhrase, setEditCustomMoodPhrase] = useState(currentItem.customMoodPhrase ?? "");
   const [editMoodPhrase, setEditMoodPhrase] = useState(currentItem.moodPhrase);
   const [editExtraEmotions, setEditExtraEmotions] = useState<string[]>(currentItem.extraEmotions ?? currentItem.tags ?? []);
@@ -917,7 +956,6 @@ const TimelineCard: React.FC<{ item: RecordSummary; moodOptions?: { primary: str
     if (isEditing) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setEditIsPublic(isPublic);
-    setEditMoodMode(currentItem.moodMode ?? "preset");
     setEditCustomMoodPhrase(currentItem.customMoodPhrase ?? "");
     setEditMoodPhrase(currentItem.moodPhrase);
 
@@ -929,7 +967,7 @@ const TimelineCard: React.FC<{ item: RecordSummary; moodOptions?: { primary: str
 
     setEditQuote(currentItem.quote ?? "");
     setEditDescription(currentItem.description ?? "");
-  }, [isEditing, isPublic, currentItem.moodMode, currentItem.customMoodPhrase, currentItem.moodPhrase, currentItem.extraEmotions, currentItem.tags, currentItem.quote, currentItem.description, currentItem.updatedAt]);
+  }, [isEditing, isPublic, currentItem.customMoodPhrase, currentItem.moodPhrase, currentItem.extraEmotions, currentItem.tags, currentItem.quote, currentItem.description, currentItem.updatedAt]);
 
   const toggleVisibility = () => {
     if (isMockItem) {
@@ -954,7 +992,6 @@ const TimelineCard: React.FC<{ item: RecordSummary; moodOptions?: { primary: str
 
   const handleEditCancel = () => {
     setEditIsPublic(isPublic);
-    setEditMoodMode(currentItem.moodMode ?? "preset");
     setEditCustomMoodPhrase(currentItem.customMoodPhrase ?? "");
     setEditMoodPhrase(currentItem.moodPhrase);
 
@@ -973,6 +1010,7 @@ const TimelineCard: React.FC<{ item: RecordSummary; moodOptions?: { primary: str
   const handleEditSave = () => {
     const finalMoodPhrase = editMoodPhrase;
     const moodPhrase = finalMoodPhrase.trim();
+    const resolvedMoodMode = buildHomeMoodSelectorState(moodOptions, editExtraEmotions).moodMode;
     const moodCheck = validateMoodPhraseLength(moodPhrase);
     if (!moodCheck.ok) {
       setEditFeedback(moodCheck.reason);
@@ -991,7 +1029,7 @@ const TimelineCard: React.FC<{ item: RecordSummary; moodOptions?: { primary: str
     if (isMockItem) {
       setMockSnapshot((prev) => ({
         ...(prev ?? {}),
-        moodMode: editMoodMode,
+        moodMode: resolvedMoodMode,
         customMoodPhrase: editExtraEmotions.includes("custom") ? editCustomMoodPhrase : null,
         moodPhrase,
         extraEmotions: editExtraEmotions.map(e => e === "custom" ? editCustomMoodPhrase || "" : e).filter(Boolean),
@@ -1011,7 +1049,7 @@ const TimelineCard: React.FC<{ item: RecordSummary; moodOptions?: { primary: str
     }
 
     editMutation.mutate({
-      moodMode: editMoodMode,
+      moodMode: resolvedMoodMode,
       customMoodPhrase: editExtraEmotions.includes("custom") ? editCustomMoodPhrase : null,
       moodPhrase,
       extraEmotions: editExtraEmotions.map(e => e === "custom" ? editCustomMoodPhrase || "" : e).filter(Boolean),
@@ -1076,7 +1114,6 @@ const TimelineCard: React.FC<{ item: RecordSummary; moodOptions?: { primary: str
               onSelect={(emotions, customVal) => {
                 setEditExtraEmotions(emotions);
                 setEditCustomMoodPhrase(customVal);
-                setEditMoodMode(emotions.includes("custom") ? "custom" : "preset");
                 setEditFeedback(null);
               }}
             />
@@ -1196,40 +1233,42 @@ const TimelineCard: React.FC<{ item: RecordSummary; moodOptions?: { primary: str
   );
 };
 const MainMoodSelector: React.FC<{
-  moodOptions: { primary: string[]; rotating: string[]; extra: string[] } | undefined;
+  moodOptions: MoodOptionsResponse | undefined;
   extraEmotions: string[];
   customMoodPhrase?: string;
   customMoodError?: string | null;
-  onSelect: (extraEmotions: string[], customVal: string) => void;
+  onSelect: (extraEmotions: string[], customVal: string, moodMode: HomeMoodMode) => void;
 }> = ({ moodOptions, extraEmotions, customMoodPhrase, customMoodError, onSelect }) => {
-  const primaryTags = moodOptions?.primary ?? ["温柔", "热烈", "想念", "孤独", "平静", "欢欣", "迷茫", "希望"];
-  const rotatingTags = moodOptions?.rotating ?? ["期盼", "激动", "感动", "满足", "震撼", "释然", "宁静", "狂喜"];
-
-  // Mix rotating tags into the strip directly, followed by custom.
-  const items = [...primaryTags, ...rotatingTags, "custom"];
+  const { displayTags, lowFrequencyTags } = buildHomeMoodSelectorState(moodOptions, extraEmotions);
+  const items = [...displayTags, "custom"];
 
   return (
   <div className="flex flex-col gap-3 flex-1 w-full min-w-0">
     <MoodStripSelector
       mode="main"
       items={items}
-      rotatingItems={rotatingTags}
+      rotatingItems={lowFrequencyTags}
       selectedItems={extraEmotions}
       customMoodPhrase={customMoodPhrase}
       customMoodError={customMoodError}
       onCustomMoodPhraseChange={(val) => {
-        onSelect(extraEmotions.includes("custom") ? [...extraEmotions.filter(e => e !== "custom"), "custom"] : extraEmotions, val);
+        const nextEmotions = extraEmotions.includes("custom")
+          ? [...extraEmotions.filter((emotion) => emotion !== "custom"), "custom"]
+          : extraEmotions;
+        onSelect(nextEmotions, val, buildHomeMoodSelectorState(moodOptions, nextEmotions).moodMode);
       }}
       onToggle={(tag) => {
         if (extraEmotions.includes(tag)) {
-          // Remove
           const newEmotions = extraEmotions.filter(e => e !== tag);
-          // Map back "custom" to actual val if not removed? No, we just emit the array of keys, and "custom" is emitted as "custom".
-          // The parent maps "custom" -> customVal on submit.
-          onSelect(newEmotions, tag === "custom" ? "" : (customMoodPhrase || ""));
+          onSelect(
+            newEmotions,
+            tag === "custom" ? "" : (customMoodPhrase || ""),
+            buildHomeMoodSelectorState(moodOptions, newEmotions).moodMode,
+          );
         } else {
-          if (extraEmotions.length >= 2) return; // Prevent more than 2
-          onSelect([...extraEmotions, tag], customMoodPhrase || "");
+          if (extraEmotions.length >= 2) return;
+          const newEmotions = [...extraEmotions, tag];
+          onSelect(newEmotions, customMoodPhrase || "", buildHomeMoodSelectorState(moodOptions, newEmotions).moodMode);
         }
       }}
     />

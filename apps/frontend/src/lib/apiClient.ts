@@ -19,6 +19,7 @@ import type {
   NudgeScene,
   NudgeFeedbackRequest,
   NudgeRecommendationsResponse,
+  MoodOptionsResponse,
   OnboardingCompleteDayResponse,
   OnboardingGuideStatePatchRequest,
   OnboardingGuideStatePatchResponse,
@@ -306,17 +307,7 @@ export const updateRecordVisibility = (id: string, isPublic: boolean) =>
   }));
 
 export const getMoodOptions = () =>
-  fetchApi<{
-    primary: string[];
-    rotating: string[];
-    extra: string[];
-    custom: {
-      enabled: boolean;
-      maxChineseChars: number;
-      maxEnglishWords: number;
-      reviewPipeline: string[];
-    };
-  }>('/api/records/mood-options');
+  fetchApi<MoodOptionsResponse>('/api/records/mood-options');
 
 export const updateRecord = (id: string, data: UpdateRecordRequest) =>
   fetchApi<RawUpdateRecordResponse>(`/api/records/${id}`, {

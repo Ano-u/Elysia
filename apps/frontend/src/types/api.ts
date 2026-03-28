@@ -211,6 +211,19 @@ export interface UpdateRecordRequest {
   tags?: string[];
 }
 
+export interface MoodOptionsResponse {
+  primary: string[];
+  rotating: string[];
+  extra: string[];
+  homepageDisplay?: string[];
+  custom: {
+    enabled: boolean;
+    maxChineseChars: number;
+    maxEnglishWords: number;
+    reviewPipeline: string[];
+  };
+}
+
 export interface RecordSummary {
   id: string;
   moodMode?: "preset" | "other_random" | "custom";

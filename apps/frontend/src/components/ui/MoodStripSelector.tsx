@@ -40,8 +40,10 @@ export const MoodStripSelector: React.FC<MoodStripSelectorProps> = ({
     <div className="flex flex-col items-center gap-6 w-full">
       <div
         className={twMerge(
-          "relative flex justify-start sm:justify-center items-center py-12 px-4 overflow-x-auto hide-scrollbar w-full max-w-full",
-          mode === "main" ? "gap-[8px]" : "gap-[10px]",
+          "relative flex justify-start sm:justify-center items-center py-12 overflow-x-auto hide-scrollbar w-full max-w-full",
+          mode === "main"
+            ? "-mx-8 px-8 sm:-mx-12 sm:px-12 lg:-mx-16 lg:px-16 gap-[8px]"
+            : "px-4 gap-[10px]",
           className
         )}
       >
@@ -54,7 +56,7 @@ export const MoodStripSelector: React.FC<MoodStripSelectorProps> = ({
         const staggerY = isEven ? 24 : -24;
 
         // Strip dimensions
-        const stripWidth = mode === "main" ? 32 : 36; // thinner to fit 10 items
+        const stripWidth = mode === "main" ? 32 : 36;
         const stripGap = mode === "main" ? 8 : 10;
         const step = stripWidth + stripGap;
 
@@ -113,8 +115,7 @@ export const MoodStripSelector: React.FC<MoodStripSelectorProps> = ({
                     : "border-white/20 opacity-70 hover:opacity-90 hover:scale-[1.02] brightness-[0.8] hover:brightness-100 grayscale-[0.3] shadow-lg"
               )}
             >
-
-              <div className={clsx("absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[100%] pointer-events-none blur-md transition-all duration-300 w-6 h-18 bg-black/60")}/>
+              <div className={clsx("absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-[100%] pointer-events-none blur-md transition-all duration-300 w-6 h-18 bg-black/60")} />
               <span
                 style={{ writingMode: "vertical-rl" }}
                 className={clsx(
