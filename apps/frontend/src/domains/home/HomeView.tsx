@@ -20,7 +20,7 @@ import {
   completeOnboardingDay,
 } from "../../lib/apiClient";
 import type { RecordSummary, VisibilityIntent, CreateRecordRequest } from "../../types/api";
-import { Clock, PenLine, Loader, Check, X, Trash2, Lock, Compass, Eye, AlertTriangle, Tag as TagIcon, Quote, ListChevronsUpDown } from "lucide-react";
+import { Clock, PenLine, Loader, Check, X, Trash2, Lock, Compass, Eye, AlertTriangle, Tag as TagIcon, Quote, ListChevronsUpDown, Info } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { pickRandomCopy, useRotatingCopy } from "../../lib/rotatingCopy";
 import { getCreateSuccessMessage, getPublicationStatusMeta, type PublicationTone } from "../../lib/publicationCopy";
@@ -666,7 +666,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             </div>
           )}
 
-          <div ref={composerGuideRef} className={`${guideTargetClass(0)} rounded-[2.25rem] w-full flex flex-col gap-10`}>
+          <div ref={composerGuideRef} className={`${guideTargetClass(0)} rounded-[2.25rem] w-full flex flex-col gap-6`}>
             {/* Emotions & Actions */}
             <div className="flex flex-col gap-6 px-6">
               <div className="flex items-center gap-2">
@@ -707,8 +707,25 @@ export const HomeView: React.FC<HomeViewProps> = ({
               />
             </motion.div>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex-shrink-0 flex items-end justify-end mt-2 sm:mt-0 pb-3">
+            <div className="flex w-full items-center justify-end gap-3 mt-2 sm:mt-0 pb-3 sm:px-2 px-1">
+              <AnimatePresence>
+                {draft.visibilityIntent === "public" && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8, x: 10 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.8, x: 10 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                    className="group/hint relative flex items-center justify-center w-6 h-6 rounded-full text-blue-400/80 hover:bg-blue-100 hover:text-blue-500 transition-colors cursor-help"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                    <div className="absolute bottom-full right-0 mb-2 w-[220px] p-3 text-xs leading-relaxed text-blue-100 bg-slate-900/90 backdrop-blur-md rounded-xl shadow-xl opacity-0 group-hover/hint:opacity-100 transition-opacity pointer-events-none z-50">
+                      为了保护你的小秘密，链接、地址和时间可能会做一点模糊处理呢♪
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="flex-shrink-0">
                 <AsymmetricTogglePanel
                   currentState={draft.visibilityIntent === "public" ? "universe" : "mindmap"}
                   onStateChange={(newState) => {
@@ -717,6 +734,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   }}
                   onSubmit={handleSave}
                   isPending={createMutation.isPending}
+                  canSend={draft.moodPhrase.trim().length > 0}
                 />
               </div>
             </div>
@@ -900,9 +918,9 @@ const TimelineCard: React.FC<{ item: RecordSummary; moodOptions?: { primary: str
     setEditMoodMode(currentItem.moodMode ?? "preset");
     setEditCustomMoodPhrase(currentItem.customMoodPhrase ?? "");
     setEditMoodPhrase(currentItem.moodPhrase);
-    
+
     const rawEmotions = currentItem.extraEmotions ?? currentItem.tags ?? [];
-    const normalizedEmotions = currentItem.customMoodPhrase 
+    const normalizedEmotions = currentItem.customMoodPhrase
       ? rawEmotions.map(e => e === currentItem.customMoodPhrase ? "custom" : e)
       : rawEmotions;
     setEditExtraEmotions(normalizedEmotions);
@@ -937,9 +955,9 @@ const TimelineCard: React.FC<{ item: RecordSummary; moodOptions?: { primary: str
     setEditMoodMode(currentItem.moodMode ?? "preset");
     setEditCustomMoodPhrase(currentItem.customMoodPhrase ?? "");
     setEditMoodPhrase(currentItem.moodPhrase);
-    
+
     const rawEmotions = currentItem.extraEmotions ?? currentItem.tags ?? [];
-    const normalizedEmotions = currentItem.customMoodPhrase 
+    const normalizedEmotions = currentItem.customMoodPhrase
       ? rawEmotions.map(e => e === currentItem.customMoodPhrase ? "custom" : e)
       : rawEmotions;
     setEditExtraEmotions(normalizedEmotions);
@@ -1184,7 +1202,7 @@ const MainMoodSelector: React.FC<{
 }> = ({ moodOptions, extraEmotions, customMoodPhrase, customMoodError, onSelect }) => {
   const primaryTags = moodOptions?.primary ?? ["温柔", "热烈", "想念", "孤独", "平静", "欢欣", "迷茫", "希望"];
   const rotatingTags = moodOptions?.rotating ?? ["期盼", "激动", "感动", "满足", "震撼", "释然", "宁静", "狂喜"];
-  
+
   // Mix rotating tags into the strip directly, followed by custom.
   const items = [...primaryTags, ...rotatingTags, "custom"];
 

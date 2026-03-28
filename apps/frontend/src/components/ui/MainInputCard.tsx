@@ -361,20 +361,6 @@ export const MainInputCard: React.FC<MainInputCardProps> = ({
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Hints */}
-        <AnimatePresence>
-          {hasValue && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="mt-2 flex flex-col items-center justify-center gap-1.5 text-[11px] text-slate-400/80 dark:text-slate-500/80 text-center"
-            >
-              <p>为了保护你的小秘密，如果内容设为公开，里面的链接、地址和时间可能会做一点模糊处理呢♪</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </LiquidCard>
   );

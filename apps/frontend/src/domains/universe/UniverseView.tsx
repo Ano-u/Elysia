@@ -147,7 +147,7 @@ export const UniverseView: React.FC = () => {
         return;
       }
     }
-    
+
     createMutation.mutate({
       content: finalMood,
       moodMode: replyDraft.moodMode,
@@ -326,14 +326,14 @@ export const UniverseView: React.FC = () => {
 
       // 基于情绪标签的极坐标聚类偏移，使卡片更紧凑且有联系
       const tag = card.tags?.[0] || '';
-      
+
       // 用 id 生成确定性的伪随机数 (0-1)
       const hash1 = card.id.split("").reduce((acc: number, c: string) => acc + c.charCodeAt(0), 0);
       const hash2 = card.id.split("").reduce((acc: number, c: string, i: number) => acc + c.charCodeAt(0) * (i + 1), 0);
       const rand1 = (hash1 % 1000) / 1000;
       const rand2 = (hash2 % 1000) / 1000;
       const rand3 = ((hash1 + hash2) % 1000) / 1000;
-      
+
       let clusterAngle = 0;
       let clusterRadius = 150 + rand1 * 80;
 
@@ -996,6 +996,7 @@ export const UniverseView: React.FC = () => {
                             }}
                             onSubmit={handleSaveReply}
                             isPending={createMutation.isPending}
+                            canSend={replyDraft.moodPhrase.trim().length > 0}
                           />
                         </div>
                       </div>
