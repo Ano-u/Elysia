@@ -208,7 +208,7 @@ function buildEntryContext(accessStatus: "not_submitted" | "pending" | "approved
     needsAccessApplication: true,
     accessStatus,
     estimatedReviewText: "通常会在 1-3 天内完成审核。",
-    applicationHint: "在正式开放更多互动前，会先通过一段简短申请确认你的使用意图与安全边界。",
+    applicationHint: "先写下第一段话吧，它将代表你进入往事乐土。",
   };
 }
 

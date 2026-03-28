@@ -593,7 +593,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               Elysia
             </h1>
             <p className="mt-4 font-elysia-display text-base sm:text-lg text-slate-500 dark:text-slate-300">
-              粉色天光落进往世乐土，Elysia会永远回应你的期待♪
+              粉色天光坠入往世乐土，Elysia 会永远回应你的期待♪
             </p>
           </motion.div>
         </motion.div>
@@ -684,27 +684,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 })()}
               </AnimatePresence>
 
-              {onboardingData.entryContext?.needsAccessApplication && onboardingData.entryContext.applicationHint && (
-                <motion.div
-                  initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="w-full flex items-start gap-3.5 mt-2 px-5 py-4 rounded-[1.5rem] bg-white/50 dark:bg-black/30 border border-pink-100/80 dark:border-pink-900/30 backdrop-blur-md shadow-sm"
-                >
-                  <div className="mt-0.5 flex items-center justify-center w-8 h-8 rounded-full bg-pink-50 text-pink-500 dark:bg-pink-950/30 dark:text-pink-400 shrink-0">
-                    <Clock className="w-4 h-4" />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <p className="text-sm text-slate-700 dark:text-slate-200 font-medium leading-relaxed">
-                      {onboardingData.entryContext.applicationHint}
-                    </p>
-                    {onboardingData.entryContext.estimatedReviewText && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        ✨ {onboardingData.entryContext.estimatedReviewText}
-                      </p>
-                    )}
-                  </div>
-                </motion.div>
-              )}
             </div>
           )}
 
@@ -745,6 +724,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   setFeedbackMessage(null);
                 }}
                 isPending={createMutation.isPending}
+                applicationHint={onboardingData?.entryContext?.needsAccessApplication ? onboardingData?.entryContext?.applicationHint : undefined}
               />
             </div>
 
